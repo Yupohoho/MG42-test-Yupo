@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>27 Typewriter</title>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .ln { position:absolute; white-space:nowrap; line-height:1; font-family:'DotGothic16',monospace; }
+  #cur { position:absolute; width:2px; }
+</style>
+</head>
+<body>
+<div id="card"><div id="cur"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#f2eee4', cursor: '#b794fe',
+  lines: [
+    { text: '夜が明ける前に', color: '#24242c', y: .40 },   // y = 行中心（畫面高比例）
+    { text: 'また会おう',     color: '#b794fe', y: .76 },
+  ],
+  left: 23, fontSize: 28,
+  startFrame: 6,       // 第 6 幀打出第一個字（之前只有游標）
+  perChar: 3,          // 每 3 幀打一個字（30fps）
+  lineBreak: 8,        // 換行停頓：上一行最後一字後隔 8 幀才打下一行第一字（游標提前 3 幀換行）
+  loopFrames: 54,      // 1.8 秒後清空重來
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+const cur = document.getElementById('cur');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+Object.assign(cur.style, { background: CFG.cursor, height: CFG.fontSize * 1.05 + 'px' });
+const els = CFG.lines.map(l => {
+  const d = document.createElement('div'); d.className = 'ln';
+  Object.assign(d.style, { left: CFG.left + 'px', top: l.y * CFG.H - CFG.fontSize / 2 + 'px', fontSize: CFG.fontSize + 'px', color: l.color });
+  card.insertBefore(d, cur); return d;
+});
+
+// 每個字出現的幀
+const sched = []; let f0 = CFG.startFrame;
+CFG.lines.forEach((l, li) => {
+  if (li > 0) f0 += CFG.lineBreak - CFG.perChar;
+  [...l.text].forEach((c, ci) => { sched.push({ li, ci, f: f0 }); f0 += CFG.perChar; });
+});
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  const shown = CFG.lines.map(() => 0);
+  let curLine = 0;
+  sched.forEach(s => { if (f >= s.f) { shown[s.li] = s.ci + 1; curLine = s.li; } });
+  // 換行：上一行打完且到了換行時間點，游標先移到下一行開頭
+  const nextLineStart = sched.find(s => s.ci === 0 && s.li > curLine);
+  if (nextLineStart && f >= nextLineStart.f - CFG.perChar) curLine = nextLineStart.li;
+  els.forEach((el, i) => el.textContent = [...CFG.lines[i].text].slice(0, shown[i]).join(''));
+  const el = els[curLine];
+  cur.style.left = CFG.left + el.offsetWidth + 2 + 'px';
+  cur.style.top = CFG.lines[curLine].y * CFG.H - CFG.fontSize * .52 + 'px';
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t') % (CFG.loopFrames / 30));
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % (CFG.loopFrames / 30)); requestAnimationFrame(f); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "DotGothic16"`, CFG.lines.map(l => l.text).join('')).then(start);
+</script>
+</body>
+</html>

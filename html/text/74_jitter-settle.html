@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>74 Jitter Settle</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #row { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+  .c { display:inline-block; line-height:1; font-family:'Dela Gothic One',sans-serif; transform-origin:50% 60%; }
+</style>
+</head>
+<body>
+<div id="card"><div id="row"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: 'ブルブル',
+  W: 324, H: 106,
+  bg: '#fcc63c',
+  colors: ['#17171a', '#7a5508'],   // 字色依序交替
+  fontSize: 59,
+  offsetX: -8,              // 整排往左偏一點（px）
+  shakeX: 7, shakeY: 6, shakeRot: 9,   // 震動最大幅度：位移（px）、旋轉（度）
+  hold: 2,                  // 每個震動位置停幾幀（30fps）；2 = 每 2 幀跳一次
+  settle: 1.7,              // 幾秒內從最大震動衰減到靜止
+  loop: 2.4,                // 靜止到循環結束後，再從最大震動重來
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), row = document.getElementById('row');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+row.style.transform = `translateX(${CFG.offsetX}px)`;
+const els = [...CFG.text].map((ch, i) => {
+  const s = document.createElement('span'); s.className = 'c'; s.textContent = ch;
+  Object.assign(s.style, { fontSize: CFG.fontSize+'px', color: CFG.colors[i % CFG.colors.length] });
+  row.appendChild(s); return s;
+});
+const hash = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+
+function render(t) {
+  // 震動強度：開頭最大，越來越小直到靜止（平方曲線＝前段劇烈、後段只剩細微抖動）
+  const k = Math.max(0, 1 - t / CFG.settle), env = k * k;
+  const step = Math.floor(t * 30 / CFG.hold);                 // 逐格跳，不補間
+  els.forEach((el, i) => {
+    const r = (j) => (hash(step * 13 + i * 7 + j) - .5) * 2;
+    el.style.transform = `translate(${r(1) * CFG.shakeX * env}px,${r(2) * CFG.shakeY * env}px) rotate(${r(3) * CFG.shakeRot * env}deg)`;
+  });
+}
+
+document.fonts.load(`${CFG.fontSize}px "Dela Gothic One"`, CFG.text).then(() => {
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(f); })(t0); }
+});
+</script>
+</body>
+</html>

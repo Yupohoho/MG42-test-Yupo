@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>22 Text Orbit</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #w { position:absolute; left:0; top:0; line-height:1; white-space:nowrap; font-family:'Dela Gothic One',sans-serif; }
+  svg { position:absolute; inset:0; }
+</style>
+</head>
+<body>
+<div id="card"><svg id="orbit"></svg><div id="w"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '軌道',
+  W: 324, H: 106,
+  bg: '#22d3c5',
+  color: '#0f1a1a',
+  orbitColor: '#0e6b62',
+  fontSize: 44,
+  cx: .50, cy: .52,      // 橢圓中心（畫面比例）
+  rx: 114, ry: 27,       // 橢圓半徑（px）
+  backScale: .43,        // 繞到最後面時的大小
+  backOpacity: .45,
+  loop: 2.0,             // 繞一圈秒數
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+const w = document.getElementById('w');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+Object.assign(w.style, { fontSize: CFG.fontSize+'px', color: CFG.color });
+w.textContent = CFG.text;
+const CX = CFG.cx * CFG.W, CY = CFG.cy * CFG.H;
+document.getElementById('orbit').innerHTML =
+  `<ellipse cx="${CX}" cy="${CY}" rx="${CFG.rx}" ry="${CFG.ry}" fill="none" stroke="${CFG.orbitColor}" stroke-width="1.3" stroke-dasharray="3 3"/>`;
+
+function render(t) {
+  // 角度 0 = 右端、90° = 正前方（下方）、180° = 左端、270° = 最後面（上方）
+  const a = t / CFG.loop * Math.PI * 2;
+  const x = CX + Math.cos(a) * CFG.rx, y = CY + Math.sin(a) * CFG.ry;
+  const depth = (Math.sin(a) + 1) / 2;                       // 1 = 最前、0 = 最後
+  const s = CFG.backScale + (1 - CFG.backScale) * depth;
+  const o = CFG.backOpacity + (1 - CFG.backOpacity) * depth;
+  w.style.transform = `translate(${x - w.offsetWidth/2}px,${y - w.offsetHeight/2}px) scale(${s})`;
+  w.style.opacity = o;
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(f); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "Dela Gothic One"`, CFG.text).then(start);
+</script>
+</body>
+</html>

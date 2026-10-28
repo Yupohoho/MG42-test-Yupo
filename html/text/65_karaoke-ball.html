@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>65 Karaoke Ball</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .ch { position:absolute; top:0; line-height:1; font-family:'Noto Sans JP',sans-serif; font-weight:700; white-space:nowrap; }
+  #ball { position:absolute; left:0; top:0; border-radius:50%; }
+</style>
+</head>
+<body>
+<div id="card"></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: 'ボールが跳ねる',
+  W: 324, H: 106,
+  bg: '#14181c',
+  base: '#78787c',      // 還沒唱到的字
+  hi: '#2cd8c0',        // 唱過的字、球
+  fontSize: 33,
+  textLeft: 35,         // 第一個字的左緣（px）
+  textCY: 74,           // 字的垂直中心（px）
+  ball: 8,              // 球半徑
+  ballTop: 7, ballBottom: 45,      // 彈跳最高點、落點（球心 y）
+  ballX0: 24, ballXEnd: 258,       // 球起跳 x、最後落點 x
+  firstLand: 7.2, hop: 7.27,       // 第一次落地在第幾幀、之後每跳幾幀（30fps）
+  hopShape: 3,          // 越大在高處停越久、落地越快
+  loop: 1.85,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const chars = [...CFG.text], N = chars.length;
+const els = chars.map((c, i) => {
+  const d = document.createElement('div'); d.className = 'ch'; d.textContent = c;
+  Object.assign(d.style, { fontSize: CFG.fontSize+'px', left: (CFG.textLeft + i * CFG.fontSize)+'px', top: (CFG.textCY - CFG.fontSize * .55)+'px' });
+  card.appendChild(d); return d;
+});
+const ball = document.createElement('div'); ball.id = 'ball';
+Object.assign(ball.style, { width: CFG.ball*2+'px', height: CFG.ball*2+'px', background: CFG.hi });
+card.appendChild(ball);
+
+// 第 k 次落地的幀（k=1..N）；k=0 是畫面外的起跳點
+const land = k => CFG.firstLand + (k - 1) * CFG.hop;
+const lastLand = land(N);
+const xSpeed = (CFG.ballXEnd - CFG.ballX0) / (lastLand - (CFG.firstLand - 2.8));
+
+function render(t) {
+  const f = t * 30;
+  // 每次落地，對應的字一幀內變色（硬切）
+  const sung = f < CFG.firstLand ? 0 : Math.min(N, Math.floor((f - CFG.firstLand) / CFG.hop) + 1);
+  els.forEach((e, i) => e.style.color = i < sung ? CFG.hi : CFG.base);
+  let x, y, o = 1;
+  if (f <= lastLand) {
+    // 拋物線式彈跳：u = 這一跳的進度，|2u-1|^n 讓球在高處停久、落地前加速
+    const k0 = Math.floor((f - land(0)) / CFG.hop);
+    const u = (f - land(k0)) / CFG.hop;
+    y = CFG.ballTop + (CFG.ballBottom - CFG.ballTop) * Math.pow(Math.abs(2 * u - 1), CFG.hopShape);
+    x = Math.max(CFG.ballX0, CFG.ballX0 + (f - (CFG.firstLand - 2.8)) * xSpeed);
+  } else {
+    // 最後一跳後往右下落進字裡、3 幀內消失
+    const d = f - lastLand;
+    x = CFG.ballXEnd + d * 2.5; y = CFG.ballBottom + d * 2; o = Math.max(0, 1 - d / 3);
+  }
+  ball.style.transform = `translate(${x - CFG.ball}px,${y - CFG.ball}px)`;
+  ball.style.opacity = o;
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(f); })(t0); }
+};
+document.fonts.load(`700 ${CFG.fontSize}px "Noto Sans JP"`, CFG.text).then(start);
+</script>
+</body>
+</html>

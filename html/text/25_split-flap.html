@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>25 Split Flap</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .tile { position:absolute; border-radius:4px; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+  .ch { line-height:1; font-family:'Noto Sans JP',sans-serif; font-weight:700; }
+  #line { position:absolute; height:1.5px; }
+</style>
+</head>
+<body>
+<div id="card"><div id="line"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#14181e', tile: '#f6efe8', ink: '#111111', line: '#b794fe',
+  final: '発車時刻',                          // 最後停下來的字
+  pool: 'あいうえおかきくけこ一二三四五六七八九',   // 翻動中隨機出現的字（沒有 spin 時使用）
+  // 原版每次翻動顯示的字（第 1 次起）；鎖定的格子會自動顯示最終字。換文字時可刪掉這行改用 pool 亂數
+  spin: ['二う一九','七けえ七','二こ五九','五きかい','かかおえ','発おくか','発あこ二','発車九う','発車八お','発車時四','発車時い'],
+  lockTick: [6, 8, 10, 12],                  // 第幾次翻動時鎖定成最終字（左到右）
+  tileW: 54, tileH: 64, gap: 6, top: 21,     // 牌的大小、間距、上緣位置
+  fontSize: 40,
+  tick: 3,                                   // 每幾幀翻一次（30fps）
+  loop: 2.0,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const n = CFG.final.length;
+const totalW = n * CFG.tileW + (n - 1) * CFG.gap, left0 = (CFG.W - totalW) / 2;
+const chars = [...CFG.final].map((_, i) => {
+  const t = document.createElement('div'); t.className = 'tile';
+  Object.assign(t.style, { left: left0 + i * (CFG.tileW + CFG.gap) + 'px', top: CFG.top + 'px', width: CFG.tileW + 'px', height: CFG.tileH + 'px', background: CFG.tile });
+  const c = document.createElement('div'); c.className = 'ch';
+  Object.assign(c.style, { fontSize: CFG.fontSize + 'px', color: CFG.ink });
+  t.appendChild(c); card.insertBefore(t, document.getElementById('line')); return c;
+});
+Object.assign(document.getElementById('line').style, { left: left0 - 2 + 'px', width: totalW + 4 + 'px', top: CFG.top + CFG.tileH / 2 + 'px', background: CFG.line });
+
+// 決定性亂數：同一次翻動、同一格永遠是同一個字（定格截圖才會一致）
+const rndChar = (tick, i) => (CFG.spin && CFG.spin[tick-1] && CFG.spin[tick-1].length === n)
+  ? CFG.spin[tick-1][i]
+  : CFG.pool[(tick * 7 + i * 13 + tick * i * 5) % CFG.pool.length];
+// 每次翻動 3 幀：細線（0.1）→ 0.8 → 1.0
+const FLAP = [.1, .8, 1];
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6);
+  const tick = Math.floor(f / CFG.tick), sub = f % CFG.tick;
+  chars.forEach((c, i) => {
+    const lock = CFG.lockTick[i];
+    let ch, sy;
+    if (tick === 0)          { ch = CFG.pool[0]; sy = .1; }                    // 開頭：全部只剩一條細線
+    else if (tick < lock)    { ch = rndChar(tick, i); sy = FLAP[sub]; }        // 翻動中
+    else if (tick === lock)  { ch = CFG.final[i]; sy = FLAP[sub]; }            // 最後一翻，翻出最終字
+    else                     { ch = CFG.final[i]; sy = 1; }                    // 鎖定不動
+    c.textContent = ch;
+    c.style.transform = `scaleY(${sy})`;
+  });
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(f); })(t0); }
+};
+document.fonts.load(`700 ${CFG.fontSize}px "Noto Sans JP"`, CFG.final + CFG.pool).then(start);
+</script>
+</body>
+</html>

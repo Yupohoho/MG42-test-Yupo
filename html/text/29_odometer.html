@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>29 Odometer</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Noto+Sans+JP:wght@900&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .tile { position:absolute; border-radius:4px; overflow:hidden; }
+  .dg { position:absolute; left:0; right:0; display:flex; align-items:center; justify-content:center; line-height:1;
+        font-family:'Dela Gothic One',sans-serif; }
+  .lbl { position:absolute; line-height:1; font-family:'Noto Sans JP',sans-serif; font-weight:900; white-space:nowrap; }
+  .sep { position:absolute; border-radius:50%; }
+</style>
+</head>
+<body>
+<div id="card"></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#14181e', tile: '#f6efe8', ink: '#111111', accent: '#b794fe',
+  prefix: '累計', suffix: '人',
+  target: '12480',               // 最後停下的數字
+  groups: [2, 3],                // 位數分組（中間加千分位點）
+  tileW: 33, tileH: 56, gap: 3, groupGap: 14, top: 25,
+  fontSize: 42, labelSize: 17,
+  startFrame: 3,                 // 第 3 幀開始捲
+  endFrame: [26, 30, 32, 33, 34], // 各位數停下的幀（左到右）
+  laps: 1,                       // 停下前先捲過幾整圈
+  fadeStart: 53, fade: [.7, .35, .05, 0],   // 第 53 幀起逐幀淡出
+  loopFrames: 60,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const digits = [...CFG.target].map(Number);
+const add = (cls, style, text) => { const d = document.createElement('div'); d.className = cls; Object.assign(d.style, style); if (text) d.textContent = text; card.appendChild(d); return d; };
+
+// 版面：[前綴] [數字組 . 數字組] [後綴]，整體置中
+const nD = digits.length;
+const numW = nD * CFG.tileW + (nD - CFG.groups.length) * CFG.gap + (CFG.groups.length - 1) * CFG.groupGap;
+const pre = add('lbl', { fontSize: CFG.labelSize + 'px', color: CFG.accent }, CFG.prefix);
+const suf = add('lbl', { fontSize: CFG.labelSize + 'px', color: CFG.accent }, CFG.suffix);
+const fadeEls = [];
+const tiles = [];
+function layout() {
+  const preW = pre.offsetWidth, sufW = suf.offsetWidth, pad = 14;
+  let x = (CFG.W - (preW + pad + numW + pad + sufW)) / 2;
+  Object.assign(pre.style, { left: x + 'px', top: CFG.top + CFG.tileH / 2 - CFG.labelSize * .7 + 'px' });
+  x += preW + pad;
+  let di = 0;
+  CFG.groups.forEach((g, gi) => {
+    for (let k = 0; k < g; k++, di++) {
+      const t = add('tile', { left: x + 'px', top: CFG.top + 'px', width: CFG.tileW + 'px', height: CFG.tileH + 'px', background: CFG.tile });
+      const a = document.createElement('div'), b = document.createElement('div');
+      [a, b].forEach(s => { s.className = 'dg'; Object.assign(s.style, { height: CFG.tileH + 'px', fontSize: CFG.fontSize + 'px', color: CFG.ink }); t.appendChild(s); });
+      tiles.push({ t, a, b }); fadeEls.push(t);
+      x += CFG.tileW + (k < g - 1 ? CFG.gap : 0);
+    }
+    if (gi < CFG.groups.length - 1) {   // 千分位點
+      fadeEls.push(add('sep', { left: x + CFG.groupGap / 2 - 2 + 'px', top: CFG.top + CFG.tileH - 6 + 'px', width: '4px', height: '4px', background: CFG.tile }));
+      x += CFG.groupGap;
+    }
+  });
+  Object.assign(suf.style, { left: x + pad + 'px', top: CFG.top + CFG.tileH / 2 - CFG.labelSize * .3 + 'px' });
+}
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  const fade = f < CFG.fadeStart ? 1 : (CFG.fade[f - CFG.fadeStart] ?? 0);
+  tiles.forEach((T, i) => {
+    const D = CFG.laps * 10 + digits[i];                 // 總共要捲幾格
+    const e = CFG.endFrame[i];
+    const k = Math.min(1, Math.max(0, (f - CFG.startFrame) / (e - CFG.startFrame)));
+    const p = D * (1 - (1 - k) * (1 - k));               // ease-out（二次）：一開始每幀約 1 格，越來越慢
+    const n = Math.floor(p + 1e-6), fr = p - n;          // 數字往上捲：目前數字往上移、下一個從下方進來
+    T.a.textContent = n % 10;       T.a.style.transform = `translateY(${-fr * CFG.tileH}px)`;
+    T.b.textContent = (n + 1) % 10; T.b.style.transform = `translateY(${(1 - fr) * CFG.tileH}px)`;
+  });
+  fadeEls.forEach(el => el.style.opacity = fade);
+}
+
+const start = () => {
+  layout();
+  if (q.has('t')) render(+q.get('t') % (CFG.loopFrames / 30));
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % (CFG.loopFrames / 30)); requestAnimationFrame(f); })(t0); }
+};
+Promise.all([document.fonts.load(`${CFG.fontSize}px "Dela Gothic One"`, '0123456789'),
+             document.fonts.load(`900 ${CFG.labelSize}px "Noto Sans JP"`, CFG.prefix + CFG.suffix)]).then(start);
+</script>
+</body>
+</html>

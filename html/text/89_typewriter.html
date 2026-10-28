@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>89 Typewriter</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#e8e6e2; }
+  body { display:flex; align-items:center; justify-content:center; min-height:100vh; }
+  body.m { display:block; min-height:0; }
+  /* ?z=2 放大觀看；?t=0.5 定格；?m=1 量測用（卡片貼左上） */
+  #card { position:relative; overflow:hidden; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<div id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: 'NEW DROP',
+  W: 284, H: 158, radius: 12,
+  bg: '#fcfbf8',
+  ink: '#252633',                 // 字色
+  accent: '#f08a54',              // 游標與底線
+  font: '500 {S}px "JetBrains Mono"',
+  fonts: ['500 30px "JetBrains Mono"'], fontText: 'NEWDROP',
+  cell: 22,                       // 每字格寬（等寬）
+  capTop: 65, base: 91,           // 字的上緣與基線
+  cursor: { w: 17, top: 58, bottom: 98 },
+  line: { y: 109, h: 3 },         // 底線
+  typeStart: 9, perChar: 3,       // 第幾幀開始打字、每字間隔幀數
+};
+const LOOP = 120;                 // 4 秒一輪
+// =================================
+
+// ===== 共用 =====
+const q = new URLSearchParams(location.search);
+const Z = +(q.get('z') || 1);
+if (q.get('m') === '1') document.body.classList.add('m');
+const card = document.getElementById('card'), cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+const DPR = Math.max(1, window.devicePixelRatio || 1) * Z;
+cv.width = CFG.W * DPR; cv.height = CFG.H * DPR;
+cv.style.width = CFG.W * Z + 'px'; cv.style.height = CFG.H * Z + 'px';
+Object.assign(card.style, { width: CFG.W * Z + 'px', height: CFG.H * Z + 'px', background: CFG.bg, borderRadius: CFG.radius * Z + 'px' });
+
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const eOut3 = p => 1 - Math.pow(1 - clamp(p), 3);
+const eOut4 = p => 1 - Math.pow(1 - clamp(p), 4);
+const eInOut = p => { p = clamp(p); return p < .5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2; };
+// 逐幀表取值（u 為幀，可為小數；超出範圍取端點）
+const tab = (arr, u) => { if (u <= 0) return arr[0]; const n = arr.length - 1; if (u >= n) return arr[n]; const i = Math.floor(u), k = u - i; return arr[i] + (arr[i + 1] - arr[i]) * k; };
+// 把字塞進指定墨跡框 box=[左,上,右,下]；mode 'sx' 水平拉伸、'track' 用字距補寬
+function fit(word, font, box, mode) {
+  ctx.font = font.replace('{S}', 100);
+  const m = ctx.measureText(word);
+  const ih = m.actualBoundingBoxAscent + m.actualBoundingBoxDescent;
+  const size = 100 * (box[3] - box[1]) / ih, k = size / 100;
+  ctx.font = font.replace('{S}', size);
+  const chars = [...word], M = ctx.measureText(word);
+  const inkW = (M.actualBoundingBoxLeft + M.actualBoundingBoxRight);
+  let sx = 1, track = 0;
+  if (mode === 'track' && chars.length > 1) track = ((box[2] - box[0]) - inkW) / (chars.length - 1);
+  else sx = (box[2] - box[0]) / inkW;
+  const base = box[1] + m.actualBoundingBoxAscent * k;
+  const ox = box[0] + M.actualBoundingBoxLeft * sx;
+  const letters = chars.map((ch, i) => {
+    const pre = ctx.measureText(chars.slice(0, i).join('')).width, cm = ctx.measureText(ch);
+    const x = ox + pre * sx + track * i;
+    return { ch, x, cx: x + (cm.actualBoundingBoxRight - cm.actualBoundingBoxLeft) / 2 * sx, w: cm.width * sx };
+  });
+  return { font: font.replace('{S}', size), size, sx, base, letters };
+}
+// 在 (px,py) 為支點，水平 sx2、垂直 sy2 縮放、rot 度旋轉後畫一個字
+function drawLetter(L, F, color, px, py, sx2 = 1, sy2 = 1, rot = 0, dx = 0, dy = 0) {
+  ctx.save();
+  ctx.translate(px + dx, py + dy); ctx.rotate(rot * Math.PI / 180); ctx.scale(sx2, sy2); ctx.translate(-px, -py);
+  ctx.translate(L.x, F.base); ctx.scale(F.sx, 1);
+  ctx.font = F.font; ctx.fillStyle = color; ctx.textBaseline = 'alphabetic';
+  ctx.fillText(L.ch, 0, 0);
+  ctx.restore();
+}
+function frame(t) {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.clearRect(0, 0, CFG.W, CFG.H);
+  render(t);
+}
+
+let F;
+// 底線長度（相對全長），打完字 4 幀後開始，逐幀
+const LINE = [0, 45, 82, 109, 130, 145, 155, 163, 167, 170, 172, 173, 174].map(v => v / 174);
+// 游標熄滅區間（相對打完最後一字的幀數），之後恆亮
+const OFF = [[7, 12], [17, 22], [27, 31], [36, 41], [46, 51]];
+function setup() {
+  ctx.font = CFG.font.replace('{S}', 100);
+  const a = ctx.measureText('N').actualBoundingBoxAscent;
+  F = { size: 100 * (CFG.base - CFG.capTop) / a };
+}
+function render(t) {
+  const f = t * 30, n = [...CFG.text].length;
+  const x0 = Math.round(CFG.W / 2 - n * CFG.cell / 2);
+  // 已打出的字
+  const typed = clamp(Math.floor((f - CFG.typeStart) / CFG.perChar) + 1, 0, n);
+  ctx.font = CFG.font.replace('{S}', F.size); ctx.fillStyle = CFG.ink;
+  [...CFG.text].slice(0, typed).forEach((ch, i) => {
+    const w = ctx.measureText(ch).width;
+    ctx.fillText(ch, x0 + i * CFG.cell + (CFG.cell - w) / 2, CFG.base);
+  });
+  // 游標
+  const endF = CFG.typeStart + CFG.perChar * (n - 1), rel = f - endF;
+  const off = OFF.some(([a, b]) => rel >= a && rel < b);
+  if (!off) { ctx.fillStyle = CFG.accent; ctx.fillRect(x0 + typed * CFG.cell, CFG.cursor.top, CFG.cursor.w, CFG.cursor.bottom - CFG.cursor.top); }
+  // 底線
+  const p = tab(LINE, rel - 4);
+  if (p > 0) { ctx.fillStyle = CFG.accent; ctx.fillRect(x0 + 1, CFG.line.y, (n * CFG.cell - 2) * p, CFG.line.h); }
+}
+
+Promise.all(CFG.fonts.map(f => document.fonts.load(f, CFG.fontText))).then(() => {
+  setup();
+  if (q.has('t')) frame((+q.get('t') * 30) % LOOP / 30);
+  else { const t0 = performance.now(); (function f(now) { frame(((now - t0) / 1000 * 30 % LOOP) / 30); requestAnimationFrame(f); })(t0); }
+});
+</script>
+</body>
+</html>

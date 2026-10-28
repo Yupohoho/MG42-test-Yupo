@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>64 Text Fan</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@900&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .c { position:absolute; left:0; top:0; line-height:1; white-space:nowrap; font-family:'Noto Serif JP',serif; font-weight:900; transform-origin:50% 50%; }
+</style>
+</head>
+<body>
+<div id="card"></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '扇',
+  W: 324, H: 106,
+  bg: '#14161c',
+  colors: ['#f3efe6', '#8f6df5'],   // 扇面上的字依序交替（偶數白、奇數紫；紫的疊在下面）
+  fontSize: 30,
+  count: 9,                // 扇面上的字數
+  spread: 150,             // 扇面最大張開角度（度），左右各一半
+  radius: 62,              // 字到轉軸的距離（px）
+  pivotY: .9,              // 轉軸位置（畫面高比例），在字的正下方
+  openAt: 0.0, openTime: 0.5,       // 張開
+  closeAt: 1.5, closeTime: 0.4,     // 收合
+  loop: 2.0,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const els = Array.from({ length: CFG.count }, (_, k) => {
+  const d = document.createElement('div'); d.className = 'c'; d.textContent = CFG.text;
+  Object.assign(d.style, { fontSize: CFG.fontSize + 'px', color: CFG.colors[k % 2], zIndex: k % 2 ? 1 : 2 });
+  card.appendChild(d); return d;
+});
+
+// 張開：先快後慢；收合：先慢後快
+function spread(u) {
+  if (u >= CFG.closeAt) { const x = Math.min(1, (u - CFG.closeAt) / CFG.closeTime); return 1 - x * x; }
+  const x = Math.min(1, Math.max(0, (u - CFG.openAt) / CFG.openTime));
+  return 1 - (1 - x) * (1 - x);
+}
+
+function render(t) {
+  const s = spread(t % CFG.loop), mid = (CFG.count - 1) / 2;
+  els.forEach((el, k) => {
+    const deg = (k - mid) / mid * (CFG.spread / 2) * s, a = deg * Math.PI / 180;
+    const w = el.offsetWidth, h = el.offsetHeight;
+    // 繞著下方轉軸：字沿圓弧擺開，同時跟著傾斜
+    const x = CFG.W / 2 + Math.sin(a) * CFG.radius, y = CFG.H * CFG.pivotY - Math.cos(a) * CFG.radius;
+    el.style.transform = `translate(${x - w / 2}px,${y - h / 2}px) rotate(${deg}deg)`;
+  });
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "Noto Serif JP"`, CFG.text).then(start);
+</script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>66 Swing Letters</title>
+<link href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .piv { position:absolute; left:0; top:0; width:0; height:0; }
+  .ch { position:absolute; line-height:1; font-family:'Mochiy Pop One',sans-serif; white-space:nowrap; transform:translate(-50%,-50%); }
+</style>
+</head>
+<body>
+<div id="card"></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#2cd8c0',
+  fontSize: 44,
+  // 每個字：靜止時的中心 x、顏色、比第一個字晚幾幀開始擺（30fps）
+  letters: [
+    { ch: 'ゆ', x: 77,  color: '#101418', delay: 0 },
+    { ch: 'ら', x: 129, color: '#00645c', delay: 6 },
+    { ch: 'ゆ', x: 190, color: '#101418', delay: 13 },
+    { ch: 'ら', x: 242, color: '#00645c', delay: 20 },
+  ],
+  cy: 57,              // 字中心 y
+  arm: 37,             // 擺錘長度：支點在字中心上方多少 px
+  swing: 24,           // 最大擺角（度）
+  loop: 2.0,           // 一個來回的秒數
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+// 每個字掛在自己的支點下面，旋轉支點 = 像鐘擺一樣擺
+const els = CFG.letters.map(L => {
+  const p = document.createElement('div'); p.className = 'piv';
+  p.style.left = L.x + 'px'; p.style.top = (CFG.cy - CFG.arm) + 'px';
+  const d = document.createElement('div'); d.className = 'ch'; d.textContent = L.ch;
+  Object.assign(d.style, { fontSize: CFG.fontSize+'px', color: L.color, top: CFG.arm+'px', left: '0px' });
+  p.appendChild(d); card.appendChild(p); return p;
+});
+
+function render(t) {
+  CFG.letters.forEach((L, i) => {
+    // 正弦擺動，後面的字依序延遲 → 一排字像波浪般錯開擺
+    const a = CFG.swing * Math.sin(2 * Math.PI * (t - L.delay / 30) / CFG.loop);
+    els[i].style.transform = `rotate(${a}deg)`;
+  });
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(f); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "Mochiy Pop One"`, CFG.letters.map(l => l.ch).join('')).then(start);
+</script>
+</body>
+</html>

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>42 Laser Cut</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .half { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; line-height:1;
+          font-family:'Dela Gothic One',sans-serif; white-space:nowrap; }
+  #beam { position:absolute; left:0; height:2px; background:linear-gradient(90deg, rgba(255,40,60,.15), #ff2a3c);
+          box-shadow:0 0 6px 1px rgba(255,40,60,.6); }
+  #dot { position:absolute; width:10px; height:10px; margin:-5px 0 0 -5px; border-radius:50%; background:#fff;
+         box-shadow:0 0 6px 3px #ff8a5c, 0 0 14px 6px rgba(255,80,60,.6); }
+</style>
+</head>
+<body>
+<div id="card"><div class="half" id="top"></div><div class="half" id="bot"></div><div id="beam"></div><div id="dot"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '切断',
+  W: 324, H: 106,
+  bg: '#c4f73c',
+  color: '#121212',
+  fontSize: 64,
+  cutY: .48,          // 切線高度（畫面比例）
+  offset: [9, 6],     // 切開後上半往右上、下半往左下的位移（px）
+  laserStart: 0.40,   // 雷射從左邊出發的時間（秒）
+  laserEnd: 0.77,     // 雷射到右邊的時間
+  rejoinAt: 1.70,     // 兩半硬切合回的時間
+  loop: 2.0,
+};
+// =================================
+const F = 1/30;
+// 切開的逐幀進度（雷射到右邊後的第 0、1、2 幀）
+const SPLIT = [.4, .8, 1];
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const upH = document.getElementById('top'), loH = document.getElementById('bot');
+const beam = document.getElementById('beam'), dot = document.getElementById('dot');
+const cut = CFG.cutY * CFG.H;
+[upH, loH].forEach(el => { el.textContent = CFG.text; Object.assign(el.style, { fontSize: CFG.fontSize+'px', color: CFG.color }); });
+// 上下兩半在切線處各多留 0.5px，縮放時不會露縫
+upH.style.clipPath = `inset(0 0 ${CFG.H - cut - .5}px 0)`;
+loH.style.clipPath = `inset(${cut - .5}px 0 0 0)`;
+beam.style.top = cut - 1 + 'px'; dot.style.top = cut + 'px';
+
+function render(t) {
+  const f = Math.floor(t / F + 1e-6);
+  const fEnd = Math.round(CFG.laserEnd / F), fRe = Math.round(CFG.rejoinAt / F);
+  // 切開
+  let k = 0;
+  if (f >= fEnd && f < fRe) k = SPLIT[Math.min(f - fEnd, SPLIT.length - 1)];
+  const [ox, oy] = CFG.offset;
+  upH.style.transform = `translate(${ox * k}px,${-oy * k}px)`;
+  loH.style.transform = `translate(${-ox * k}px,${oy * k}px)`;
+  // 雷射：從左邊等速射到右邊，光點在前端；到右邊後光束 4 幀內淡掉
+  if (t >= CFG.laserStart && f < fEnd + 4) {
+    const p = Math.min(1, (t - CFG.laserStart) / (CFG.laserEnd - CFG.laserStart));
+    const x = p * CFG.W;
+    beam.style.width = x + 'px';
+    beam.style.opacity = f < fEnd ? 1 : 1 - (f - fEnd + 1) / 5;
+    dot.style.left = x + 'px';
+    dot.style.opacity = f < fEnd ? 1 : 0;
+  } else { beam.style.opacity = 0; dot.style.opacity = 0; }
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function loop(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(loop); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "Dela Gothic One"`, CFG.text).then(start);
+</script>
+</body>
+</html>

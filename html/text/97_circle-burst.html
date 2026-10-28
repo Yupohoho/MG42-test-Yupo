@@ -1,0 +1,80 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>T97 Circle Burst</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Oswald:wght@700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#e9e7e3}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh}
+body.m{display:block;min-height:0}
+.card{position:relative;overflow:hidden}
+canvas{display:block}
+</style></head>
+<body><div class="card" id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== CFG：可換內容集中在這裡 =====
+const CFG={
+  text:'NEW',
+  font:'"Archivo Black"', weight:'400',
+  circle:{cx:144,cy:78.5,r:49},          // 圓停住時的位置與半徑
+  textH:24, textMaxW:62,                  // 字的墨跡高度與最大寬度（整個字留在圓內，四周留白）
+  bg:'#fcfcf9', accent:'#9575cd', textColor:'#ffffff', ring:'#a0a09d'
+};
+const LOOP=120; // 幀（30fps），動畫約 32 幀，其餘停住
+
+// ===== 動態 =====
+const POP=[0,.3,.6,.85,1,1.08,1.1,1.08,1.05,1.03,1.02,1.01,1];                 // 圓彈出
+const TS=[.17,.5,.76,.97,1.08,1.14,1.18,1.18,1.17,1.15,1.12,1.09,1.06,1.04,1.02,1.01,1]; // 字彈出（n=15 起）
+const RR=[50,53,61,69,77,84,90,95,100,104,108,111,114,117,119,121,123];          // 波紋半徑（出生後第 k 幀）
+const LA=[.6,.6,.5,.45,.42,.37,.3,.25,.22,.2,.17,.15,.13,.1,.07,.04,0];          // 淡紫波紋不透明度
+const WAVES=[['lav',3],['gray',9],['lav',11],['gray',16],['lav',20]];            // [種類, 出生幀]
+let L;
+function init(){
+  const {cx,cy}=CFG.circle;let h=CFG.textH;L=fitText(CFG.text,CFG.font,CFG.weight,{x:cx,y:cy-h/2,h});
+  if(L.nw>CFG.textMaxW){h*=CFG.textMaxW/L.nw;L=fitText(CFG.text,CFG.font,CFG.weight,{x:cx,y:cy-h/2,h});}
+}
+function render(n){
+  const {cx,cy,r}=CFG.circle;
+  for(const [k,t0] of WAVES){const i=n-t0;if(i<0||i>=RR.length)continue;
+    ctx.beginPath();
+    if(k==='gray'){ctx.globalAlpha=clamp(1.1-0.075*i,0,1);ctx.strokeStyle=CFG.ring;ctx.lineWidth=2;ctx.arc(cx,cy,RR[i],0,Math.PI*2);ctx.stroke();}
+    else{ctx.globalAlpha=LA[i];ctx.filter='blur(1.5px)';ctx.strokeStyle=CFG.accent;ctx.lineWidth=7;ctx.arc(cx,cy,RR[i]+3,0,Math.PI*2);ctx.stroke();ctx.filter='none';}
+    ctx.globalAlpha=1;}
+  const s=tab(POP,n);if(s<=0)return;
+  ctx.beginPath();ctx.arc(cx,cy,r*s,0,Math.PI*2);ctx.fillStyle=CFG.accent;ctx.fill();
+  if(n>=15)drawText(L,CFG.textColor,tab(TS,n-15));
+}
+
+// ===== 共用 =====
+const Q=new URLSearchParams(location.search),Z=+(Q.get('z')||1);
+if(Q.get('m'))document.body.classList.add('m');
+const CW=284,CH=158,DPR=window.devicePixelRatio||1;
+const card=document.getElementById('card'),cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+card.style.cssText+=`width:${CW*Z}px;height:${CH*Z}px;border-radius:${12*Z}px;background:${CFG.bg}`;
+cv.width=CW*Z*DPR;cv.height=CH*Z*DPR;cv.style.width=CW*Z+'px';cv.style.height=CH*Z+'px';
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const tab=(A,i)=>A[clamp(Math.floor(i),0,A.length-1)];
+const lerp=(a,b,p)=>a+(b-a)*p;
+const hex=h=>[1,3,5].map(i=>parseInt(h.substr(i,2),16));
+const mix=(a,b,p)=>{const A=hex(a),B=hex(b);return `rgb(${A.map((v,i)=>Math.round(v+(B[i]-v)*p)).join(',')})`};
+// 文字依墨跡框定位：box={x,y,w,h}；w 省略時照字型原比例
+function fitText(str,fam,wt,box){
+  const c=document.createElement('canvas').getContext('2d');c.font=`${wt} 200px ${fam}`;
+  const m=c.measureText(str),k=box.h/(m.actualBoundingBoxAscent+m.actualBoundingBoxDescent);
+  const nw=(m.actualBoundingBoxLeft+m.actualBoundingBoxRight)*k,sx=box.w?box.w/nw:1;
+  return{str,font:`${wt} ${200*k}px ${fam}`,sx,ox:-(m.actualBoundingBoxRight-m.actualBoundingBoxLeft)/2*k,
+    nw,oy:(m.actualBoundingBoxAscent-m.actualBoundingBoxDescent)/2*k,cx:box.x+(box.w||0)/2,cy:box.y+box.h/2};
+}
+function drawText(L,color,s=1,alpha=1,dy=0){
+  ctx.save();ctx.globalAlpha=alpha;ctx.translate(L.cx,L.cy+dy);ctx.scale(s*L.sx,s);
+  ctx.font=L.font;ctx.fillStyle=color;ctx.fillText(L.str,L.ox,L.oy);ctx.restore();
+}
+function frame(t){
+  const n=Math.floor(t*30+1e-6)%LOOP;
+  ctx.setTransform(Z*DPR,0,0,Z*DPR,0,0);ctx.globalAlpha=1;ctx.filter='none';
+  ctx.fillStyle=CFG.bg;ctx.fillRect(0,0,CW,CH);render(n);
+}
+const T0=Q.get('t');
+document.fonts.load(`400 60px "Archivo Black"`,'A').then(()=>document.fonts.load(`700 60px "Oswald"`,'A')).catch(()=>{}).then(()=>{
+  init();
+  if(T0!==null)frame(+T0);else{const st=performance.now();const lp=()=>{frame((performance.now()-st)/1000);requestAnimationFrame(lp)};lp();}
+});
+</script></body></html>

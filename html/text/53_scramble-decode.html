@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>53 Scramble Decode</title>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .s { position:absolute; top:0; text-align:center; line-height:1; font-family:'DotGothic16',sans-serif; }
+</style>
+</head>
+<body>
+<div id="card"></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '解読完了',
+  W: 324, H: 106,
+  bg: '#14181e',
+  done: '#f4f0e6',      // 解讀完成的字色
+  noise: '#ff6b4f',     // 亂碼與開頭閃現的字色
+  pool: '0123456789ABCDEF#あいうえおかきくけ',   // 亂碼字庫
+  fontSize: 44,
+  slot: 51,             // 每個字的格寬（px），亂碼和正確字都放在同一格
+  cy: .53,
+  // 以下都是幀數（30fps）
+  flash: 3,             // 開頭先用亂碼色顯示正確答案幾幀
+  every: 2,             // 亂碼每幾幀換一次
+  lockAt: [18, 25, 32, 38],   // 每個字在第幾幀定下來（由左到右）
+  frames: 59,           // 一個循環幾幀
+};
+CFG.loop = CFG.frames / 30;
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const chars = [...CFG.text], N = chars.length, pool = [...CFG.pool];
+const x0 = (CFG.W - N * CFG.slot) / 2;
+const els = chars.map((_, i) => {
+  const d = document.createElement('div'); d.className = 's';
+  Object.assign(d.style, { left: x0 + i * CFG.slot + 'px', width: CFG.slot + 'px', fontSize: CFG.fontSize + 'px', top: CFG.cy * CFG.H - CFG.fontSize / 2 + 'px' });
+  card.appendChild(d); return d;
+});
+const hash = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.frames;
+  els.forEach((el, i) => {
+    if (f < CFG.flash) { el.textContent = chars[i]; el.style.color = CFG.noise; return; }
+    if (f >= CFG.lockAt[i]) { el.textContent = chars[i]; el.style.color = CFG.done; return; }
+    const step = Math.floor((f - CFG.flash) / CFG.every);
+    el.textContent = pool[Math.floor(hash(step * 13 + i * 7) * pool.length)];
+    el.style.color = CFG.noise;
+  });
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(f); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "DotGothic16"`, CFG.text + CFG.pool).then(start);
+</script>
+</body>
+</html>

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>79 Crumble Down</title>
+<link href="https://fonts.googleapis.com/css2?family=Kaisei+Tokumin:wght@800&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #row { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+  .c { display:inline-block; line-height:1; font-family:'Kaisei Tokumin',serif; font-weight:800; transform-origin:50% 80%; }
+</style>
+</head>
+<body>
+<div id="card"><div id="row"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '崩れ落ちる',
+  W: 324, H: 106,
+  bg: '#f3efe6',
+  colors: ['#17171a', '#7a5a10', '#17171a', '#7a5a10', '#2b2b2b'],
+  fontSize: 47,
+  offsetX: -12, offsetY: 4,
+  // 進場：每個字從上方 dropIn px 處落下、淡入；由左到右每隔 inGap 秒一個
+  inAt: .067, inGap: .05, inDur: .13, dropIn: 14,
+  // 崩落：由右到左每隔 outGap 秒一個，往下掉 fall px（越掉越快）、一邊旋轉一邊淡出
+  outAt: .85, outGap: .065, outDur: .38, fall: 70,
+  spin: [-14, 18, -22, 26, 30],   // 每個字崩落時的旋轉角度（度）
+  loop: 1.6,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), row = document.getElementById('row');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+row.style.transform = `translate(${CFG.offsetX}px,${CFG.offsetY}px)`;
+const chars = [...CFG.text], n = chars.length;
+const els = chars.map((ch, i) => {
+  const s = document.createElement('span'); s.className = 'c'; s.textContent = ch;
+  Object.assign(s.style, { fontSize: CFG.fontSize+'px', color: CFG.colors[i % CFG.colors.length] });
+  row.appendChild(s); return s;
+});
+const clamp = (v) => Math.max(0, Math.min(1, v));
+
+function render(t) {
+  els.forEach((el, i) => {
+    const a = clamp((t - CFG.inAt - i * CFG.inGap) / CFG.inDur);          // 進場進度
+    const b = clamp((t - CFG.outAt - (n - 1 - i) * CFG.outGap) / CFG.outDur);   // 崩落進度（右邊先）
+    const ein = 1 - Math.pow(1 - a, 2), eout = b * b;                     // 進場減速、崩落加速（像重力）
+    const y = -CFG.dropIn * (1 - ein) + CFG.fall * eout;
+    const r = CFG.spin[i % CFG.spin.length] * eout;
+    el.style.opacity = (t < CFG.inAt + i * CFG.inGap ? 0 : .3 + .7 * a) * (1 - b);
+    el.style.transform = `translateY(${y}px) rotate(${r}deg)`;
+  });
+}
+
+document.fonts.load(`800 ${CFG.fontSize}px "Kaisei Tokumin"`, CFG.text).then(() => {
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(f); })(t0); }
+});
+</script>
+</body>
+</html>

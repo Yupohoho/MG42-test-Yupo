@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>33 Outline Text</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #rot { position:absolute; left:50%; top:50%; width:0; height:0; }
+  .row { position:absolute; left:0; top:0; white-space:nowrap; line-height:1;
+         font-family:'Dela Gothic One','Noto Sans JP',sans-serif; paint-order:stroke fill; }
+</style>
+</head>
+<body>
+<div id="card"><div id="rot"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#14161c',
+  unit: '疾風怒濤・',          // 重複的單位
+  fontSize: 41,
+  pitch: 38,                    // 行距（px）
+  angle: -7,                    // 整體傾斜角度
+  stroke: '#f3eee4', strokeW: 1.6,   // 白色描邊：空心時是外框，填色後仍留在字外圍
+  fill: '#ff8a3d',
+  rows: 5,                      // 行數（含上下被切到的行）
+  speed: 1,                     // 每個循環捲動幾個單位寬（左右交替方向）
+  fillAt: [0.47, 0.47, 0.97, 1.47, 1.47],   // 每行（由上而下）硬切填色的時間（秒）
+  loop: 2.0,                    // 循環結束時全部一次重置回空心
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+const rot = document.getElementById('rot');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+rot.style.transform = `rotate(${CFG.angle}deg)`;
+
+const els = [];
+let unitW = 0;
+
+function build() {
+  const probe = document.createElement('span');
+  probe.className = 'row'; probe.style.fontSize = CFG.fontSize+'px'; probe.textContent = CFG.unit;
+  rot.appendChild(probe); unitW = probe.offsetWidth; probe.remove();
+  const reps = Math.ceil(CFG.W * 2.2 / unitW) + 2;
+  for (let i = 0; i < CFG.rows; i++) {
+    const d = document.createElement('div'); d.className = 'row';
+    d.textContent = CFG.unit.repeat(reps);
+    d.style.fontSize = CFG.fontSize + 'px';
+    rot.appendChild(d); els.push(d);
+  }
+}
+
+function render(t) {
+  els.forEach((el, i) => {
+    const dir = i % 2 ? 1 : -1;
+    const shift = (dir * CFG.speed * unitW * t / CFG.loop) % unitW;
+    const x = -el.offsetWidth / 2 + shift;
+    const y = (i - (CFG.rows - 1) / 2) * CFG.pitch - el.offsetHeight / 2;
+    el.style.transform = `translate(${x}px,${y}px)`;
+    const filled = t >= CFG.fillAt[i];
+    el.style.color = filled ? CFG.fill : 'transparent';
+    // 填色後描邊不拿掉：描邊畫在填色下面、加粗一倍，露在字外的寬度跟空心時一樣
+    el.style.webkitTextStroke = `${filled ? CFG.strokeW * 2 : CFG.strokeW}px ${CFG.stroke}`;
+  });
+}
+
+document.fonts.load(`${CFG.fontSize}px "Dela Gothic One"`, CFG.unit).then(() => {
+  build();
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(f); })(t0); }
+});
+</script>
+</body>
+</html>

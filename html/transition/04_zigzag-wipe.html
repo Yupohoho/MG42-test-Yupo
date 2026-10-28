@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>S04 Zigzag Wipe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#0f1015;}
+  body{display:flex;align-items:center;justify-content:center;min-height:100vh;}
+  #card{position:relative;width:324px;height:106px;border-radius:12px;overflow:hidden;transform-origin:center;}
+  .abs{position:absolute;left:0;top:0;width:324px;height:106px;}
+  .letter{display:flex;align-items:center;justify-content:center;font-family:"Roboto Mono",monospace;font-weight:700;}
+</style>
+</head>
+<body>
+<div id="card">
+  <div class="abs" id="aBg"></div>
+  <div class="abs letter" id="aLet"></div>
+  <div class="abs" id="bBg"></div>
+  <div class="abs letter" id="bLet"></div>
+</div>
+<script>
+/* ========== CFG：可換內容集中在這裡 ========== */
+const CFG = {
+  sceneA: { img:'img/A_scene.jpg', bg:'#14181e', letter:'A', color:'#f4f0e6' },   // 轉場前的畫面（底色＋字）
+  sceneB: { img:'img/B_scene.jpg', bg:'#ff5b8f', letter:'B', color:'#14181e' },   // 轉場後的畫面（底色＋字）
+  fontSize: 50
+};
+/* ========== 動態參數（30fps 幀為單位）==========
+   一輪 = 49.6 幀。兩幕都是完整畫面。
+   鋸齒邊：5 個三角齒、週期 21.2px、齒高 48px，齒尖朝右，谷在 y=0,21.2,…,106、尖在 y=10.6+21.2k。
+   入場（c<20）：A 在下，B 在上；B 以鋸齒邊由左往右刷過整張卡片，谷底位置 v 見 ENTER 表，
+                 最後 v 超過卡片右緣，鋸齒完全離開畫面，B 完整露出。
+   退場（c≥20）：B 在下，A 在上；A 以同樣的鋸齒邊晚 27 幀刷過去，完整露出。 */
+const LOOP = 49.6, W = 324, H = 106, PHASE = 20, EXIT_AT = 27;
+const PERIOD = 21.2, TOOTH = 48;
+const ENTER = [[-0.5,-70],[0,-28],[1,37],[2,110],[3,169],[4,211],[5,241],[6,260],[7,271],[8,285],[9,300],[10,314],[11,324]];
+const EXIT  = [[-0.5,-70],[0,-22],[1,42],[2,116],[3,174],[4,216],[5,246],[6,265],[7,274],[8,285],[9,300],[10,314],[11,324]];
+function lerpTab(tab, x){
+  if (x <= tab[0][0]) return tab[0][1];
+  for (let i=1;i<tab.length;i++) if (x <= tab[i][0]){ const a=tab[i-1], b=tab[i]; return a[1]+(b[1]-a[1])*(x-a[0])/(b[0]-a[0]); }
+  return tab[tab.length-1][1];
+}
+const $ = id => document.getElementById(id);
+const SC = { a:{bg:$('aBg'), let:$('aLet')}, b:{bg:$('bBg'), let:$('bLet')} };
+function stage(topKey, clip){
+  const top = SC[topKey], base = SC[topKey==='b' ? 'a' : 'b'];
+  base.bg.style.zIndex = 1; base.let.style.zIndex = 2;
+  top.bg.style.zIndex = 4;  top.let.style.zIndex = 6;
+  top.bg.style.clipPath = top.let.style.clipPath = clip;
+  base.bg.style.clipPath = base.let.style.clipPath = 'none';
+}
+function zigzag(v){   // 鋸齒邊多邊形：左側填滿，右緣 x = v + T(y)
+  const pts = [[-200,-1]];
+  const n = Math.round(H/PERIOD);
+  for (let k=0;k<=n;k++){
+    pts.push([v, k*PERIOD]);
+    if (k<n) pts.push([v+TOOTH, k*PERIOD+PERIOD/2]);
+  }
+  pts.push([-200,H+1]);
+  return 'polygon('+pts.map(p=>p[0].toFixed(1)+'px '+p[1].toFixed(1)+'px').join(',')+')';
+}
+function render(t){
+  const c = ((t*30) % LOOP + LOOP) % LOOP;
+  if (c < PHASE) stage('b', zigzag(lerpTab(ENTER, c)));
+  else           stage('a', zigzag(lerpTab(EXIT, c - EXIT_AT)));
+}
+/* ========== 外殼 ========== */
+(function(){
+  const q = new URLSearchParams(location.search);
+  const card = $('card');
+  if (q.has('m')) { document.body.style.display='block'; document.body.style.minHeight='0'; } // 量測用：卡片貼左上
+  card.style.background = CFG.sceneA.bg;
+  for (const [bg, let_, s] of [['aBg','aLet',CFG.sceneA],['bBg','bLet',CFG.sceneB]]){
+    const useImg = q.has('img') && s.img;   // ?img=1：兩幕改用圖片
+    $(bg).style.background = useImg ? 'url('+s.img+') center/cover no-repeat' : s.bg;
+    const e = $(let_); e.textContent = useImg ? '' : s.letter; e.style.color = s.color; e.style.fontSize = CFG.fontSize+'px';
+  }
+  const z = parseFloat(q.get('z')||'1'); if (z !== 1) card.style.transform = 'scale('+z+')';
+  const start = () => {
+    if (q.has('t')) { render(parseFloat(q.get('t'))); document.title += ' ready'; return; }
+    const t0 = performance.now();
+    (function loop(){ render((performance.now()-t0)/1000); requestAnimationFrame(loop); })();
+  };
+  document.fonts.load('700 50px "Roboto Mono"', 'AB').then(start, start);
+})();
+</script>
+</body>
+</html>

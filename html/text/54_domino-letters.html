@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>54 Domino Letters</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .c { position:absolute; left:0; top:0; line-height:1; white-space:nowrap; font-family:'Dela Gothic One',sans-serif; transform-origin:100% 100%; }
+  #floor { position:absolute; left:0; height:1px; }
+</style>
+</head>
+<body>
+<div id="card"><div id="floor"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: 'ドミノ倒し',
+  W: 324, H: 106,
+  bg: '#fc6f50',
+  colors: ['#141414', '#f4efe4'],   // 字色依序交替
+  floor: 'rgba(0,0,0,0)',           // 地面細線（0 透明 = 不要）
+  fontSize: 45,
+  gap: 1,
+  base: .70,           // 字底（地面）的高度（畫面高比例）
+  // 以下都是幀數（30fps）
+  fallAt: 7, fallStep: 5, fallDur: 5,     // 第 i 個字在 fallAt + i×fallStep 幀開始往右倒，fallDur 幀內加速倒平（90°）
+  riseAt: 35, riseStep: 4, riseDur: 5,    // 全倒之後，第 i 個字在 riseAt + i×riseStep 幀開始立回，riseDur 幀內立起
+  overshoot: 8,        // 立回時往左多彈的角度（度）
+  frames: 56,          // 一個循環幾幀
+};
+CFG.loop = CFG.frames / 30;
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+Object.assign(document.getElementById('floor').style, { top: CFG.base * CFG.H + 'px', width: CFG.W + 'px', background: CFG.floor });
+const chars = [...CFG.text], N = chars.length;
+const els = chars.map((ch, i) => {
+  const d = document.createElement('div'); d.className = 'c'; d.textContent = ch;
+  Object.assign(d.style, { fontSize: CFG.fontSize+'px', color: CFG.colors[i % CFG.colors.length] });
+  card.appendChild(d); return d;
+});
+
+// 第 i 個字在幀 f 的角度（0 = 立著，90 = 往右倒平；以字的右下角為支點）
+function angle(f, i) {
+  const fs = CFG.fallAt + i * CFG.fallStep, rs = CFG.riseAt + i * CFG.riseStep;
+  if (f < fs) return 0;
+  if (f < fs + CFG.fallDur) { const k = (f - fs) / CFG.fallDur; return 90 * Math.pow(k, 1.3); }   // 越倒越快
+  if (f < rs) return 90;
+  if (f < rs + CFG.riseDur) {                                                           // 立回，最後往左彈一下
+    const k = (f - rs) / CFG.riseDur, e = 1 - Math.pow(1 - k, 3);
+    return 90 * (1 - e) - CFG.overshoot * Math.sin(Math.PI * k) * k;
+  }
+  if (f < rs + CFG.riseDur + 3) return -CFG.overshoot * (1 - (f - rs - CFG.riseDur) / 3) * .4;
+  return 0;
+}
+
+function render(t) {
+  const f = (t * 30) % CFG.frames;
+  const ws = els.map(e => e.offsetWidth), total = ws.reduce((a, b) => a + b, 0) + CFG.gap * (N - 1);
+  let x = (CFG.W - total) / 2;
+  els.forEach((el, i) => {
+    el.style.transform = `translate(${x}px,${CFG.base * CFG.H - el.offsetHeight}px) rotate(${angle(f, i)}deg)`;
+    x += ws[i] + CFG.gap;
+  });
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(f); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "Dela Gothic One"`, CFG.text).then(start);
+</script>
+</body>
+</html>

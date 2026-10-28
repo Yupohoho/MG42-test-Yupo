@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>26 Flip Cards</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .fc { position:absolute; border-radius:6px; display:flex; align-items:center; justify-content:center; line-height:1;
+        font-family:'Dela Gothic One',sans-serif; }
+</style>
+</head>
+<body>
+<div id="card"></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#b794fe', cardBg: '#0e1214', ink: '#b794fe',
+  wordA: '日の出',          // 第一個詞
+  wordB: '月明り',          // 第二個詞（字數要跟 A 一樣）
+  cardW: 56, cardH: 73, gap: 6, top: 16,
+  fontSize: 40,
+  perspective: 260,
+  inStart: 4.6, inGap: 3.5, // 進場：第 1 張約從第 5 幀開始，每張間隔 3.5 幀
+  swStart: 37, swGap: 3.5,  // 換詞：第 1 張從第 37 幀開始翻
+  outFrame: 51,             // 第 51 幀全部消失（硬切）
+  loopFrames: 51,           // 循環 1.7 秒
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})`});
+const n = CFG.wordA.length;
+const totalW = n * CFG.cardW + (n - 1) * CFG.gap, left0 = (CFG.W - totalW) / 2;
+const els = [...CFG.wordA].map((_, i) => {
+  const d = document.createElement('div'); d.className = 'fc';
+  Object.assign(d.style, { left: left0 + i * (CFG.cardW + CFG.gap) + 'px', top: CFG.top + 'px', width: CFG.cardW + 'px', height: CFG.cardH + 'px',
+    background: CFG.cardBg, color: CFG.ink, fontSize: CFG.fontSize + 'px' });
+  card.appendChild(d); return d;
+});
+
+// 翻轉角度（rotateX，0 = 正面朝前，90 = 側面只剩一條線）
+// 進場（距該卡開始的幀數）：先翻出 B 的字，停 2 幀，再翻成 A 的字
+const IN = [[84,'B'],[53,'B'],[0,'B'],[0,'B'],[60,'A'],[37,'A'],[0,'A']];
+// 換詞：微傾 → 側面 → 翻出 B 的字
+const SW = [[25,'A'],[84,'A'],[45,'B'],[0,'B']];
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  els.forEach((el, i) => {
+    const fi = f - Math.round(CFG.inStart + i * CFG.inGap);
+    const fs = f - Math.round(CFG.swStart + i * CFG.swGap);
+    let ang, w;
+    if (fi < 0 || f >= CFG.outFrame) { el.style.opacity = 0; return; }
+    if (fs >= 0) [ang, w] = fs < SW.length ? SW[fs] : [0, 'B'];
+    else         [ang, w] = fi < IN.length ? IN[fi] : [0, 'A'];
+    el.style.opacity = 1;
+    el.textContent = (w === 'A' ? CFG.wordA : CFG.wordB)[i];
+    el.style.transform = `perspective(${CFG.perspective}px) rotateX(${ang}deg)`;   // 每張卡各自透視，翻轉時是對稱梯形
+  });
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t') % (CFG.loopFrames / 30));
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % (CFG.loopFrames / 30)); requestAnimationFrame(f); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "Dela Gothic One"`, CFG.wordA + CFG.wordB).then(start);
+</script>
+</body>
+</html>

@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>S02 Diagonal Wipe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#0f1015;}
+  body{display:flex;align-items:center;justify-content:center;min-height:100vh;}
+  #card{position:relative;width:324px;height:106px;border-radius:12px;overflow:hidden;transform-origin:center;}
+  .abs{position:absolute;left:0;top:0;width:324px;height:106px;}
+  .letter{display:flex;align-items:center;justify-content:center;font-family:"Roboto Mono",monospace;font-weight:700;}
+</style>
+</head>
+<body>
+<div id="card">
+  <div class="abs" id="aBg"></div>
+  <div class="abs letter" id="aLet"></div>
+  <div class="abs" id="mr" style="z-index:3"></div>
+  <div class="abs" id="bBg"></div>
+  <div class="abs letter" id="bLet"></div>
+</div>
+<script>
+/* ========== CFG：可換內容集中在這裡 ========== */
+const CFG = {
+  sceneA: { img:'img/A_scene.jpg', bg:'#ff5b8f', letter:'A', color:'#15151d' },   // 轉場前的畫面（底色＋字，或圖）
+  sceneB: { img:'img/B_scene.jpg', bg:'#f4f0e6', letter:'B', color:'#ff5b8f' },   // 轉場後的畫面
+  maroon: '#ffffff',   // 先掃過的過場色面（單一色塊用白色）
+  fontSize: 50
+};
+/* ========== 動態參數（30fps 幀為單位）==========
+   一輪 = 51.6 幀。像 01 的色面擦除，只是邊緣是斜的（對角線版）。沒有條紋。
+   入場（c<20）：A 在下，B 在上；深色過場面斜緣「\」由左掃過，B 以同樣的斜緣晚 4.1 幀掃過並露出。
+   退場（c≥20）：B 在下，A 在上；深色過場面斜緣「／」掃過，A 晚 3.9 幀以同樣斜緣掃過並露出。 */
+const LOOP = 51.6, W = 324, H = 106, PHASE = 20;
+const IN_LEAN = 31, OUT_LEAN = 30;
+const IN_T  = [[-0.35,-35],[0,-3],[1,88],[2,202],[3,277],[4,345]];
+const OUT_B = [[-0.5,-60],[0,-30],[1,86],[2,205],[3,278],[4,335]];
+const CREAM_DELAY = 4.1, PINK_DELAY = 3.9;
+function lerpTab(tab, x){
+  if (x <= tab[0][0]) return tab[0][1];
+  for (let i=1;i<tab.length;i++){
+    if (x <= tab[i][0]){ const a=tab[i-1], b=tab[i]; return a[1] + (b[1]-a[1])*(x-a[0])/(b[0]-a[0]); }
+  }
+  return tab[tab.length-1][1];
+}
+const $ = id => document.getElementById(id);
+const SC = { a:{bg:$('aBg'), let:$('aLet')}, b:{bg:$('bBg'), let:$('bLet')} };
+function stage(topKey, clip){
+  const top = SC[topKey], base = SC[topKey==='b' ? 'a' : 'b'];
+  base.bg.style.zIndex = 1; base.let.style.zIndex = 2;
+  top.bg.style.zIndex = 4;  top.let.style.zIndex = 6;
+  top.bg.style.clipPath = top.let.style.clipPath = clip;
+  base.bg.style.clipPath = base.let.style.clipPath = 'none';
+}
+const polyStr = pts => 'polygon('+pts.map(p=>p[0]+'px '+p[1]+'px').join(',')+')';
+function render(t){
+  const c = ((t*30) % LOOP + LOOP) % LOOP;
+  if (c < PHASE){
+    const t1 = lerpTab(IN_T, c), t2 = lerpTab(IN_T, c - CREAM_DELAY);
+    $('mr').style.clipPath = polyStr([[0,0],[t1,0],[t1+IN_LEAN,H],[0,H]]);
+    stage('b', polyStr([[0,0],[t2,0],[t2+IN_LEAN,H],[0,H]]));
+  } else {
+    const g = c - 27;
+    const b1 = g < -0.5 ? -80 : lerpTab(OUT_B, g);
+    const b2 = (g-PINK_DELAY) < -0.5 ? -80 : lerpTab(OUT_B, g - PINK_DELAY);
+    $('mr').style.clipPath = polyStr([[0,0],[b1+OUT_LEAN,0],[b1,H],[0,H]]);
+    stage('a', polyStr([[0,0],[b2+OUT_LEAN,0],[b2,H],[0,H]]));
+  }
+}
+/* ========== 外殼 ========== */
+(function(){
+  const q = new URLSearchParams(location.search);
+  const card = $('card');
+  if (q.has('m')) { document.body.style.display='block'; document.body.style.minHeight='0'; } // 量測用：卡片貼左上
+  card.style.background = CFG.sceneA.bg;
+  $('mr').style.background = CFG.maroon;
+  for (const [bg, let_, s] of [['aBg','aLet',CFG.sceneA],['bBg','bLet',CFG.sceneB]]){
+    const useImg = q.has('img') && s.img;   // ?img=1：兩幕改用圖片
+    $(bg).style.background = useImg ? 'url('+s.img+') center/cover no-repeat' : s.bg;
+    const e = $(let_); e.textContent = useImg ? '' : s.letter; e.style.color = s.color; e.style.fontSize = CFG.fontSize+'px';
+  }
+  const z = parseFloat(q.get('z')||'1'); if (z !== 1) card.style.transform = 'scale('+z+')';
+  const start = () => {
+    if (q.has('t')) { render(parseFloat(q.get('t'))); document.title += ' ready'; return; }
+    const t0 = performance.now();
+    (function loop(){ render((performance.now()-t0)/1000); requestAnimationFrame(loop); })();
+  };
+  document.fonts.load('700 50px "Roboto Mono"', 'AB').then(start, start);
+})();
+</script>
+</body>
+</html>

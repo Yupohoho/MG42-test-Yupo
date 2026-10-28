@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>19 Text Cylinder</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #cyl { position:absolute; left:0; top:0; width:100%; height:100%; transform-style:preserve-3d; }
+  .c { position:absolute; left:0; top:0; line-height:1; font-family:'Dela Gothic One',sans-serif; transform-origin:50% 50%; backface-visibility:hidden; }
+</style>
+</head>
+<body>
+<div id="card"></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '世界は回り続ける',   // 繞圓柱一圈的字（字數 = 圓周上的格數）
+  W: 324, H: 106,
+  bg: '#f3efe6',
+  radius: 84,               // 圓柱半徑（px），決定橫向寬度
+  perspective: 420,         // 透視距離（越小越有立體感：兩側的字越窄越小）
+  fontSize: 33,
+  // 三行：y = 行中心（畫面高比例）；dir = 轉向（1 / -1）；phase = 起始偏移（字數）
+  rows: [
+    { y: .14, color: '#121212', dir:  1, phase: 0 },
+    { y: .52, color: '#0e6b62', dir: -1, phase: 0 },
+    { y: .90, color: '#121212', dir:  1, phase: 0 },
+  ],
+  loop: 2.0,                // 轉一圈的秒數
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})`, perspective: CFG.perspective+'px' });
+const cyl = document.createElement('div'); cyl.id = 'cyl'; card.appendChild(cyl);
+const chars = [...CFG.text], N = chars.length;
+const cells = CFG.rows.map(r => chars.map(ch => {
+  const d = document.createElement('div'); d.className = 'c'; d.textContent = ch;
+  Object.assign(d.style, { fontSize: CFG.fontSize+'px', color: r.color });
+  cyl.appendChild(d); return d;
+}));
+
+function render(t) {
+  CFG.rows.forEach((r, ri) => {
+    cells[ri].forEach((el, i) => {
+      // 每個字在圓柱上的角度；0 = 正對畫面
+      const a = ((i - r.phase) / N + r.dir * t / CFG.loop) * 360;
+      const w = el.offsetWidth, h = el.offsetHeight;
+      // 真的貼在 3D 圓柱表面：圓柱軸放在畫面後方 radius 處，正面的字剛好在畫面上；背面靠 backface-visibility 隱藏
+      el.style.transform = `translate3d(${CFG.W/2 - w/2}px,${r.y*CFG.H - h/2}px,${-CFG.radius}px) rotateY(${a}deg) translateZ(${CFG.radius}px)`;
+    });
+  });
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(f); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "Dela Gothic One"`, CFG.text).then(start);
+</script>
+</body>
+</html>

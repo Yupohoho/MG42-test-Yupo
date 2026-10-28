@@ -1,0 +1,92 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>T99 Geometric Morph</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Oswald:wght@700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#e9e7e3}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh}
+body.m{display:block;min-height:0}
+.card{position:relative;overflow:hidden}
+canvas{display:block}
+</style></head>
+<body><div class="card" id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== CFG：可換內容集中在這裡 =====
+const CFG={
+  cx:142, cy:79,              // 圖形中心（卡片正中央，全程不動）
+  size:106,                   // 圓直徑＝方形邊長
+  // 依序變形的形狀：sides=0 為圓；R 為外接半徑；col 為該形狀的顏色（a/b）
+  seq:[
+    {sides:0, R:53, col:'a'},
+    {sides:4, R:75, col:'b'},
+    {sides:3, R:63, col:'a'},
+    {sides:6, R:53, col:'b'},
+    {sides:0, R:53, col:'a'},
+  ],
+  spin:288,                   // 全程總共轉幾度（順時針）
+  bg:'#fcfcf9', a:'#9575cd', b:'#232631'   // 兩個交替的顏色（紫、深藍黑）
+};
+const LOOP=120; // 幀（30fps），動畫約 84 幀，其餘停住
+
+// ===== 動態 =====
+// 中心固定，整體以平滑的速度一路順時針轉；轉的途中依序變形（圓→方→三角→六角→圓），顏色跟著交替，最後圓縮小停住
+const POP=[0,.25,.5,.72,.88,.98,1.04,1.06,1.05,1.03,1.02,1.01,1];   // 一開始圓彈出
+const MORPH=[18,34,50,66], MD=10;                                    // 各次變形的開始幀、長度
+const SPIN0=4, SPIN1=82;                                             // 旋轉期間（頭尾緩入緩出、中間等速）
+const SHRINK0=70, SHRINK1=84, SHRINK_TO=.604;                        // 最後縮小
+const N=180;
+const ss=p=>p*p*(3-2*p);
+function spinAt(n){ // 緩入 12 幀＋等速＋緩出 12 幀，角度單調增加
+  const T=SPIN1-SPIN0,e=12,t=clamp(n-SPIN0,0,T),v=1/(T-e);  // v：等速段每幀比例
+  let d;if(t<e)d=v*t*t/(2*e);else if(t<T-e)d=v*(e/2+(t-e));else{const u=T-t;d=1-v*u*u/(2*e);}
+  return CFG.spin*d;
+}
+function rPoly(s,phi){if(!s.sides)return s.R;const k=2*Math.PI/s.sides,a=s.R*Math.cos(Math.PI/s.sides);
+  const q=((phi+Math.PI/2)%k+k)%k;return a/Math.cos(q-k/2);}   // 頂點朝上
+function init(){}
+function render(n){
+  let i=0,p=0;for(let m=0;m<MORPH.length;m++){if(n>=MORPH[m]){i=m;p=ss(clamp((n-MORPH[m])/MD,0,1));}}
+  if(n<MORPH[0]){i=0;p=0;}
+  const A=CFG.seq[i],B=CFG.seq[n<MORPH[0]?0:i+1];
+  const ca=CFG[A.col],cb=CFG[B.col];
+  const k=tab(POP,n)*(n<SHRINK0?1:lerp(1,SHRINK_TO,ss(clamp((n-SHRINK0)/(SHRINK1-SHRINK0),0,1))));
+  if(k<=0)return;
+  ctx.save();ctx.translate(CFG.cx,CFG.cy);ctx.rotate(spinAt(n)*Math.PI/180);ctx.scale(k,k);ctx.beginPath();
+  for(let j=0;j<N;j++){const f=j/N*Math.PI*2,r=lerp(rPoly(A,f),rPoly(B,f),p);j?ctx.lineTo(r*Math.cos(f),r*Math.sin(f)):ctx.moveTo(r*Math.cos(f),r*Math.sin(f));}
+  ctx.closePath();ctx.fillStyle=mix(ca,cb,p);ctx.fill();ctx.restore();
+}
+
+// ===== 共用 =====
+const Q=new URLSearchParams(location.search),Z=+(Q.get('z')||1);
+if(Q.get('m'))document.body.classList.add('m');
+const CW=284,CH=158,DPR=window.devicePixelRatio||1;
+const card=document.getElementById('card'),cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+card.style.cssText+=`width:${CW*Z}px;height:${CH*Z}px;border-radius:${12*Z}px;background:${CFG.bg}`;
+cv.width=CW*Z*DPR;cv.height=CH*Z*DPR;cv.style.width=CW*Z+'px';cv.style.height=CH*Z+'px';
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const tab=(A,i)=>A[clamp(Math.floor(i),0,A.length-1)];
+const lerp=(a,b,p)=>a+(b-a)*p;
+const hex=h=>[1,3,5].map(i=>parseInt(h.substr(i,2),16));
+const mix=(a,b,p)=>{const A=hex(a),B=hex(b);return `rgb(${A.map((v,i)=>Math.round(v+(B[i]-v)*p)).join(',')})`};
+// 文字依墨跡框定位：box={x,y,w,h}；w 省略時照字型原比例
+function fitText(str,fam,wt,box){
+  const c=document.createElement('canvas').getContext('2d');c.font=`${wt} 200px ${fam}`;
+  const m=c.measureText(str),k=box.h/(m.actualBoundingBoxAscent+m.actualBoundingBoxDescent);
+  const nw=(m.actualBoundingBoxLeft+m.actualBoundingBoxRight)*k,sx=box.w?box.w/nw:1;
+  return{str,font:`${wt} ${200*k}px ${fam}`,sx,ox:-(m.actualBoundingBoxRight-m.actualBoundingBoxLeft)/2*k,
+    nw,oy:(m.actualBoundingBoxAscent-m.actualBoundingBoxDescent)/2*k,cx:box.x+(box.w||0)/2,cy:box.y+box.h/2};
+}
+function drawText(L,color,s=1,alpha=1,dy=0){
+  ctx.save();ctx.globalAlpha=alpha;ctx.translate(L.cx,L.cy+dy);ctx.scale(s*L.sx,s);
+  ctx.font=L.font;ctx.fillStyle=color;ctx.fillText(L.str,L.ox,L.oy);ctx.restore();
+}
+function frame(t){
+  const n=Math.floor(t*30+1e-6)%LOOP;
+  ctx.setTransform(Z*DPR,0,0,Z*DPR,0,0);ctx.globalAlpha=1;ctx.filter='none';
+  ctx.fillStyle=CFG.bg;ctx.fillRect(0,0,CW,CH);render(n);
+}
+const T0=Q.get('t');
+document.fonts.load(`400 60px "Archivo Black"`,'A').then(()=>document.fonts.load(`700 60px "Oswald"`,'A')).catch(()=>{}).then(()=>{
+  init();
+  if(T0!==null)frame(+T0);else{const st=performance.now();const lp=()=>{frame((performance.now()-st)/1000);requestAnimationFrame(lp)};lp();}
+});
+</script></body></html>

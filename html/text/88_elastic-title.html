@@ -1,0 +1,63 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>T88 Elastic Title</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#e9e7e3}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh}
+body.m{display:block;min-height:0}
+.card{position:relative;overflow:hidden}
+canvas{display:block}
+</style></head>
+<body><div class="card" id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== CFG：可換內容集中在這裡 =====
+const CFG={
+  text:'READY?', accentIdx:[5],
+  font:'"Archivo Black"', weight:'400',
+  box:{x:33,y:60,w:221,h:37},
+  gap:3,                               // 每個字間隔幾幀落下
+  bg:'#fcfcf9', ink:'#3a3a46', accent:'#5178eb'
+};
+const LOOP=120;
+
+// ===== 共用 =====
+const Q=new URLSearchParams(location.search),Z=+(Q.get('z')||1);
+if(Q.get('m'))document.body.classList.add('m');
+const CW=284,CH=158,DPR=window.devicePixelRatio||1;
+const card=document.getElementById('card'),cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+card.style.cssText+=`width:${CW*Z}px;height:${CH*Z}px;border-radius:${12*Z}px;background:${CFG.bg}`;
+cv.width=CW*Z*DPR;cv.height=CH*Z*DPR;cv.style.width=CW*Z+'px';cv.style.height=CH*Z+'px';
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function layout(str,fam,wt,box){
+  const c=document.createElement('canvas').getContext('2d'),f=s=>`${wt} ${s}px ${fam}`;c.font=f(200);
+  const m=c.measureText(str),k=box.h/(m.actualBoundingBoxAscent+m.actualBoundingBoxDescent);
+  const sx=box.w/((m.actualBoundingBoxLeft+m.actualBoundingBoxRight)*k);
+  const pen0=box.x+m.actualBoundingBoxLeft*k*sx,base=box.y+m.actualBoundingBoxAscent*k;
+  const L=[...str].map((ch,i)=>{const pre=c.measureText(str.slice(0,i)).width,mc=c.measureText(ch);
+    const pen=pen0+pre*k*sx;return{ch,pen,cx:pen+(mc.actualBoundingBoxRight-mc.actualBoundingBoxLeft)/2*k*sx}});
+  return{font:f(200*k),sx,base,L};
+}
+let LAY;
+// ===== 動態 =====
+// 每個字從上方拉長落下 → 落地壓扁 → 往上拉長 → 小幅回彈定位（支點在字底）
+// [字底 y 相對定位的位移 px, 垂直倍率]；k = 這個字開始後第幾幀
+const SEQ=[[-96,2.2],[-54,2.0],[-3,1.27],[2,0.73],[3,0.6],[0,0.87],[2,1.16],[2,1.22],[0,1.1],[-1,0.97],[0,0.92],[0,0.92],[0,0.95],[0,0.97]];
+const START=1;
+function render(t){
+  const n=Math.floor(t*30+1e-6)%LOOP;
+  ctx.setTransform(Z*DPR,0,0,Z*DPR,0,0);ctx.fillStyle=CFG.bg;ctx.fillRect(0,0,CW,CH);
+  ctx.font=LAY.font;
+  LAY.L.forEach((l,i)=>{
+    const k=n-(START+CFG.gap*i);if(k<0)return;
+    const [dy,sy]=k<SEQ.length?SEQ[k]:[0,1],sxx=1+(1-sy)*0.15;
+    ctx.save();ctx.translate(l.cx,LAY.base+dy);ctx.scale(sxx,sy);ctx.translate(-l.cx,0);
+    ctx.translate(l.pen,0);ctx.scale(LAY.sx,1);ctx.fillStyle=CFG.accentIdx.includes(i)?CFG.accent:CFG.ink;
+    ctx.fillText(l.ch,0,0);ctx.restore();
+  });
+}
+const T0=Q.get('t');
+document.fonts.load(`${CFG.weight} 60px ${CFG.font}`,CFG.text).then(()=>{
+  LAY=layout(CFG.text,CFG.font,CFG.weight,CFG.box);
+  if(T0!==null)render(+T0);else{const st=performance.now();const loop=()=>{render((performance.now()-st)/1000);requestAnimationFrame(loop)};loop();}
+});
+</script></body></html>

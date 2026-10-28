@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>37 Text Liquid Fill</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .w { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; line-height:1;
+       font-family:'Dela Gothic One','Noto Sans JP',sans-serif; }
+  #fill { color:transparent; -webkit-background-clip:text; background-clip:text; background-repeat:no-repeat; }
+</style>
+</head>
+<body>
+<div id="card"><div class="w" id="outline"></div><div class="w" id="fill"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '満',
+  W: 324, H: 106,
+  bg: '#14161c',
+  stroke: '#f6efe4', strokeW: 1.3,
+  liquid: '#ff8a3d',
+  fontSize: 92,
+  yOffset: 4,
+  low: 0.40,           // 最低水位（字高比例，從字底算）
+  high: 1.05,          // 最高水位（略超過字頂 = 全滿）
+  // 一個循環（秒）：上升 → 滿著停 → 下降，上升與下降都是 ease-in-out
+  rise: 0.67, hold: 0.67, fall: 0.67,
+  waveAmp: 4,          // 波浪振幅（px）
+  waveLen: 46,         // 波長（px）
+  waveSpeed: 70,       // 波浪往右流動速度（px/秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+const outline = document.getElementById('outline');
+const fill = document.getElementById('fill');
+const LOOP = CFG.rise + CFG.hold + CFG.fall;
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+for (const el of [outline, fill]) { el.textContent = CFG.text; Object.assign(el.style, { fontSize: CFG.fontSize+'px', top: CFG.yOffset+'px' }); }
+Object.assign(outline.style, { color: 'transparent', webkitTextStroke: `${CFG.strokeW}px ${CFG.stroke}` });
+
+const ease = k => k < .5 ? 2*k*k : 1 - Math.pow(-2*k + 2, 2) / 2;
+function level(t) {
+  if (t < CFG.rise) return CFG.low + (CFG.high - CFG.low) * ease(t / CFG.rise);
+  if (t < CFG.rise + CFG.hold) return CFG.high;
+  return CFG.high - (CFG.high - CFG.low) * ease((t - CFG.rise - CFG.hold) / CFG.fall);
+}
+
+// 液體 = 一張 SVG：波浪頂邊 + 下方實心，用 background-clip:text 只留字形內部
+function render(t) {
+  const H = CFG.H, inkTop = H/2 + CFG.yOffset - CFG.fontSize*.42, inkH = CFG.fontSize*.84;
+  const surf = inkTop + inkH * (1 - level(t % LOOP));
+  const ph = (CFG.waveSpeed * t) % CFG.waveLen;
+  let d = `M ${-CFG.waveLen} ${H}`;
+  for (let x = -CFG.waveLen; x <= CFG.W + CFG.waveLen; x += 4)
+    d += ` L ${x} ${(surf + CFG.waveAmp * Math.sin((x - ph) / CFG.waveLen * 2 * Math.PI)).toFixed(2)}`;
+  d += ` L ${CFG.W + CFG.waveLen} ${H} Z`;
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${CFG.W}' height='${H}'><path d='${d}' fill='${CFG.liquid}'/></svg>`;
+  fill.style.backgroundImage = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+  fill.style.backgroundPosition = `0 ${-CFG.yOffset}px`;
+}
+
+document.fonts.load(`${CFG.fontSize}px "Dela Gothic One"`, CFG.text).then(() => {
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+});
+</script>
+</body>
+</html>

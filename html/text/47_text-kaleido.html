@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>47 Text Kaleido</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #wheel { position:absolute; width:0; height:0; }
+  .arm { position:absolute; left:0; top:0; line-height:1; white-space:nowrap; font-family:'Dela Gothic One',sans-serif;
+         transform-origin:50% 0; opacity:.95; }
+</style>
+</head>
+<body>
+<div id="card"><div id="wheel"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '華',          // 每支放的字（1–2 字最好看）
+  W: 324, H: 106,
+  bg: '#f3efe6',
+  colors: ['#3d5a0a', '#2a2c33'],   // 相鄰兩支交替的顏色
+  arms: 8,             // 繞一圈放幾份（偶數，顏色才會交替）
+  fontSize: 30,
+  stretch: 1.45,       // 字往外（半徑方向）拉長的倍率
+  skew: .25,           // 每支往旁邊偏一點，排起來像風車（字寬比例）
+  inner: 6,            // 字從中心多遠開始（中間留一個小圓洞）
+  cx: .5, cy: .55,
+  turnsPerLoop: 2,     // 每個循環轉過幾格（一格 = 360/arms 度）
+  breathe: .06,        // 每支字的大小輕微脈動幅度
+  loop: 2.0,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), wheel = document.getElementById('wheel');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+Object.assign(wheel.style, { left: CFG.cx * CFG.W + 'px', top: CFG.cy * CFG.H + 'px' });
+const arms = Array.from({ length: CFG.arms }, (_, i) => {
+  const d = document.createElement('div'); d.className = 'arm'; d.textContent = CFG.text;
+  Object.assign(d.style, { fontSize: CFG.fontSize+'px', color: CFG.colors[i % 2] });
+  wheel.appendChild(d); return d;
+});
+
+function render(t) {
+  const step = 360 / CFG.arms, k = t / CFG.loop;
+  const rot = k * CFG.turnsPerLoop * step;
+  arms.forEach((el, i) => {
+    const w = el.offsetWidth;
+    // 每支：直書的字從中心往外排，繞中心等分；整個輪子等速轉，相鄰兩支脈動相反
+    const s = 1 + CFG.breathe * Math.sin(k * Math.PI * 2 * CFG.turnsPerLoop + i * Math.PI);
+    el.style.transform = `rotate(${i * step + rot + 180}deg) translate(${-w/2 + w * CFG.skew}px,${CFG.inner}px) scale(${s},${s * CFG.stretch})`;
+  });
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function loop(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(loop); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "Dela Gothic One"`, CFG.text).then(start);
+</script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>50 Stop Motion</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@900&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .c { position:absolute; left:0; top:0; line-height:1; white-space:nowrap; font-family:'Noto Sans JP',sans-serif; font-weight:900; }
+</style>
+</head>
+<body>
+<!-- 手作感：每個姿勢換一組雜訊，字的邊緣微微抖動 -->
+<svg width="0" height="0" style="position:absolute">
+  <filter id="rough" x="-10%" y="-10%" width="120%" height="120%">
+    <feTurbulence id="turb" type="fractalNoise" baseFrequency="0.08" numOctaves="2" seed="1"/>
+    <feDisplacementMap in="SourceGraphic" scale="2.2" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+</svg>
+<div id="card"></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: 'コマ撮り',
+  W: 324, H: 106,
+  bg: '#fe6e52',
+  colors: ['#141414', '#f4efe4'],   // 字色依序交替
+  fontSize: 52,
+  gap: 6,              // 字與字的間距（px）
+  cy: .55,             // 文字中心高度（畫面高比例）
+  hold: 4,             // 每個姿勢停幾幀（30fps）：4 = 一秒 7.5 格，像定格動畫
+  jx: 3, jy: 3,        // 每個姿勢的隨機位移範圍（±px）
+  jr: 5,               // 每個姿勢的隨機旋轉範圍（±度）
+  poses: 15,           // 幾個姿勢後循環（15 × 4 幀 = 2 秒）
+};
+CFG.loop = CFG.poses * CFG.hold / 30;
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const turb = document.getElementById('turb');
+const chars = [...CFG.text], N = chars.length;
+const els = chars.map((ch, i) => {
+  const d = document.createElement('div'); d.className = 'c'; d.textContent = ch;
+  Object.assign(d.style, { fontSize: CFG.fontSize+'px', color: CFG.colors[i % CFG.colors.length], filter: 'url(#rough)' });
+  card.appendChild(d); return d;
+});
+const hash = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+
+function render(t) {
+  const pose = Math.floor(t * 30 / CFG.hold + 1e-6) % CFG.poses;   // 目前是第幾個姿勢（不補間，直接跳）
+  turb.setAttribute('seed', pose + 1);
+  const ws = els.map(e => e.offsetWidth), total = ws.reduce((a, b) => a + b, 0) + CFG.gap * (N - 1);
+  let x = (CFG.W - total) / 2;
+  els.forEach((el, i) => {
+    const r = (k) => (hash(pose * 17 + i * 5 + k) - .5) * 2;
+    const dx = r(1) * CFG.jx, dy = r(2) * CFG.jy, rot = r(3) * CFG.jr;
+    el.style.transform = `translate(${x + dx}px,${CFG.cy * CFG.H - el.offsetHeight / 2 + dy}px) rotate(${rot}deg)`;
+    x += ws[i] + CFG.gap;
+  });
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(f); })(t0); }
+};
+document.fonts.load(`900 ${CFG.fontSize}px "Noto Sans JP"`, CFG.text).then(start);
+</script>
+</body>
+</html>

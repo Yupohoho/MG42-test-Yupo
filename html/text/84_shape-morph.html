@@ -1,0 +1,70 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>T84 Shape Morph</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#e9e7e3}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh}
+body.m{display:block;min-height:0}
+.card{position:relative;overflow:hidden}
+canvas{display:block}
+</style></head>
+<body><div class="card" id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== CFG：可換內容集中在這裡 =====
+const CFG={
+  text:'NEW',                          // 第一個字由圖形變成（強調色），其餘為深色
+  font:'"Archivo Black"', weight:'400',
+  box:{x:55,y:53,w:177,h:50},
+  shapeC:{x:142.5,y:78.5}, shapeD:100, // 圓／方形起始中心與直徑
+  bg:'#fcfcf9', ink:'#282e36', accent:'#3e6be9'
+};
+const LOOP=120;
+
+// ===== 共用 =====
+const Q=new URLSearchParams(location.search),Z=+(Q.get('z')||1);
+if(Q.get('m'))document.body.classList.add('m');
+const CW=284,CH=158,DPR=window.devicePixelRatio||1;
+const card=document.getElementById('card'),cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+card.style.cssText+=`width:${CW*Z}px;height:${CH*Z}px;border-radius:${12*Z}px;background:${CFG.bg}`;
+cv.width=CW*Z*DPR;cv.height=CH*Z*DPR;cv.style.width=CW*Z+'px';cv.style.height=CH*Z+'px';
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),eo3=p=>1-Math.pow(1-p,3);
+const eio3=p=>p<.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2,tab=(A,i)=>A[clamp(i,0,A.length-1)];
+function layout(str,fam,wt,box){
+  const c=document.createElement('canvas').getContext('2d'),f=s=>`${wt} ${s}px ${fam}`;c.font=f(200);
+  const m=c.measureText(str),k=box.h/(m.actualBoundingBoxAscent+m.actualBoundingBoxDescent);
+  const sx=box.w/((m.actualBoundingBoxLeft+m.actualBoundingBoxRight)*k);
+  const pen0=box.x+m.actualBoundingBoxLeft*k*sx,base=box.y+m.actualBoundingBoxAscent*k;
+  const L=[...str].map((ch,i)=>{const pre=c.measureText(str.slice(0,i)).width,mc=c.measureText(ch);
+    const pen=pen0+pre*k*sx,l=pen-mc.actualBoundingBoxLeft*k*sx,r=pen+mc.actualBoundingBoxRight*k*sx;
+    return{ch,pen,l,r,t:base-mc.actualBoundingBoxAscent*k,b:base+mc.actualBoundingBoxDescent*k}});
+  return{font:f(200*k),sx,base,L};
+}
+function drawLetter(l,color,dx=0){ctx.font=LAY.font;ctx.fillStyle=color;ctx.save();ctx.translate(l.pen+dx,LAY.base);ctx.scale(LAY.sx,1);ctx.fillText(l.ch,0,0);ctx.restore()}
+let LAY;
+// ===== 動態 =====
+// n0–15 圓形彈出；n34 圓瞬間變方形；n39–51 方形邊轉邊縮、移到第一個字的位置；n43 起其餘字淡入滑入；n46–52 方形邊到位邊溶成字（連續過渡）
+const SLIDE=[16,10,7,5,3,2,1,0]; // 其餘字的右移量（從 n=45 起）
+function render(t){
+  const n=Math.floor(t*30+1e-6)%LOOP;
+  ctx.setTransform(Z*DPR,0,0,Z*DPR,0,0);ctx.fillStyle=CFG.bg;ctx.fillRect(0,0,CW,CH);
+  const L0=LAY.L[0],tx=(L0.l+L0.r)/2,ty=(L0.t+L0.b)/2,ts=Math.max(L0.r-L0.l,L0.b-L0.t);
+  ctx.fillStyle=CFG.accent;
+  if(n<34){ // 圓
+    const s=n<8?1.12*eo3(n/8):(n<15?1.12-0.12*eo3((n-8)/7):1);
+    ctx.beginPath();ctx.arc(CFG.shapeC.x,CFG.shapeC.y,CFG.shapeD/2*s,0,Math.PI*2);ctx.fill();
+  }else{ // 方形 → 最後 6 幀邊縮邊溶成字（不停頓）
+    const p=clamp((n-39)/12,0,1),e=eio3(p),m=clamp((n-46)/6,0,1);
+    const size=CFG.shapeD+(ts-CFG.shapeD)*e,x=CFG.shapeC.x+(tx-CFG.shapeC.x)*e,y=CFG.shapeC.y+(ty-CFG.shapeC.y)*e;
+    if(m<1){ctx.save();ctx.globalAlpha=1-m;ctx.translate(x,y);ctx.rotate(22*Math.sin(Math.PI*p)*Math.PI/180);ctx.fillRect(-size/2,-size/2,size,size);ctx.restore();}
+    if(m>0){const k=0.92+0.08*m;ctx.save();ctx.globalAlpha=m;ctx.translate(x,y);ctx.scale(k,k);ctx.translate(-tx,-ty);drawLetter(L0,CFG.accent);ctx.restore();}
+  }
+  // 其餘字
+  if(n>=43){const a=clamp((n-43)/3,0,1),dx=n<45?16:tab(SLIDE,n-45);
+    ctx.globalAlpha=a;for(let i=1;i<LAY.L.length;i++)drawLetter(LAY.L[i],CFG.ink,dx);ctx.globalAlpha=1;}
+}
+const T0=Q.get('t');
+document.fonts.load(`${CFG.weight} 60px ${CFG.font}`,CFG.text).then(()=>{
+  LAY=layout(CFG.text,CFG.font,CFG.weight,CFG.box);
+  if(T0!==null)render(+T0);else{const st=performance.now();const loop=()=>{render((performance.now()-st)/1000);requestAnimationFrame(loop)};loop();}
+});
+</script></body></html>

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>58 Letter Bounce</title>
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@800&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .c { position:absolute; top:0; line-height:1; font-family:'M PLUS Rounded 1c',sans-serif; font-weight:800; white-space:nowrap; }
+</style>
+</head>
+<body>
+<div id="card"></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: 'はずむ文字',
+  W: 324, H: 106,
+  bg: '#9b7cff',
+  colors: ['#141414', '#f6efe4'],   // 字色依序交替
+  fontSize: 48,
+  baseY: .63,              // 字的垂直中心（畫面比例）
+  start: 0.13,             // 第一個字起跳時間
+  stagger: 0.133,          // 每個字比前一個晚幾秒起跳（約 4 幀）
+  jumpTime: 0.33,          // 一次跳躍（離地到落地）的秒數
+  height: 21,              // 跳起最高高度（px）
+  loop: 1.0,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const chars = [...CFG.text];
+const els = chars.map((ch, i) => {
+  const d = document.createElement('div'); d.className = 'c'; d.textContent = ch;
+  Object.assign(d.style, { fontSize: CFG.fontSize+'px', color: CFG.colors[i % CFG.colors.length] });
+  card.appendChild(d); return d;
+});
+
+function layout() {
+  const ws = els.map(e => e.offsetWidth), total = ws.reduce((a, b) => a + b, 0);
+  let x = (CFG.W - total) / 2;
+  els.forEach((e, i) => { e._x = x; x += ws[i]; e._y = CFG.baseY * CFG.H - e.offsetHeight / 2; });
+}
+
+// 拋物線跳躍：起跳快、頂點慢、落地快
+function jump(dt) {
+  if (dt < 0 || dt >= CFG.jumpTime) return 0;
+  const k = dt / CFG.jumpTime;
+  return 4 * k * (1 - k);
+}
+
+function render(t) {
+  els.forEach((e, i) => {
+    const y = -CFG.height * jump(t - CFG.start - i * CFG.stagger);
+    e.style.transform = `translate(${e._x}px,${e._y + y}px)`;
+  });
+}
+
+document.fonts.load(`800 ${CFG.fontSize}px "M PLUS Rounded 1c"`, CFG.text).then(() => {
+  layout();
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(f); })(t0); }
+});
+</script>
+</body>
+</html>

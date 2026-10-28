@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>67 Pixel Dissolve</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@900&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  canvas { position:absolute; left:0; top:0; }
+</style>
+</head>
+<body>
+<div id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: 'ピクセル化',
+  W: 324, H: 106,
+  bg: '#f4f0e4',
+  ink: '#121214',
+  fontSize: 45,
+  cx: 168, cy: 56,       // 字的中心
+  cell: 7,               // 方塊大小（px）
+  // 時間（30fps 幀）：完整 → 逐格消失 → 全空 → 逐格長回 → 完整
+  outStart: 14.5, outEnd: 26.5,
+  inStart: 30.5, inEnd: 42,
+  loop: 1.383,           // 41.5 幀
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const Z = +(q.get('z') || 1);
+const card = document.getElementById('card'), cv = document.getElementById('cv');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${Z})` });
+const R = 3;   // 畫布用 3 倍解析度畫，放大看也清楚
+cv.width = CFG.W * R; cv.height = CFG.H * R; cv.style.width = CFG.W+'px'; cv.style.height = CFG.H+'px';
+const ctx = cv.getContext('2d');
+
+// 每個方塊各有一個「消失順序」與「長回順序」（固定亂數，畫面每次都一樣）
+const rnd = s => () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+const cols = Math.ceil(CFG.W / CFG.cell), rows = Math.ceil(CFG.H / CFG.cell);
+const r1 = rnd(7), r2 = rnd(1234);
+const outT = Array.from({ length: cols * rows }, r1), inT = Array.from({ length: cols * rows }, r2);
+let textCanvas;
+
+function prepare() {
+  textCanvas = document.createElement('canvas'); textCanvas.width = cv.width; textCanvas.height = cv.height;
+  const c = textCanvas.getContext('2d');
+  c.scale(R, R); c.fillStyle = CFG.ink; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.font = `900 ${CFG.fontSize}px "Noto Sans JP"`; c.fillText(CFG.text, CFG.cx, CFG.cy);
+}
+
+function render(t) {
+  const f = Math.floor(t * 30);   // 逐幀跳，不補間
+  // shown(i)：方塊 i 這一幀看不看得到
+  let shown;
+  if (f < CFG.outStart) shown = () => true;
+  else if (f < CFG.outEnd) { const p = (f - CFG.outStart + 1) / (CFG.outEnd - CFG.outStart); shown = i => outT[i] >= p; }
+  else if (f < CFG.inStart) shown = () => false;
+  else if (f < CFG.inEnd) { const p = (f - CFG.inStart + 1) / (CFG.inEnd - CFG.inStart); shown = i => inT[i] < p; }
+  else shown = () => true;
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  const s = CFG.cell * R;
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    if (!shown(r * cols + c)) continue;
+    ctx.drawImage(textCanvas, c * s, r * s, s, s, c * s, r * s, s, s);
+  }
+}
+
+const start = () => {
+  prepare();
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(f); })(t0); }
+};
+document.fonts.load(`900 ${CFG.fontSize}px "Noto Sans JP"`, CFG.text).then(start);
+</script>
+</body>
+</html>

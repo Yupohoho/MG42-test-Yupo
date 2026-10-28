@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>68 Rotating Words</title>
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@800&family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #ring, #word { position:absolute; left:0; top:0; width:0; height:0; }
+  .rc { position:absolute; left:0; top:0; line-height:1; font-family:'M PLUS Rounded 1c',sans-serif; font-weight:800; }
+  .w { position:absolute; line-height:1; font-family:'Dela Gothic One',sans-serif; transform:translate(-50%,-50%); white-space:nowrap; }
+</style>
+</head>
+<body>
+<div id="card"><div id="ring"></div><div id="word"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#14181c',
+  ringText: 'まわる',  ringRepeat: 6,          // 外圈文字（重複幾次排滿一圈）
+  ringColors: ['#2cd8c0', '#f4f0e4'],         // 外圈逐字交替的顏色
+  ringSize: 14, radius: 40,                   // 外圈字級、半徑
+  ringSpeed: 180,                             // 外圈每秒轉幾度（正 = 順時針）
+  words: [ { text: '春', color: '#2cd8c0' }, { text: '夏', color: '#f4f0e4' } ],   // 中央輪流切換的詞
+  wordSize: 46,
+  cx: 162, cy: 55,                            // 圓心
+  hold: 1.0,                                  // 每個詞停留秒數
+  // 切換時中央詞的上下壓扁（相對切換點的幀 → 高度比例）：壓扁成一條線、新詞一幀彈回
+  flip: { '-2': .4, '-1': .12, '0': .03, '1': .85 },
+  loop: 2.0,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), ring = document.getElementById('ring'), word = document.getElementById('word');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+ring.style.left = word.style.left = CFG.cx + 'px'; ring.style.top = word.style.top = CFG.cy + 'px';
+
+// 外圈：每個字繞圓排列、字頭朝外
+const rt = [...CFG.ringText.repeat(CFG.ringRepeat)], n = rt.length;
+rt.forEach((c, i) => {
+  const d = document.createElement('div'); d.className = 'rc'; d.textContent = c;
+  Object.assign(d.style, { fontSize: CFG.ringSize+'px', color: CFG.ringColors[i % CFG.ringColors.length] });
+  const a = i / n * 360;
+  d.style.transform = `rotate(${a}deg) translate(-50%,${-CFG.radius}px) translateY(-50%)`;
+  d.style.transformOrigin = '0 0';
+  ring.appendChild(d);
+});
+const wordEl = document.createElement('div'); wordEl.className = 'w'; wordEl.style.fontSize = CFG.wordSize + 'px'; word.appendChild(wordEl);
+
+function render(t) {
+  ring.style.transform = `rotate(${t * CFG.ringSpeed}deg)`;
+  // 中央詞：每 hold 秒換下一個；切換點前後幾幀上下壓扁
+  const f = Math.round(t * 30), per = Math.round(CFG.hold * 30);
+  let idx = Math.floor(f / per) % CFG.words.length, rel = f - (Math.floor(f / per) + 1) * per;   // rel：距離下一次切換的幀數（負值）
+  let sy = CFG.flip[rel];
+  if (sy === undefined) { const relPrev = f - Math.floor(f / per) * per; sy = CFG.flip[relPrev] ?? 1; }
+  const w = CFG.words[idx];
+  wordEl.textContent = w.text; wordEl.style.color = w.color;
+  word.style.transform = `scaleY(${sy})`;
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(f); })(t0); }
+};
+Promise.all([
+  document.fonts.load(`800 ${CFG.ringSize}px "M PLUS Rounded 1c"`, CFG.ringText),
+  document.fonts.load(`${CFG.wordSize}px "Dela Gothic One"`, CFG.words.map(w => w.text).join('')),
+]).then(start);
+</script>
+</body>
+</html>

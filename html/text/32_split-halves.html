@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>32 Split Halves</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Noto+Sans+JP:wght@900&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .half { position:absolute; left:0; right:0; overflow:hidden; }
+  .w { position:absolute; left:0; right:0; display:flex; justify-content:center; line-height:1; white-space:nowrap;
+       font-family:'Dela Gothic One',sans-serif; }
+  #hidden { position:absolute; left:0; right:0; display:flex; justify-content:center; line-height:1;
+            font-family:'Noto Sans JP',sans-serif; font-weight:900; }
+</style>
+</head>
+<body>
+<div id="card"><div id="hidden"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#14181e', ink: '#f2eee4', hiddenInk: '#b794fe',
+  word: '分裂',                    // 被切開的字
+  hidden: '本音',                  // 裂縫中出現的字
+  fontSize: 62, y: .55,           // y = 字中心（畫面高比例）；上下半以此為切線
+  hiddenSize: 17,
+  topMove: [37, -22],             // 上半最大位移（px）：往右、往上
+  botMove: [-37, 12],             // 下半最大位移（px）：往左、往下
+  openStart: 8, openDur: 11,      // 第 8 幀開始分開（第 9 幀就已分開約 1/4），11 幀內 ease-out 分到最開
+  hiddenIn: [15, 17],             // 「本音」第 15 幀開始淡入、第 17 幀全顯
+  hiddenOut: [37, 40],            // 第 37 幀開始淡出、第 40 幀消失
+  closeStart: 42, closeDur: 6,    // 第 42 幀開始合回，6 幀內 ease-in-out 合起
+  loopFrames: 51,                 // 1.7 秒
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const cutY = CFG.y * CFG.H;
+// 同一個字做兩份，分別用上下兩個框裁切，拼起來就是完整的字
+const halves = ['top', 'bot'].map(k => {
+  const h = document.createElement('div'); h.className = 'half';
+  Object.assign(h.style, k === 'top' ? { top: 0, height: cutY + 'px' } : { top: cutY + 'px', bottom: 0 });
+  const w = document.createElement('div'); w.className = 'w'; w.textContent = CFG.word;
+  Object.assign(w.style, { fontSize: CFG.fontSize + 'px', color: CFG.ink, top: (k === 'top' ? cutY : 0) - CFG.fontSize * .5 + 'px' });
+  h.appendChild(w); card.appendChild(h); return h;
+});
+const hid = document.getElementById('hidden');
+Object.assign(hid.style, { fontSize: CFG.hiddenSize + 'px', color: CFG.hiddenInk, top: cutY - CFG.hiddenSize * .55 + 'px' });
+hid.textContent = CFG.hidden;
+
+const easeOutCubic = k => 1 - Math.pow(1 - k, 3);
+const easeInOutSine = k => (1 - Math.cos(Math.PI * k)) / 2;
+const ramp = (f, a, b) => Math.min(1, Math.max(0, (f - a) / (b - a)));
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  let p;                                                // 分開程度 0（合起）→ 1（最開）
+  if (f < CFG.openStart) p = 0;
+  else if (f < CFG.closeStart) p = easeOutCubic(ramp(f, CFG.openStart, CFG.openStart + CFG.openDur));
+  else p = 1 - easeInOutSine(ramp(f, CFG.closeStart, CFG.closeStart + CFG.closeDur));
+  halves[0].style.transform = `translate(${CFG.topMove[0] * p}px,${CFG.topMove[1] * p}px)`;
+  halves[1].style.transform = `translate(${CFG.botMove[0] * p}px,${CFG.botMove[1] * p}px)`;
+  hid.style.opacity = f < CFG.hiddenOut[0] ? ramp(f, CFG.hiddenIn[0] - 1, CFG.hiddenIn[1]) : 1 - ramp(f, CFG.hiddenOut[0], CFG.hiddenOut[1]);
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t') % (CFG.loopFrames / 30));
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % (CFG.loopFrames / 30)); requestAnimationFrame(f); })(t0); }
+};
+Promise.all([document.fonts.load(`${CFG.fontSize}px "Dela Gothic One"`, CFG.word),
+             document.fonts.load(`900 ${CFG.hiddenSize}px "Noto Sans JP"`, CFG.hidden)]).then(start);
+</script>
+</body>
+</html>

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>30 Headline Swap</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #band { position:absolute; left:0; right:0; overflow:hidden; }
+  #tag { position:absolute; left:0; top:0; bottom:0; display:flex; align-items:center; justify-content:center; line-height:1;
+         font-family:'Dela Gothic One',sans-serif; }
+  .hl { position:absolute; top:0; bottom:0; display:flex; align-items:center; line-height:1; white-space:nowrap;
+        font-family:'Dela Gothic One',sans-serif; }
+</style>
+</head>
+<body>
+<div id="card"><div id="band"><div id="tag"></div></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#b794fe', band: '#0e1214', tagBg: '#f6efe8', tagInk: '#111111', ink: '#b794fe',
+  tag: '速報',
+  words: ['解禁', '発表', '決定'],
+  bandTop: 30, bandH: 48, tagW: 74,
+  tagSize: 20, fontSize: 25, textLeft: 84,
+  swapAt: [3, 23, 43, 63],      // 各次換詞開始的幀：第 1 個詞進場、換第 2、換第 3、最後一個詞退場（退場會跨到下一輪開頭）
+  loopFrames: 64,               // 約 2.13 秒
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+const band = document.getElementById('band');
+const tag = document.getElementById('tag');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+Object.assign(band.style, { top: CFG.bandTop + 'px', height: CFG.bandH + 'px', background: CFG.band });
+Object.assign(tag.style, { width: CFG.tagW + 'px', background: CFG.tagBg, color: CFG.tagInk, fontSize: CFG.tagSize + 'px', zIndex: 2 });
+tag.textContent = CFG.tag;
+const els = CFG.words.map(w => {
+  const d = document.createElement('div'); d.className = 'hl'; d.textContent = w;
+  Object.assign(d.style, { left: CFG.textLeft + 'px', fontSize: CFG.fontSize + 'px', color: CFG.ink });
+  band.appendChild(d); return d;
+});
+
+// 換詞（從開始換詞算的幀 → 位置，單位 = 橫條高度，正 = 往下）
+const IN  = [.65, .2, 0];       // 新詞從下方推上來：3 幀
+const OUT = [-.15, -.6];        // 舊詞往上推出去：2 幀後消失（與新詞同時開始）
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  els.forEach((el, i) => {
+    const sIn = CFG.swapAt[i], sOut = CFG.swapAt[i + 1];
+    let y = null;
+    for (const g of [f, f + CFG.loopFrames]) {          // 最後一個詞的退場會跨到下一輪開頭
+      if (g >= sIn && g < sIn + IN.length) y = IN[g - sIn];
+      else if (g >= sIn + IN.length && g < sOut) y = 0;
+      else if (g >= sOut && g < sOut + OUT.length) y = OUT[g - sOut];
+      if (y !== null) break;
+    }
+    el.style.opacity = y === null ? 0 : 1;
+    if (y !== null) el.style.transform = `translateY(${y * CFG.bandH}px)`;
+  });
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t') % (CFG.loopFrames / 30));
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % (CFG.loopFrames / 30)); requestAnimationFrame(f); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "Dela Gothic One"`, CFG.tag + CFG.words.join('')).then(start);
+</script>
+</body>
+</html>

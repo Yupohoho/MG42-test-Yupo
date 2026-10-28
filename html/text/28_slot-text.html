@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>28 Slot Text</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .reel { position:absolute; border-radius:5px; overflow:hidden; }
+  .sym { position:absolute; left:0; right:0; display:flex; align-items:center; justify-content:center; line-height:1;
+         font-family:'Dela Gothic One',sans-serif; }
+</style>
+</head>
+<body>
+<div id="card"></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#14181e', reel: '#f6efe8', ink: '#111111',
+  final: '大吉！',                       // 最後停下的字（左到右）
+  start: '福福福',                       // 轉動前靜止顯示的字
+  pool: '福幸吉喜運祝大',                // 轉動中出現的字
+  reelW: 49, reelH: 79, gap: 6, top: 13,
+  fontSize: 44,
+  spinFrame: 4,                          // 第 4 幀開始轉
+  stopFrame: [23, 28, 33],               // 各捲軸落定（第一個過衝幀）的幀，左到右
+  speed: .45,                            // 轉速：每幀移動幾格字
+  fadeStart: 55, fade: [.6, .4, .15, 0],  // 第 55 幀起逐幀淡出
+  loopFrames: 60,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const fin = [...CFG.final], st = [...CFG.start], n = fin.length;
+const totalW = n * CFG.reelW + (n - 1) * CFG.gap, left0 = (CFG.W - totalW) / 2;
+const reels = fin.map((_, i) => {
+  const r = document.createElement('div'); r.className = 'reel';
+  Object.assign(r.style, { left: left0 + i * (CFG.reelW + CFG.gap) + 'px', top: CFG.top + 'px', width: CFG.reelW + 'px', height: CFG.reelH + 'px', background: CFG.reel });
+  const a = document.createElement('div'), b = document.createElement('div');
+  [a, b].forEach(s => { s.className = 'sym'; Object.assign(s.style, { height: CFG.reelH + 'px', fontSize: CFG.fontSize + 'px', color: CFG.ink }); r.appendChild(s); });
+  card.appendChild(r); return { r, a, b };
+});
+
+// 捲軸上第 k 格的字：0 = 起始字，K = 最終字，中間由 pool 依序排列
+function symAt(i, k, K) {
+  if (k <= 0) return st[i];
+  if (k === K) return fin[i];
+  return CFG.pool[(k * 3 + i * 5) % CFG.pool.length];
+}
+// 停下時：最終字從上方落下，往下過衝 25% → 12%（各 1 幀）再回正
+const SETTLE = [[-1, -.5], [0, .25], [1, .12], [2, 0]];
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  const fade = f < CFG.fadeStart ? 1 : (CFG.fade[f - CFG.fadeStart] ?? 0);
+  reels.forEach((R, i) => {
+    const s = CFG.stopFrame[i];
+    const K = Math.max(2, Math.round((s - CFG.spinFrame) * CFG.speed));
+    let p;                                                   // 捲動位置（格），整數 = 剛好對正
+    if (f < CFG.spinFrame) p = 0;
+    else if (f < s - 1) p = (f - CFG.spinFrame) * (K - .5) / (s - 1 - CFG.spinFrame);
+    else { const e = SETTLE.find(x => x[0] === f - s); p = K + (e ? e[1] : 0); }
+    const k = Math.floor(p), fr = p - k;                     // 字往下移：第 k 格往下、第 k+1 格從上方進來
+    R.a.textContent = symAt(i, k, K);     R.a.style.transform = `translateY(${fr * CFG.reelH}px)`;
+    R.b.textContent = symAt(i, k + 1, K); R.b.style.transform = `translateY(${(fr - 1) * CFG.reelH}px)`;
+    R.r.style.opacity = fade;
+  });
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t') % (CFG.loopFrames / 30));
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % (CFG.loopFrames / 30)); requestAnimationFrame(f); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "Dela Gothic One"`, CFG.final + CFG.start + CFG.pool).then(start);
+</script>
+</body>
+</html>

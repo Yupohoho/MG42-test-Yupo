@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>59 Text Flag</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .c { position:absolute; left:0; top:0; line-height:1; font-family:'Dela Gothic One',sans-serif; white-space:nowrap; transform-origin:50% 50%; }
+</style>
+</head>
+<body>
+<div id="card"></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: 'はためく旗',
+  W: 324, H: 106,
+  bg: '#f3efe6',
+  colors: ['#141414', '#9b7cff'],   // 字色依序交替
+  fontSize: 50,
+  spacing: 5,              // 字與字的間距（px，負值 = 字靠緊）
+  baseY: .52,              // 字的垂直中心（畫面比例）
+  ampStart: 2.5,            // 最左邊（旗桿端）上下擺幅（px）
+  ampEnd: 17,               // 最右邊（自由端）上下擺幅（px）
+  delay: 1.1,              // 波從最左傳到最右要幾秒（越大波越密）
+  phase: 0.07,             // 整體波動的時間偏移（秒）
+  tilt: 1,                 // 字順著波的斜率傾斜的比例（1 = 完全貼著波）
+  loop: 2.0,               // 擺一次的週期
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const els = [...CFG.text].map((ch, i) => {
+  const d = document.createElement('div'); d.className = 'c'; d.textContent = ch;
+  Object.assign(d.style, { fontSize: CFG.fontSize+'px', color: CFG.colors[i % CFG.colors.length] });
+  card.appendChild(d); return d;
+});
+
+let x0, x1;
+function layout() {
+  const ws = els.map(e => e.offsetWidth + CFG.spacing), total = ws.reduce((a, b) => a + b, 0);
+  let x = (CFG.W - total) / 2; x0 = x + ws[0] / 2; x1 = x + total - ws[ws.length - 1] / 2;
+  els.forEach((e, i) => { e._cx = x + ws[i] / 2; e._w = ws[i] - CFG.spacing; e._h = e.offsetHeight; x += ws[i]; });
+}
+
+// 旗子的波：位置 x 處的上下位移；越往右擺幅越大、時間越晚（波往右傳）
+function wave(x, t) {
+  const u = (x - x0) / (x1 - x0);
+  const amp = CFG.ampStart + (CFG.ampEnd - CFG.ampStart) * u;
+  return amp * Math.sin(2 * Math.PI * (t - CFG.phase - u * CFG.delay) / CFG.loop);
+}
+
+function render(t) {
+  els.forEach(e => {
+    const y = wave(e._cx, t);
+    const slope = (wave(e._cx + 1, t) - wave(e._cx - 1, t)) / 2;
+    const rot = Math.atan(slope) * 180 / Math.PI * CFG.tilt;
+    e.style.transform = `translate(${e._cx - e._w / 2}px,${CFG.baseY * CFG.H - e._h / 2 + y}px) rotate(${rot}deg)`;
+  });
+}
+
+document.fonts.load(`${CFG.fontSize}px "Dela Gothic One"`, CFG.text).then(() => {
+  layout();
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(f); })(t0); }
+});
+</script>
+</body>
+</html>

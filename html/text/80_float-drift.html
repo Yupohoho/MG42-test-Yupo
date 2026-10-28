@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>80 Float Drift</title>
+<link href="https://fonts.googleapis.com/css2?family=Yusei+Magic&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #row { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+  .c { display:inline-block; line-height:1; font-family:'Yusei Magic',sans-serif; transform-origin:50% 50%; }
+</style>
+</head>
+<body>
+<div id="card"><div id="row"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: 'ふわふわ',
+  W: 324, H: 106,
+  bg: '#14161c',
+  // 字色依序交替；每組 [亮, 暗]，字飄到高處變亮、低處變暗
+  colors: [['#f3efe6', '#8d8c88'], ['#ffc93c', '#a3842a']],
+  fontSize: 56,
+  offsetX: -6, offsetY: 4,
+  floatY: 7,                // 上下漂浮幅度（px）
+  floatX: 2,                // 左右微微晃動（px）
+  tilt: 7,                  // 左右傾斜幅度（度）
+  lag: 1.6,                 // 相鄰兩字的相位差（弧度），每個字各飄各的
+  loop: 2.0,                // 漂浮一個來回的秒數
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), row = document.getElementById('row');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+row.style.transform = `translate(${CFG.offsetX}px,${CFG.offsetY}px)`;
+const els = [...CFG.text].map((ch, i) => {
+  const s = document.createElement('span'); s.className = 'c'; s.textContent = ch;
+  s.style.fontSize = CFG.fontSize + 'px';
+  row.appendChild(s); return s;
+});
+const hex = (h) => [1, 3, 5].map(i => parseInt(h.substr(i, 2), 16));
+
+function render(t) {
+  const a = t / CFG.loop * Math.PI * 2;
+  els.forEach((el, i) => {
+    const p = a - i * CFG.lag;
+    const y = -Math.sin(p) * CFG.floatY, x = Math.sin(p * 2 + i) * CFG.floatX * .5 + Math.cos(p) * CFG.floatX;
+    const r = Math.sin(p + 1.2) * CFG.tilt;
+    const [hi, lo] = CFG.colors[i % CFG.colors.length].map(hex), k = (Math.sin(p) + 1) / 2;   // 高處 k=1 最亮
+    el.style.color = `rgb(${lo.map((v, j) => Math.round(v + (hi[j] - v) * k)).join(',')})`;
+    el.style.transform = `translate(${x}px,${y}px) rotate(${r}deg)`;
+  });
+}
+
+document.fonts.load(`${CFG.fontSize}px "Yusei Magic"`, CFG.text).then(() => {
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(f); })(t0); }
+});
+</script>
+</body>
+</html>

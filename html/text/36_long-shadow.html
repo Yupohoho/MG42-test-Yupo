@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>36 Long Shadow</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #w { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; line-height:1;
+       font-family:'Dela Gothic One','Noto Sans JP',sans-serif; }
+</style>
+</head>
+<body>
+<div id="card"><div id="w"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '光と影',
+  W: 324, H: 106,
+  bg: '#14161c',
+  color: '#f6efe4',
+  shadow: '#ff8a3d',
+  fontSize: 52,
+  yOffset: 6,
+  length: 75,          // 影子長度（px）
+  startDeg: 0,         // 0 秒時影子方向（0 = 往右，90 = 往下）
+  loop: 2.0,           // 影子方向轉一圈（順時針、等速）的秒數
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+const w = document.getElementById('w');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+Object.assign(w.style, { fontSize: CFG.fontSize+'px', color: CFG.color, top: CFG.yOffset+'px' });
+w.textContent = CFG.text;
+
+// 長影子 = 同一個字沿著方向每 1px 疊一層 text-shadow（實心、無模糊）
+function render(t) {
+  const a = (CFG.startDeg + 360 * t / CFG.loop) * Math.PI / 180;
+  const dx = Math.cos(a), dy = Math.sin(a);
+  const layers = [];
+  for (let i = 1; i <= CFG.length; i++) layers.push(`${(dx*i).toFixed(2)}px ${(dy*i).toFixed(2)}px 0 ${CFG.shadow}`);
+  w.style.textShadow = layers.join(',');
+}
+
+document.fonts.load(`${CFG.fontSize}px "Dela Gothic One"`, CFG.text).then(() => {
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(f); })(t0); }
+});
+</script>
+</body>
+</html>

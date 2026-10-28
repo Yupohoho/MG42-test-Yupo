@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>63 Weight Grow</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@200..900&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #w { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; line-height:1;
+       font-family:'Noto Serif JP',serif; white-space:nowrap; }
+</style>
+</head>
+<body>
+<div id="card"><div id="w"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '太くなる',
+  W: 324, H: 106,
+  bg: '#f3efe6',
+  ink: '#141414',
+  fontSize: 52,
+  spacing: .18,            // 字距（em）
+  offsetY: 4,              // 字往下偏移（px）
+  thin: 300, thick: 900,   // 最細與最粗的字重（需要可變字重字型）
+  // 時間軸（幀，30fps）：變粗開始、變粗完成、開始變細、變細完成
+  growStart: 9, growEnd: 31, shrinkStart: 37, shrinkEnd: 52,
+  frames: 54,              // 一個循環幾幀
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), w = document.getElementById('w');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+Object.assign(w.style, { fontSize: CFG.fontSize+'px', color: CFG.ink, letterSpacing: CFG.spacing+'em',
+  paddingLeft: CFG.spacing+'em', top: CFG.offsetY+'px' });
+w.textContent = CFG.text;
+
+const ease = (k) => k < .5 ? 2 * k * k : 1 - 2 * (1 - k) ** 2;
+const ramp = (g, a, b) => Math.max(0, Math.min(1, (g - a) / (b - a)));
+
+function render(t) {
+  const g = (t * 30) % CFG.frames;
+  const k = ease(ramp(g, CFG.growStart, CFG.growEnd)) * (1 - ease(ramp(g, CFG.shrinkStart, CFG.shrinkEnd)));
+  w.style.fontWeight = Math.round(CFG.thin + (CFG.thick - CFG.thin) * k);
+}
+
+// 可變字重：先載入最細和最粗兩端
+Promise.all([CFG.thin, CFG.thick].map(wt => document.fonts.load(`${wt} ${CFG.fontSize}px "Noto Serif JP"`, CFG.text))).then(() => {
+  const loop = CFG.frames / 30;
+  if (q.has('t')) render(+q.get('t') % loop);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % loop); requestAnimationFrame(f); })(t0); }
+});
+</script>
+</body>
+</html>

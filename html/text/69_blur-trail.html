@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>69 Blur Trail</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .w { position:absolute; left:0; top:0; line-height:1; font-family:'Dela Gothic One',sans-serif; white-space:nowrap; }
+</style>
+</head>
+<body>
+<div id="card"></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '疾風',
+  W: 324, H: 106,
+  bg: '#14181c',
+  color: '#f4f0e4',       // 主字
+  trail: '#2cd8c0',       // 殘影
+  fontSize: 70,
+  cx: 163, cy: 57,        // 停住時的中心
+  // 進場：從左邊衝進來，每幀剩下的距離 × inDecay（越接近終點越慢）
+  inAt: 7, inGap: 36, inDecay: .45,      // 第 inAt 幀時還差 inGap px
+  // 出場：每幀距離 × outGrow 往右加速衝出
+  outAt: 48, outStart: 2, outGrow: 2.3,  // 第 outAt 幀已經往右 outStart px
+  ghosts: 6, ghostLag: .6,               // 殘影數量、每個殘影落後幾幀
+  loop: 1.917,                           // 57.5 幀
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const mk = (color) => { const d = document.createElement('div'); d.className = 'w'; d.textContent = CFG.text;
+  Object.assign(d.style, { fontSize: CFG.fontSize+'px', color }); card.appendChild(d); return d; };
+const ghosts = Array.from({ length: CFG.ghosts }, () => mk(CFG.trail)).reverse();
+const main = mk(CFG.color);
+
+// 第 f 幀時字相對停點的水平位移
+function dx(f) {
+  if (f < CFG.outAt - 1) return -CFG.inGap * Math.pow(CFG.inDecay, f - CFG.inAt);
+  return CFG.outStart * Math.pow(CFG.outGrow, f - CFG.outAt);
+}
+
+function place(el, f, opacity, blur) {
+  const w = el.offsetWidth, h = el.offsetHeight;
+  el.style.transform = `translate(${CFG.cx + dx(f) - w / 2}px,${CFG.cy - h / 2}px)`;
+  el.style.opacity = opacity;
+  el.style.filter = blur > .3 ? `blur(${blur}px)` : '';
+}
+
+function render(t) {
+  const f = t * 30;
+  const v = Math.abs(dx(f) - dx(f - 1));                  // 這一幀移動了多少 px
+  const fadeIn = Math.min(1, Math.max(0, (f - 2.5) / 4));   // 剛進場時字是半透明的灰
+  place(main, f, fadeIn, Math.min(4, v / 12));
+  // 殘影：同一個字停在前幾幀的位置，越舊越淡越糊；停住時剛好被主字蓋住
+  ghosts.forEach((g, i) => {
+    const k = i + 1, fg = f - k * CFG.ghostLag;
+    place(g, fg, fadeIn * (1 - k / (CFG.ghosts + 1)) * .9, Math.min(6, 1 + v / 8 + k * .4));
+  });
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(f); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "Dela Gothic One"`, CFG.text).then(start);
+</script>
+</body>
+</html>

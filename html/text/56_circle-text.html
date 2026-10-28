@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>56 Circle Text</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .c { position:absolute; left:0; top:0; width:40px; height:40px; display:flex; align-items:center; justify-content:center;
+       line-height:1; font-family:'Dela Gothic One',sans-serif; }
+</style>
+</head>
+<body>
+<div id="card"></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '回転',         // 每一圈都用這組字重複排滿
+  W: 324, H: 106,
+  bg: '#14181e',
+  cx: .5, cy: .5,
+  // 由內到外的圈：半徑、字數、字級、顏色、每個循環轉幾度（正 = 順時針；相鄰圈方向相反）
+  // 每圈的轉角要是「一組字」角度的整數倍，循環點才不跳
+  rings: [
+    { r: 22, n: 8,  size: 13, color: '#ff6b4f', turn: 180 },
+    { r: 37, n: 14, size: 12, color: '#f4f0e6', turn: -2 * 360 / 14 * 4 },
+    { r: 52, n: 22, size: 9,  color: '#ff6b4f', turn: 2 * 360 / 22 * 3 },
+  ],
+  blur: .3,             // 輕微模糊，有旋轉中的速度感
+  loop: 2.0,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const chars = [...CFG.text];
+const rings = CFG.rings.map(rg => Array.from({ length: rg.n }, (_, i) => {
+  const d = document.createElement('div'); d.className = 'c'; d.textContent = chars[i % chars.length];
+  Object.assign(d.style, { fontSize: rg.size + 'px', color: rg.color, filter: `blur(${CFG.blur}px)` });
+  card.appendChild(d); return d;
+}));
+
+function render(t) {
+  const cx = CFG.cx * CFG.W, cy = CFG.cy * CFG.H;
+  CFG.rings.forEach((rg, ri) => {
+    const rot = rg.turn * t / CFG.loop;
+    rings[ri].forEach((el, i) => {
+      const a = i / rg.n * 360 + rot, rad = a * Math.PI / 180;
+      // 字頭朝外沿著圓周排
+      el.style.transform = `translate(${cx + Math.sin(rad) * rg.r - 20}px,${cy - Math.cos(rad) * rg.r - 20}px) rotate(${a}deg)`;
+    });
+  });
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(f); })(t0); }
+};
+document.fonts.load(`20px "Dela Gothic One"`, CFG.text).then(start);
+</script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>72 Shuffle Letters</title>
+<link href="https://fonts.googleapis.com/css2?family=Yusei+Magic&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .ch { position:absolute; left:0; top:0; line-height:1; font-family:'Yusei Magic',sans-serif; white-space:nowrap; }
+</style>
+</head>
+<body>
+<div id="card"></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#14181c',
+  // 用到的字（每個字只出現一次）與顏色
+  letters: { 'な': '#f4f0e4', 'ら': '#2cd8c0', 'び': '#f4f0e4', 'か': '#2cd8c0', 'え': '#f4f0e4' },
+  // 依序輪流的排列；最後一個排列結束後硬切回第一個
+  orders: ['らかえなび', 'かなびえら', 'ならびかえ'],
+  slotX: [70, 116, 162, 209, 256],   // 每個位置的字中心 x
+  cy: 56,
+  fontSize: 50,
+  // 時間（30fps 幀）：第 i 次換位在 moves[i] 幀開始、花 move 幀；最後一個排列停完硬切回第一個
+  moves: [13, 33], move: 6.5,
+  arc: 0,               // 換位時往左移的字往上、往右移的字往下彎多少 px（0 = 直直滑過去，交錯時會重疊）
+  loop: 1.567,          // 47 幀
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const els = {};
+Object.entries(CFG.letters).forEach(([c, col]) => { const d = document.createElement('div'); d.className = 'ch'; d.textContent = c;
+  Object.assign(d.style, { fontSize: CFG.fontSize+'px', color: col }); card.appendChild(d); els[c] = d; });
+const slot = (order, c) => [...order].indexOf(c);
+const ease = u => u < .5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
+
+function render(t) {
+  const f = t * 30;
+  let k = 0; CFG.moves.forEach(m => { if (f >= m + CFG.move) k++; });   // 目前停在第 k 個排列
+  const m = CFG.moves[k];
+  const u = m !== undefined && f > m ? ease(Math.min(1, (f - m) / CFG.move)) : 0;   // 從第 k 個換到 k+1 的進度
+  Object.keys(CFG.letters).forEach(c => {
+    const a = CFG.slotX[slot(CFG.orders[k], c)];
+    const b = k < CFG.orders.length - 1 ? CFG.slotX[slot(CFG.orders[k + 1], c)] : a;
+    const x = a + (b - a) * u;
+    const y = CFG.cy + Math.sign(b - a) * CFG.arc * Math.sin(Math.PI * u);
+    const el = els[c], w = el.offsetWidth, h = el.offsetHeight;
+    el.style.transform = `translate(${x - w / 2}px,${y - h / 2}px)`;
+  });
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(f); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "Yusei Magic"`, Object.keys(CFG.letters).join('')).then(start);
+</script>
+</body>
+</html>

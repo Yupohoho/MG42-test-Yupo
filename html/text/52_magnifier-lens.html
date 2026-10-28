@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>52 Magnifier Lens</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@900&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .t { position:absolute; left:0; top:0; line-height:1; white-space:nowrap; font-family:'Noto Sans JP',sans-serif; font-weight:900; }
+  #lens { position:absolute; left:0; top:0; border-radius:50%; overflow:hidden; }
+  #ring { position:absolute; left:0; top:0; border-radius:50%; box-sizing:border-box; }
+  #handle { position:absolute; left:0; top:0; border-radius:3px; transform-origin:0 50%; }
+</style>
+</head>
+<body>
+<div id="card">
+  <div class="t" id="base"></div>
+  <div id="lens"><div class="t" id="big"></div></div>
+  <div id="handle"></div>
+  <div id="ring"></div>
+</div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '虫眼鏡で拡大',
+  W: 324, H: 106,
+  bg: '#14181e',
+  base: '#8b8b88',      // 一般文字色
+  zoomed: '#ff6b4f',    // 鏡片裡放大的字色
+  lensBg: '#14181e',    // 鏡片裡的底色
+  frame: '#f4f0e6',     // 鏡框、把手
+  fontSize: 29,
+  cy: .52,              // 文字中心高度（畫面高比例）
+  r: 38,                // 鏡片半徑（px）
+  ringW: 3.5,             // 鏡框粗細
+  mag: 2.2,             // 放大倍率
+  handleLen: 28, handleW: 5, handleAngle: 45,   // 把手長、粗、方向（度，45 = 右下）
+  // 鏡片中心沿文字左右來回：from/to 是文字寬度的比例
+  from: .05, to: .95,
+  dy: 2,                // 鏡片上下微微浮動（px）
+  loop: 2.0,            // 一個來回的秒數
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const base = document.getElementById('base'), big = document.getElementById('big'), lens = document.getElementById('lens'),
+      ring = document.getElementById('ring'), handle = document.getElementById('handle');
+base.textContent = big.textContent = CFG.text;
+Object.assign(base.style, { fontSize: CFG.fontSize+'px', color: CFG.base });
+Object.assign(big.style, { fontSize: CFG.fontSize+'px', color: CFG.zoomed, transformOrigin: '0 0' });
+const D = CFG.r * 2;
+Object.assign(lens.style, { width: D+'px', height: D+'px', background: CFG.lensBg });
+Object.assign(ring.style, { width: D+'px', height: D+'px', border: `${CFG.ringW}px solid ${CFG.frame}` });
+Object.assign(handle.style, { width: CFG.handleLen+'px', height: CFG.handleW+'px', background: CFG.frame });
+
+function render(t) {
+  const bw = base.offsetWidth, bh = base.offsetHeight;
+  const bx = (CFG.W - bw) / 2, by = CFG.cy * CFG.H - bh / 2;
+  base.style.transform = `translate(${bx}px,${by}px)`;
+  // 來回：餘弦曲線，兩端減速
+  const k = (1 - Math.cos(2 * Math.PI * t / CFG.loop)) / 2;
+  const cx = bx + bw * (CFG.from + (CFG.to - CFG.from) * k);
+  const cy = CFG.cy * CFG.H + Math.sin(4 * Math.PI * t / CFG.loop) * CFG.dy;
+  const lx = cx - CFG.r, ly = cy - CFG.r;
+  lens.style.transform = ring.style.transform = `translate(${lx}px,${ly}px)`;
+  // 鏡片裡：同一行字以鏡片中心為基準放大
+  const m = CFG.mag;
+  big.style.transform = `translate(${cx - lx + (bx - cx) * m}px,${cy - ly + (by - cy) * m}px) scale(${m})`;
+  const a = CFG.handleAngle * Math.PI / 180;
+  handle.style.transform = `translate(${cx + Math.cos(a) * (CFG.r - 1)}px,${cy + Math.sin(a) * (CFG.r - 1) - CFG.handleW / 2}px) rotate(${CFG.handleAngle}deg)`;
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(f); })(t0); }
+};
+document.fonts.load(`900 ${CFG.fontSize}px "Noto Sans JP"`, CFG.text).then(start);
+</script>
+</body>
+</html>

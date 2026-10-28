@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>61 Magnet Pull</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .c { position:absolute; left:0; top:0; line-height:1; font-family:'Dela Gothic One',sans-serif; white-space:nowrap; }
+</style>
+</head>
+<body>
+<div id="card"></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '引き寄せる',
+  W: 324, H: 106,
+  bg: '#14161c',
+  colors: ['#f3efe6', '#9b7cff'],   // 字色依序交替
+  fontSize: 48,
+  centerY: 63,             // 排好後字的中心高度（px）
+  // 每個字的起點（字中心，px，可在畫面外）與出現的幀（30fps）
+  from: [
+    { x: -20, y: 60, at: 7 },   // 引：從左邊畫面外
+    { x: 20,  y: 78, at: 5 },   // き：左下
+    { x: 55,  y: 28, at: 3 },   // 寄：左上，最先出現
+    { x: 300, y: 80, at: 5 },   // せ：右下
+    { x: 340, y: 62, at: 7 },   // る：從右邊畫面外
+  ],
+  fadeIn: 2,               // 出現時淡入幀數
+  // 像被磁鐵吸過來：彈簧運動（會衝過頭再拉回）
+  springPeriod: 7,         // 彈簧擺動週期（幀）
+  overshoot: .22,          // 第一次衝過頭的比例
+  fadeOutStart: 1.73, fadeOutEnd: 1.9,   // 全部淡出的時間（秒）
+  loop: 2.0,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const els = [...CFG.text].map((ch, i) => {
+  const d = document.createElement('div'); d.className = 'c'; d.textContent = ch;
+  Object.assign(d.style, { fontSize: CFG.fontSize+'px', color: CFG.colors[i % CFG.colors.length] });
+  card.appendChild(d); return d;
+});
+function layout() {
+  const ws = els.map(e => e.offsetWidth), total = ws.reduce((a, b) => a + b, 0);
+  let x = (CFG.W - total) / 2;
+  els.forEach((e, i) => { e._tx = x + ws[i] / 2; e._w = ws[i]; e._h = e.offsetHeight; x += ws[i]; });
+}
+
+// 欠阻尼彈簧：從 1 出發、停在 0，第一次衝過頭比例 = overshoot
+const zeta = -Math.log(CFG.overshoot) / Math.sqrt(Math.PI ** 2 + Math.log(CFG.overshoot) ** 2);
+const wd = 2 * Math.PI / CFG.springPeriod, wn = wd / Math.sqrt(1 - zeta ** 2);
+function spring(g) {
+  if (g <= 0) return 1;
+  return Math.exp(-zeta * wn * g) * (Math.cos(wd * g) + zeta * wn / wd * Math.sin(wd * g));
+}
+
+function render(t) {
+  const f = t * 30;
+  const out = t < CFG.fadeOutStart ? 1 : Math.max(0, 1 - (t - CFG.fadeOutStart) / (CFG.fadeOutEnd - CFG.fadeOutStart));
+  els.forEach((e, i) => {
+    const s = CFG.from[i], g = f - s.at;
+    const k = spring(g);
+    const x = e._tx + (s.x - e._tx) * k, y = CFG.centerY + (s.y - CFG.centerY) * k;
+    e.style.opacity = g < 0 ? 0 : Math.min(1, (g + 1) / CFG.fadeIn) * out;
+    e.style.transform = `translate(${x - e._w / 2}px,${y - e._h / 2}px)`;
+  });
+}
+
+document.fonts.load(`${CFG.fontSize}px "Dela Gothic One"`, CFG.text).then(() => {
+  layout();
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(f); })(t0); }
+});
+</script>
+</body>
+</html>

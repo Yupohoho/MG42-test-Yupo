@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>57 Water Reflection</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  canvas { position:absolute; left:0; top:0; width:100%; height:100%; }
+</style>
+</head>
+<body>
+<div id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '水面',
+  W: 324, H: 106,
+  bg: '#14161c',
+  ink: '#f3efe6',          // 水面上的字
+  reflect: '#7d5ff0',      // 倒影顏色
+  lineColor: 'rgba(200,200,205,.45)',
+  fontSize: 50,
+  cx: .5,                  // 字的水平中心（畫面比例）
+  waterY: 64,              // 水面線高度（px）
+  lineX: [20, 304],        // 水面線左右端
+  gap: 0,                  // 字底到水面線的距離
+  reflectScale: .88,       // 倒影縱向比例（略短）
+  reflectAlpha: [.12, .9],  // 倒影透明度：靠水面 → 最下面
+  waveAmp: 1.5,            // 倒影橫向波動幅度（px）
+  waveLen: 13,             // 波長（px，沿垂直方向）
+  waveCycles: 2,           // 每個循環波動走幾圈
+  ripples: [               // 水面上擴散的橢圓漣漪：x 位置、開始時間
+    { x: .36, at: 0.0 }, { x: .62, at: 0.7 }, { x: .45, at: 1.35 },
+  ],
+  rippleLife: 0.9,         // 漣漪擴散到消失的秒數
+  rippleMax: 70,           // 漣漪最大橫半徑（px）
+  loop: 2.0,
+};
+// =================================
+
+const q = new URLSearchParams(location.search), Z = +(q.get('z') || 1);
+const card = document.getElementById('card'), cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${Z})` });
+const R = Math.max(2, Z * (window.devicePixelRatio || 1));   // 畫布解析度跟著放大倍率
+cv.width = CFG.W * R; cv.height = CFG.H * R;
+const font = `${CFG.fontSize}px "Dela Gothic One"`;
+
+// 倒影先畫在離屏畫布：上下翻轉的字，套上由淡到濃的漸層
+let refl, textTop, textH, desc;
+function buildReflection() {
+  ctx.font = font;
+  const m = ctx.measureText(CFG.text);
+  desc = m.actualBoundingBoxDescent; textH = m.actualBoundingBoxAscent + desc;
+  textTop = CFG.waterY - CFG.gap - textH;
+  const rh = Math.ceil(textH * CFG.reflectScale) + 2;
+  refl = document.createElement('canvas'); refl.width = CFG.W * R; refl.height = rh * R;
+  const c = refl.getContext('2d');
+  c.scale(R, R); c.font = font; c.fillStyle = CFG.reflect; c.textAlign = 'center'; c.textBaseline = 'alphabetic';
+  c.save(); c.scale(1, -CFG.reflectScale);
+  c.fillText(CFG.text, CFG.cx * CFG.W, -m.actualBoundingBoxDescent);   // 字底貼齊倒影畫布頂端
+  c.restore();
+  // 遮罩：靠水面淡、往下濃
+  const g = c.createLinearGradient(0, 0, 0, rh);
+  g.addColorStop(0, `rgba(0,0,0,${CFG.reflectAlpha[0]})`); g.addColorStop(1, `rgba(0,0,0,${CFG.reflectAlpha[1]})`);
+  c.globalCompositeOperation = 'destination-in'; c.fillStyle = g; c.fillRect(0, 0, CFG.W, rh);
+  refl.h = rh;
+}
+
+function render(t) {
+  ctx.setTransform(R, 0, 0, R, 0, 0);
+  ctx.fillStyle = CFG.bg; ctx.fillRect(0, 0, CFG.W, CFG.H);
+  // 水面上的字（不動）
+  ctx.font = font; ctx.fillStyle = CFG.ink; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  ctx.fillText(CFG.text, CFG.cx * CFG.W, CFG.waterY - CFG.gap - desc);
+  // 倒影：一條一條水平切片各自左右偏移，形成波動（逐像素列畫，不會有縫）
+  const ph = t / CFG.loop * CFG.waveCycles * Math.PI * 2;
+  const rows = Math.ceil(refl.h * R);
+  for (let i = 0; i < rows; i++) {
+    const y = i / R;
+    const dx = CFG.waveAmp * Math.sin(y / CFG.waveLen * Math.PI * 2 - ph) * (0.4 + 0.6 * y / refl.h);
+    ctx.drawImage(refl, 0, i, refl.width, 1, dx, CFG.waterY + 1 + y, CFG.W, 1 / R);
+  }
+  // 水面線
+  ctx.fillStyle = CFG.lineColor; ctx.fillRect(CFG.lineX[0], CFG.waterY, CFG.lineX[1] - CFG.lineX[0], 1);
+  // 漣漪
+  CFG.ripples.forEach(r => {
+    const k = ((t - r.at) % CFG.loop + CFG.loop) % CFG.loop / CFG.rippleLife;
+    if (k >= 1) return;
+    ctx.strokeStyle = `rgba(220,220,225,${0.5 * (1 - k)})`; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.ellipse(r.x * CFG.W, CFG.waterY + .5, 8 + CFG.rippleMax * k, 1.5 + 2.5 * k, 0, 0, Math.PI * 2); ctx.stroke();
+  });
+}
+
+const start = () => {
+  buildReflection();
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(f); })(t0); }
+};
+document.fonts.load(font, CFG.text).then(start);
+</script>
+</body>
+</html>

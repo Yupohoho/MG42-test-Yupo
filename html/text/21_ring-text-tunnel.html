@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>21 Ring Text Tunnel</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .c { position:absolute; left:0; top:0; line-height:1; font-family:'Dela Gothic One',sans-serif; transform-origin:50% 50%; }
+</style>
+</head>
+<body>
+<div id="card"></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '光の輪をくぐれ',     // 一圈重複 repeat 次
+  repeat: 2,
+  W: 324, H: 106,
+  bg: '#14161c',
+  colors: ['#22d3c5', '#f3eee4'],   // 環與環交替
+  rings: 7,
+  r0: 3.8,            // 最小環半徑（px）
+  growth: 2.5,        // 每經過 ringTime，環放大幾倍（指數放大 = 越近衝越快）
+  ringTime: 1.0,      // 一個環長到下一個環大小的秒數
+  charSize: .32,      // 字高 = 半徑 × 此值
+  spin: 35,           // 環旋轉速度（度/每 ringTime），相鄰環反向
+  loop: 2.0,          // 必須是 ringTime 的偶數倍（兩色交替才接得起來）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const chars = [...CFG.text.repeat(CFG.repeat)], N = chars.length;
+const rings = Array.from({length: CFG.rings}, (_, ri) => chars.map(ch => {
+  const d = document.createElement('div'); d.className = 'c'; d.textContent = ch;
+  d.style.fontSize = '100px'; card.appendChild(d); return d;
+}));
+
+function render(t) {
+  const cx = CFG.W / 2, cy = CFG.H / 2;
+  rings.forEach((els, ri) => {
+    const ph = ri + t / CFG.ringTime;                  // 環的「深度相位」，越大越近
+    const R = CFG.r0 * Math.pow(CFG.growth, ph);
+    const parity = ri % 2;
+    const color = CFG.colors[parity];
+    const dir = parity ? -1 : 1;
+    const rot = dir * CFG.spin * ph + parity * 13;
+    const fs = R * CFG.charSize;
+    // 從中心淡入
+    const o = Math.min(1, Math.max(0, (ph - .3) / .8));
+    els.forEach((el, i) => {
+      const a = (i / N * 360 + rot) * Math.PI / 180;
+      const x = cx + Math.sin(a) * R, y = cy - Math.cos(a) * R;
+      // 字的頭朝外、沿圓周排列
+      el.style.color = color;
+      el.style.opacity = o;
+      el.style.transform = `translate(${x - 50}px,${y - 50}px) rotate(${a * 180 / Math.PI}deg) scale(${fs / 100})`;
+    });
+  });
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(f); })(t0); }
+};
+document.fonts.load(`100px "Dela Gothic One"`, CFG.text).then(() => {
+  // 以 100px 字為基準，置中原點
+  rings.flat().forEach(el => { el.style.width = '100px'; el.style.height = '100px'; el.style.display = 'flex';
+    el.style.alignItems = 'center'; el.style.justifyContent = 'center'; });
+  start();
+});
+</script>
+</body>
+</html>

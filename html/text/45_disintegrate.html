@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>45 Disintegrate</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .cell { position:absolute; left:0; top:0; line-height:1; white-space:nowrap; font-family:'Dela Gothic One',sans-serif; }
+</style>
+</head>
+<body>
+<div id="card"></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '消滅',
+  W: 324, H: 106,
+  bg: '#14161c',
+  colors: ['#c4f73c', '#f3efe6'],   // 格子兩色，棋盤交錯
+  fontSize: 68,
+  cx: .40, cy: .55,     // 字中心（畫面比例）
+  cell: 14,              // 格子大小（px）
+  tilt: 4,               // 每格隨機歪斜（度）
+  breakStart: 0.75,      // 開始碎掉的時間（從左邊開始）
+  sweep: 0.55,           // 從最左碎到最右要幾秒
+  fly: 0.4,              // 每塊飛走並淡出的時間
+  vx: [120, 260],        // 碎片往右飛的速度範圍（px/秒）
+  vy: [-90, 70],         // 碎片上下飛的速度範圍
+  spin: 300,             // 碎片最大旋轉速度（度/秒）
+  backAt: 1.87,          // 完整的字硬切回來的時間
+  loop: 2.0,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const rnd = (n) => { const x = Math.sin(n * 91.7 + 13.1) * 43758.5453; return x - Math.floor(x); };
+let cells = [];
+
+function build() {
+  // 量字的範圍，切成格子；每格 = 整個字裁切成那一格（相接處多 0.5px 避免縫）
+  const probe = document.createElement('div'); probe.className = 'cell';
+  probe.style.fontSize = CFG.fontSize + 'px'; probe.textContent = CFG.text; card.appendChild(probe);
+  const tw = probe.offsetWidth, th = probe.offsetHeight; probe.remove();
+  const x0 = CFG.cx * CFG.W - tw / 2, y0 = CFG.cy * CFG.H - th / 2, c = CFG.cell;
+  const nx = Math.ceil(tw / c), ny = Math.ceil(th / c);
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const k = j * nx + i;
+    const d = document.createElement('div'); d.className = 'cell'; d.textContent = CFG.text;
+    Object.assign(d.style, { fontSize: CFG.fontSize+'px', color: CFG.colors[(i + j) % 2],
+      clipPath: `inset(${j*c - .5}px ${tw - (i+1)*c - .5}px ${th - (j+1)*c - .5}px ${i*c - .5}px)`,
+      transformOrigin: `${(i+.5)*c}px ${(j+.5)*c}px` });
+    card.appendChild(d);
+    cells.push({ el: d, x0, y0, u: (i + .5) / nx,
+      tilt: (rnd(k) - .5) * 2 * CFG.tilt,
+      delay: (rnd(k + 500) - .5) * .12,
+      vx: CFG.vx[0] + rnd(k + 900) * (CFG.vx[1] - CFG.vx[0]),
+      vy: CFG.vy[0] + rnd(k + 1300) * (CFG.vy[1] - CFG.vy[0]),
+      spin: (rnd(k + 1700) - .5) * 2 * CFG.spin });
+  }
+}
+
+function render(t) {
+  cells.forEach(cl => {
+    let x = cl.x0, y = cl.y0, r = cl.tilt, o = 1, s = 1;
+    const tb = CFG.breakStart + cl.u * CFG.sweep + cl.delay;   // 這一格開始碎的時間（左邊先）
+    if (t >= tb && t < CFG.backAt) {
+      const d = t - tb;
+      x += cl.vx * d; y += cl.vy * d; r += cl.spin * d;
+      s = 1 + .25 * Math.min(1, d / CFG.fly);
+      o = Math.max(0, 1 - d / CFG.fly);
+    }
+    cl.el.style.opacity = o;
+    cl.el.style.transform = `translate(${x}px,${y}px) rotate(${r}deg) scale(${s})`;
+  });
+}
+
+const start = () => {
+  build();
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function loop(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(loop); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "Dela Gothic One"`, CFG.text).then(start);
+</script>
+</body>
+</html>

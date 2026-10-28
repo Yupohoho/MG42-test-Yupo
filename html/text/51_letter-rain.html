@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>51 Letter Rain</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .col { position:absolute; top:0; left:0; width:20px; }
+  .col span { position:absolute; left:0; width:100%; text-align:center; line-height:1; font-family:'Noto Sans JP',sans-serif; font-weight:700; }
+</style>
+</head>
+<body>
+<div id="card"></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#f4f0e6',
+  pool: 'あいうえおかきくけこさしすせそたちつてとけせおう雨雲風空雪',  // 隨機取字的字庫
+  fontSize: 17,
+  pitch: 21,              // 每行字的上下間距（px）
+  colW: 23,               // 每欄寬（px）
+  inks: ['#1a1a1a', '#1a1a1a', '#8a8a86', '#bdbab2', '#d6d2c8'],  // 一般欄每個字隨機取一個深淺
+  accentCol: 7,           // 第幾欄（從 0 算）是強調色欄
+  accentInks: ['#ff6b4f', '#ff8a70', '#ffb4a2'],
+  // 每欄一個循環有幾個字（越多 = 循環內要走的距離越長 = 越快）；每欄每個循環剛好走過自己一輪，循環點不跳
+  colLens: [10, 13, 9, 15, 11, 12, 10, 14, 9, 13, 11, 15, 10, 12],
+  loop: 4.0,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const hash = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+const pool = [...CFG.pool];
+const nCols = CFG.colLens.length, x0 = (CFG.W - nCols * CFG.colW) / 2;
+const cols = CFG.colLens.map((n, c) => {
+  const col = document.createElement('div'); col.className = 'col';
+  col.style.left = x0 + c * CFG.colW + 'px';
+  const inks = c === CFG.accentCol ? CFG.accentInks : CFG.inks;
+  // 字串要蓋滿畫面高：重複這欄的字直到超過畫面高 + 一輪
+  const reps = Math.ceil((CFG.H + n * CFG.pitch) / (n * CFG.pitch)) + 1;
+  for (let k = 0; k < n * reps; k++) {
+    const i = k % n, s = document.createElement('span');
+    s.textContent = pool[Math.floor(hash(c * 31 + i) * pool.length)];
+    Object.assign(s.style, { top: k * CFG.pitch + 'px', fontSize: CFG.fontSize + 'px', color: inks[Math.floor(hash(c * 53 + i * 7 + 1) * inks.length)] });
+    col.appendChild(s);
+  }
+  card.appendChild(col);
+  return { col, len: n * CFG.pitch, off: hash(c * 97) * n * CFG.pitch };
+});
+
+function render(t) {
+  // 往下流：每欄每個循環剛好往下走一輪（自己的長度）
+  cols.forEach(({ col, len, off }) => {
+    const y = ((t / CFG.loop) * len + off) % len;
+    col.style.transform = `translateY(${y - len}px)`;
+  });
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(f); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "Noto Sans JP"`, CFG.pool).then(start);
+</script>
+</body>
+</html>

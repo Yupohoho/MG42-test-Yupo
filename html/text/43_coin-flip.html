@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>43 Coin Flip</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #row { position:absolute; left:0; top:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; }
+  .c { display:inline-block; line-height:1; font-family:'Dela Gothic One',sans-serif; transform-origin:50% 50%; }
+</style>
+</head>
+<body>
+<div id="card"><div id="row"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '表か裏か',
+  colors: ['#141414', '#3d5a0a', '#141414', '#3d5a0a'],   // 每個字的顏色（依序循環）
+  W: 324, H: 106,
+  bg: '#f3efe6',
+  fontSize: 52,
+  cy: .55,             // 字的垂直中心（畫面比例）
+  turns: 2,            // 每個字翻幾圈（整數，翻完回到正面）
+  flipDur: 0.75,       // 每個字翻轉＋跳起的時間（秒）
+  stagger: 0.12,       // 下一個字比前一個晚幾秒
+  jump: 12,            // 跳起高度（px）
+  tilt: 8,             // 跳起時的歪斜角度（度）
+  firstAt: 0.28,       // 第一個字開始翻的時間
+  loop: 2.0,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), row = document.getElementById('row');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+row.style.top = (CFG.cy - .5) * CFG.H + 'px';
+const els = [...CFG.text].map((ch, i) => {
+  const d = document.createElement('span'); d.className = 'c'; d.textContent = ch;
+  Object.assign(d.style, { fontSize: CFG.fontSize+'px', color: CFG.colors[i % CFG.colors.length] });
+  row.appendChild(d); return d;
+});
+
+function render(t) {
+  els.forEach((el, i) => {
+    let p = (t - CFG.firstAt - i * CFG.stagger) / CFG.flipDur;
+    if (p < 0) p += CFG.loop / CFG.flipDur;
+    if (p > 1) p = 1;
+    // 翻轉：等速轉 turns 圈（rotateY 用 scaleX = cos 表示，背面時字左右相反，像硬幣翻面）
+    const a = p * CFG.turns * Math.PI * 2;
+    const sx = Math.cos(a);
+    const y = -CFG.jump * Math.sin(Math.PI * p);           // 拋物線跳起
+    const r = CFG.tilt * Math.sin(Math.PI * p) * (i % 2 ? 1 : -1);
+    el.style.transform = `translateY(${y}px) rotate(${r}deg) scaleX(${Math.abs(sx) < .02 ? .02 : sx})`;
+  });
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function loop(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(loop); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "Dela Gothic One"`, CFG.text).then(start);
+</script>
+</body>
+</html>

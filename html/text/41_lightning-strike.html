@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>41 Lightning Strike</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@900&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #word { position:absolute; left:0; top:0; white-space:nowrap; line-height:1;
+          font-family:'Noto Sans JP',sans-serif; font-weight:900; }
+  svg { position:absolute; inset:0; overflow:visible; }
+</style>
+</head>
+<body>
+<div id="card"><div id="word"></div><svg id="fx"></svg></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '雷鳴',
+  W: 324, H: 106,
+  bg: [21, 25, 31],        // 平常的深色底（RGB）
+  flash: [255, 255, 255],  // 閃光的顏色
+  textColor: '#f3f1ea',
+  glow: '#c8f53c',         // 字的光暈、閃電、光環的顏色
+  fontSize: 80,
+  cx: .47, cy: .55,        // 字中心（畫面比例）
+  loop: 2.0,
+};
+// =================================
+const F = 1/30;
+// 逐幀表（從閃光第 0 幀算起，30fps）
+// 底色亮度：0 = 平常深色、1 = 全白閃光
+const BG = [1,1,1,1,1,1,1,1,1, .60,.29,.15, .78,.55,.36,.23,.14,.07,.03,.01];
+// 字的放大倍率：閃光後 3 幀巨大，再一幀砸回原大小
+const SC = { 9: 2.3, 10: 2.15, 11: 1.85, 12: 1.06, 13: 1.03, 14: 1.01 };
+// 落地後的震動（px）
+const SHAKE = { 12: [-6,-5], 13: [8,1], 14: [-4,6], 15: [7,-3], 16: [-2,2], 17: [5,5], 18: [-2,-3], 19: [3,2] };
+// 光環半徑（px）：閃光時小圈，落地後一路擴散並淡出
+const RING_R = [14,14,14,14,14,14,14,14,14,14,14,14, 20,30,40,48,56,62,67,71,74,77,79,81,82,83];
+// 字最後淡出（幀 53–57）
+const FADE = { 53: .7, 54: .45, 55: .3, 56: .15, 57: .07, 58: 0, 59: 0 };
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), word = document.getElementById('word'), fx = document.getElementById('fx');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', transform: `scale(${+(q.get('z') || 1)})` });
+word.textContent = CFG.text;
+Object.assign(word.style, { fontSize: CFG.fontSize+'px', color: CFG.textColor });
+fx.setAttribute('width', CFG.W); fx.setAttribute('height', CFG.H);
+const X0 = CFG.cx * CFG.W, Y0 = CFG.cy * CFG.H;
+fx.innerHTML = `<defs><filter id="g" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.5" result="b"/>
+  <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+  <circle id="ring" cx="${X0}" cy="${Y0 - 4}" fill="none" stroke="${CFG.glow}" filter="url(#g)"/>
+  <polyline id="bolt" fill="none" stroke="${CFG.glow}" stroke-width="2" stroke-linejoin="bevel" filter="url(#g)"
+    points="${[[14,-62],[-6,-14],[10,-8],[-14,60]].map(([x,y]) => `${X0+x},${Y0+y}`).join(' ')}"/>`;
+const ring = fx.querySelector('#ring'), bolt = fx.querySelector('#bolt');
+const mix = (a, b, k) => a.map((v, i) => Math.round(v + (b[i] - v) * k));
+
+function render(t) {
+  const f = Math.floor(t / F + 1e-6) % Math.round(CFG.loop / F);
+  // 底色
+  const k = BG[f] ?? 0;
+  card.style.background = `rgb(${mix(CFG.bg, CFG.flash, k)})`;
+  // 字：閃光前 9 幀不出現，之後巨大 → 砸回原大小，帶震動；光暈隨底色變暗變強
+  const show = f >= 9;
+  const sc = SC[f] ?? 1, [dx, dy] = SHAKE[f] ?? [0, 0];
+  const w = word.offsetWidth, h = word.offsetHeight;
+  word.style.transform = `translate(${X0 - w/2 + dx}px,${Y0 - h/2 + dy}px) scale(${sc})`;
+  word.style.opacity = show ? (FADE[f] ?? 1) : 0;
+  const g = Math.max(0, 1 - k * 3);
+  word.style.textShadow = g > 0 ? `0 0 ${6*g}px ${CFG.glow}, 0 0 ${16*g}px ${CFG.glow}` : 'none';
+  // 光環
+  const r = RING_R[f];
+  ring.setAttribute('r', r ?? 0);
+  ring.setAttribute('stroke-width', f < 12 ? 1.5 : 3);
+  ring.style.opacity = r == null ? 0 : f < 12 ? 1 : .55 * Math.max(0, 1 - (f - 18) / 8);
+  // 閃電：落地前後出現，慢慢淡掉
+  bolt.style.opacity = f >= 9 && f <= 20 ? (f <= 12 ? 1 : 1 - (f - 12) / 9) : 0;
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function loop(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(loop); })(t0); }
+};
+document.fonts.load(`900 ${CFG.fontSize}px "Noto Sans JP"`, CFG.text).then(start);
+</script>
+</body>
+</html>

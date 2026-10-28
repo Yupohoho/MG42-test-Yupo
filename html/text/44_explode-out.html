@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>44 Explode Out</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .c { position:absolute; left:0; top:0; line-height:1; font-family:'Dela Gothic One',sans-serif; transform-origin:50% 50%; }
+</style>
+</head>
+<body>
+<div id="card"></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '爆発四散',
+  colors: ['#f3efe6', '#c4f73c', '#f3efe6', '#c4f73c'],   // 每個字的顏色（依序循環）
+  W: 324, H: 106,
+  bg: '#14161c',
+  fontSize: 58,
+  cy: .55,
+  // 每個字炸開的方向：vx, vy = 初速（px/秒，y 往下為正），spin = 旋轉速度（度/秒）
+  burst: [
+    { vx: -230, vy:   40, spin: -380 },
+    { vx: -150, vy: -120, spin:  420 },
+    { vx:   40, vy: -330, spin: -480 },
+    { vx:  300, vy: -240, spin:  360 },
+  ],
+  gravity: 1500,       // 炸開後往下掉的加速度（px/秒²）
+  popFrame: 4,         // 第一個字彈出的幀（30fps）
+  popStagger: 2,       // 每個字晚幾幀彈出
+  explodeFrame: 37,    // 炸開的幀
+  flyFrames: 8,        // 飛出並淡出的幀數
+  loopFrames: 46,
+};
+// =================================
+// 彈出的逐幀縮放（從該字出現算起）：很小 → 衝過頭 → 回彈 → 定位
+const POP = [.2, .55, .95, 1.22, 1.12, 1.03, 1];
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const chars = [...CFG.text], fs = CFG.fontSize, n = chars.length;
+const els = chars.map((ch, i) => {
+  const d = document.createElement('div'); d.className = 'c'; d.textContent = ch;
+  Object.assign(d.style, { fontSize: fs+'px', color: CFG.colors[i % CFG.colors.length] });
+  card.appendChild(d); return d;
+});
+const LOOP = CFG.loopFrames / 30;
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  els.forEach((el, i) => {
+    const x0 = CFG.W / 2 + (i - (n - 1) / 2) * fs - fs / 2, y0 = CFG.cy * CFG.H - fs / 2;
+    const fp = f - CFG.popFrame - i * CFG.popStagger;
+    if (fp < 0) { el.style.opacity = 0; return; }
+    let x = x0, y = y0, s = POP[Math.min(fp, POP.length - 1)], r = 0, o = 1;
+    const fe = f - CFG.explodeFrame;
+    if (fe >= 0) {
+      // 炸開：等速飛出 + 重力往下掉 + 旋轉，最後幾幀淡出
+      const b = CFG.burst[i % CFG.burst.length], tt = (fe + 1) / 30;
+      x += b.vx * tt; y += b.vy * tt + .5 * CFG.gravity * tt * tt;
+      r = b.spin * tt; s = 1 + .15 * fe / CFG.flyFrames;
+      o = Math.max(0, 1 - fe / CFG.flyFrames) ** .7;
+      if (fe >= CFG.flyFrames) o = 0;
+    }
+    el.style.opacity = o;
+    el.style.transform = `translate(${x}px,${y}px) rotate(${r}deg) scale(${s})`;
+  });
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t') % LOOP);
+  else { const t0 = performance.now(); (function loop(now){ render(((now - t0) / 1000) % LOOP); requestAnimationFrame(loop); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "Dela Gothic One"`, CFG.text).then(start);
+</script>
+</body>
+</html>

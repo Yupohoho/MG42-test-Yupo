@@ -1,0 +1,66 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>T86 Particle Assemble</title>
+<style>
+html,body{margin:0;background:#e9e7e3}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh}
+body.m{display:block;min-height:0}
+.card{position:relative;overflow:hidden}
+canvas{display:block}
+</style></head>
+<body><div class="card" id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== CFG：可換內容集中在這裡 =====
+// 點陣字：# = 深色點、b = 強調色圓點、. = 空（每格 pitch px，點大小 dot px）
+const CFG={
+  bitmap:[
+    '..b#####......##b###....b#',
+    '..##b###......####b#....##',
+    'b#......##..##......b#..##',
+    '##......bb..##......##..b#',
+    '##..........##......##..##',
+    '##..........b#......##..##',
+    'b#..####b#..b#......##..b#',
+    '##..b#####..##......b#..##',
+    '##......##..##......b#..##',
+    'b#......##..##......##..b#',
+    'b#......##..##......##....',
+    '##......b#..b#......##....',
+    '..##b###......b#####....##',
+    '..####b#......##b###....##'],
+  origin:{x:59,y:34}, pitch:6.5, dot:5.5,
+  roundRatio:0.2,                      // 深色點裡有多少比例是圓點
+  bg:'#fcfcf9', ink:'#262632', accent:'#3d67f2', seed:11
+};
+const LOOP=120;
+
+// ===== 共用 =====
+const Q=new URLSearchParams(location.search),Z=+(Q.get('z')||1);
+if(Q.get('m'))document.body.classList.add('m');
+const CW=284,CH=158,DPR=window.devicePixelRatio||1;
+const card=document.getElementById('card'),cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+card.style.cssText+=`width:${CW*Z}px;height:${CH*Z}px;border-radius:${12*Z}px;background:${CFG.bg}`;
+cv.width=CW*Z*DPR;cv.height=CH*Z*DPR;cv.style.width=CW*Z+'px';cv.style.height=CH*Z+'px';
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),eo3=p=>1-Math.pow(1-p,3);
+function rng(s){return()=>{s=(s*16807)%2147483647;return(s-1)/2147483646}}
+// ===== 動態 =====
+// 每顆點從卡片內隨機位置出發，各自延遲 0–10 幀，22 幀減速飛到點陣位置（n≈32 全部到位）
+const R=rng(CFG.seed),P=[];
+CFG.bitmap.forEach((row,r)=>[...row].forEach((ch,c)=>{if(ch==='.')return;
+  P.push({tx:CFG.origin.x+c*CFG.pitch,ty:CFG.origin.y+r*CFG.pitch,sx:-20+R()*324,sy:-20+R()*198,
+    delay:Math.floor(R()*10),blue:ch==='b',round:ch==='b'||R()<CFG.roundRatio,ph:R()*6.28,rot:(R()-0.5)*3});}));
+function render(t){
+  const n=Math.floor(t*30+1e-6)%LOOP;
+  ctx.setTransform(Z*DPR,0,0,Z*DPR,0,0);ctx.fillStyle=CFG.bg;ctx.fillRect(0,0,CW,CH);
+  const s=CFG.dot;
+  for(const p of P){
+    const e=eo3(clamp((n-p.delay)/22,0,1)),w=(1-e)*2.5*Math.sin(n*0.8+p.ph);
+    const x=p.sx+(p.tx-p.sx)*e+w,y=p.sy+(p.ty-p.sy)*e-w;
+    ctx.fillStyle=p.blue?CFG.accent:CFG.ink;
+    ctx.save();ctx.translate(x+s/2,y+s/2);ctx.rotate(p.rot*(1-e));
+    if(p.round){ctx.beginPath();ctx.arc(0,0,s/2,0,Math.PI*2);ctx.fill()}else ctx.fillRect(-s/2,-s/2,s,s);
+    ctx.restore();
+  }
+}
+const T0=Q.get('t');
+if(T0!==null)render(+T0);else{const st=performance.now();const loop=()=>{render((performance.now()-st)/1000);requestAnimationFrame(loop)};loop();}
+</script></body></html>

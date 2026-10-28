@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>20 Text Vortex</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  svg { position:absolute; inset:0; overflow:visible; }
+  text { font-family:'Dela Gothic One',sans-serif; }
+</style>
+</head>
+<body>
+<div id="card"></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '渦巻く',
+  W: 324, H: 106,
+  bg: '#14161c',
+  fill: '#22d3c5',     // 底色（字塊）
+  line: '#f3efe6',     // 等高線與外框的顏色
+  fontSize: 68,
+  cx: .49, cy: .57,    // 字中心位置（畫面比例）
+  rot: -4, rotWobble: 2,  // 整體傾斜（度）與左右擺動幅度（度）
+  sx: .85,              // 字的橫向比例（<1 = 字變瘦長）
+  outer: 7,            // 字塊往外擴多少（px）
+  frameW: 4,           // 白色外框寬（px）
+  step: 2.4,           // 等高線間距（px）
+  lineW: 1.1,           // 等高線粗細（px）
+  inner: 5,            // 等高線往字筆畫內最多收多深（px）
+  bandTime: 0.25,      // 等高線往外推一格的秒數
+  solidStart: 0.27, solidEnd: 0.70,     // 整塊實心（看不到字）的時段
+  growStart: 0.75, growSpeed: 12,        // 實心結束後，等高線從字邊開始長出、每秒擴散 px
+  frames: [[0.47, 0.80], [0.97, 1.17], [1.30, 1.50], [1.60, 2.27]],   // 白色外框出現的時段（會跨過循環點）
+  pops: [0.47, 0.97, 1.30, 1.60], pop: 0.06,   // 鏡頭往前一頓（瞬間放大再縮回）的時間點與放大量
+  jitter: 0,           // 每幀手持晃動（px），0 = 不晃
+  loop: 2.0,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+
+card.innerHTML = `<svg width="${CFG.W}" height="${CFG.H}"><defs><filter id="f" x="-30%" y="-60%" width="160%" height="220%"></filter></defs>
+  <g id="g"><text id="tx" text-anchor="middle" dominant-baseline="central" font-size="${CFG.fontSize}" fill="#000" filter="url(#f)">${CFG.text}</text></g></svg>`;
+const filt = card.querySelector('#f'), g = card.querySelector('#g');
+
+// 每一層 = 字形往外擴（r>0）或往內縮（r<0）r px 後填一個顏色；由大到小依序疊上去
+function layers(list) {
+  let s = '';
+  list.forEach(([r, c], i) => {
+    const op = r >= 0 ? 'dilate' : 'erode', rr = Math.max(.01, Math.abs(r));
+    s += `<feMorphology in="SourceAlpha" operator="${op}" radius="${rr}" result="m${i}"/>
+          <feFlood flood-color="${c}"/><feComposite operator="in" in2="m${i}" result="c${i}"/>`;
+  });
+  s += '<feMerge>' + list.map((_, i) => `<feMergeNode in="c${i}"/>`).join('') + '</feMerge>';
+  filt.innerHTML = s;
+}
+
+const inRange = (t, [a, b]) => (t >= a && t < b) || (t + CFG.loop >= a && t + CFG.loop < b);
+const hash = (n) => { const x = Math.sin(n * 127.1) * 43758.5453; return x - Math.floor(x); };
+
+function render(t) {
+  const solid = t >= CFG.solidStart && t < CFG.solidEnd;
+  const fr = CFG.frames.find(r => inRange(t, r));
+  const L = [];
+  if (fr) L.push([CFG.outer + CFG.frameW, CFG.line]);
+  L.push([CFG.outer, CFG.fill]);
+  if (!solid) {
+    // 等高線：位置隨時間往外推；從字邊開始長，越長越往外、往內擴散
+    const since = (t - CFG.growStart + CFG.loop) % CFG.loop;
+    const spread = since < CFG.loop - (CFG.growStart - CFG.solidEnd) ? since * CFG.growSpeed : 0;
+    const f = (t / CFG.bandTime) % 1;
+    for (let j = Math.ceil(CFG.outer / CFG.step); j >= -Math.ceil(CFG.inner / CFG.step) - 1; j--) {
+      const r = (j + f) * CFG.step;
+      if (r > CFG.outer - CFG.lineW || r < -CFG.inner || Math.abs(r) > spread) continue;
+      L.push([r + CFG.lineW / 2, CFG.line], [r - CFG.lineW / 2, CFG.fill]);
+    }
+  }
+  layers(L);
+  // 鏡頭往前一頓：瞬間放大，0.2 秒內縮回
+  let sc = 1;
+  CFG.pops.forEach(p => { const k = (t - p + CFG.loop) % CFG.loop; if (k < .2) sc = 1 + CFG.pop * (1 - k / .2); });
+  const n = Math.floor(t * 30), jx = (hash(n) - .5) * 2 * CFG.jitter, jy = (hash(n + 99) - .5) * 2 * CFG.jitter;
+  const rot = CFG.rot + CFG.rotWobble * Math.sin(t / CFG.loop * Math.PI * 2);
+  g.setAttribute('transform', `translate(${CFG.cx * CFG.W + jx},${CFG.cy * CFG.H + jy}) rotate(${rot}) scale(${sc * CFG.sx},${sc})`);
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(f); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "Dela Gothic One"`, CFG.text).then(start);
+</script>
+</body>
+</html>

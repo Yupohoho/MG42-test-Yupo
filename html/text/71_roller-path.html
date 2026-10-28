@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>71 Roller Path</title>
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@800&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  canvas { position:absolute; left:0; top:0; }
+  .ch { position:absolute; left:0; top:0; line-height:1; font-family:'M PLUS Rounded 1c',sans-serif; font-weight:800; white-space:nowrap; }
+</style>
+</head>
+<body>
+<div id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: 'ぐるぐる',
+  colors: ['#121214', '#0f6e60'],   // 逐字交替
+  W: 324, H: 106,
+  bg: '#f4f0e4',
+  dot: '#b8b4aa', dotGap: 6.5, dotR: .9,   // 虛線軌道
+  fontSize: 30,
+  cx: 163, cy: 54, A: 72, B: 27,     // ∞ 軌道中心、半寬、半高
+  shape: .5,                          // 越小，左右兩端越像直立的邊（領結形）
+  lead: 1.0,                          // t=0 時最前面那個字在軌道上的位置（弧度）
+  gap: .32,                           // 字與字之間隔多少弧度
+  loop: 2.0,                          // 繞一整圈的秒數
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), cv = document.getElementById('cv');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+
+// ∞ 軌道：θ 從 0 到 2π 走一圈（中心 → 右上 → 右端 → 右下 → 中心 → 左上 → 左端 → 左下）
+const P = th => { const s = Math.sin(th);
+  return [CFG.cx + CFG.A * Math.sign(s) * Math.pow(Math.abs(s), CFG.shape), CFG.cy - CFG.B * Math.sin(2 * th)]; };
+
+// 先畫虛線軌道（固定不動）
+const R = 3; cv.width = CFG.W * R; cv.height = CFG.H * R; cv.style.width = CFG.W+'px'; cv.style.height = CFG.H+'px';
+const ctx = cv.getContext('2d'); ctx.scale(R, R); ctx.fillStyle = CFG.dot;
+let acc = 0, prev = P(0);
+for (let i = 1; i <= 4000; i++) {
+  const p = P(i / 4000 * Math.PI * 2); acc += Math.hypot(p[0] - prev[0], p[1] - prev[1]); prev = p;
+  if (acc >= CFG.dotGap) { acc = 0; ctx.beginPath(); ctx.arc(p[0], p[1], CFG.dotR, 0, Math.PI * 2); ctx.fill(); }
+}
+
+const chars = [...CFG.text];
+const els = chars.map((c, i) => { const d = document.createElement('div'); d.className = 'ch'; d.textContent = c;
+  Object.assign(d.style, { fontSize: CFG.fontSize+'px', color: CFG.colors[i % CFG.colors.length] }); card.appendChild(d); return d; });
+
+function render(t) {
+  const base = CFG.lead + t / CFG.loop * Math.PI * 2;
+  els.forEach((el, i) => {
+    // 最後一個字在最前面帶頭，前面的字依序跟在後面
+    const th = base - (chars.length - 1 - i) * CFG.gap;
+    const [x, y] = P(th), [x2, y2] = P(th + .01);
+    const ang = Math.atan2(y2 - y, x2 - x) * 180 / Math.PI;    // 字的方向跟著軌道切線轉
+    const w = el.offsetWidth, h = el.offsetHeight;
+    el.style.transform = `translate(${x - w / 2}px,${y - h / 2}px) rotate(${ang}deg)`;
+  });
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(f); })(t0); }
+};
+document.fonts.load(`800 ${CFG.fontSize}px "M PLUS Rounded 1c"`, CFG.text).then(start);
+</script>
+</body>
+</html>

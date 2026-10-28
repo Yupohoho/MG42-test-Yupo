@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>31 LED Text</title>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .led { position:absolute; white-space:nowrap; line-height:1; font-family:'DotGothic16',monospace; }
+</style>
+</head>
+<body>
+<div id="card"></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#f4f0e6', ink: '#1a1830', glow: '#b794fe',
+  text: '新着情報',
+  fontSize: 52, y: .53,            // y = 文字中心（畫面高比例）
+  period: 260,                     // 每組文字的重複間距（px，含後面空白）
+  speed: 4,                        // 每幀往左移幾 px（30fps → 每秒 120px）
+  x0: 3,                           // 第 0 幀時第一組文字的左緣位置
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+// 鋪滿畫面所需的份數（左右各多一份）
+const copies = Math.ceil(CFG.W / CFG.period) + 2;
+const els = Array.from({ length: copies }, () => {
+  const d = document.createElement('div'); d.className = 'led'; d.textContent = CFG.text;
+  Object.assign(d.style, { fontSize: CFG.fontSize + 'px', color: CFG.ink, top: CFG.y * CFG.H - CFG.fontSize / 2 + 'px',
+    textShadow: `0 0 3px ${CFG.glow}, 0 0 8px ${CFG.glow}` });        // 點陣字外圍一圈紫色光暈
+  card.appendChild(d); return d;
+});
+const LOOP = CFG.period / CFG.speed / 30;    // 移動剛好一個重複間距 = 一個循環
+
+function render(t) {
+  // 等速捲動，以整數幀計算（每幀固定位移，像電子看板逐格移動）
+  const f = Math.floor(t * 30 + 1e-6);
+  const off = ((CFG.x0 - f * CFG.speed) % CFG.period + CFG.period) % CFG.period;
+  els.forEach((el, i) => el.style.left = off + (i - 1) * CFG.period + 'px');
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t') % LOOP);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % LOOP); requestAnimationFrame(f); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "DotGothic16"`, CFG.text).then(start);
+</script>
+</body>
+</html>

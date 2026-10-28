@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>38 Highlight Text</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #bar { position:absolute; }
+  #w { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; line-height:1;
+       font-family:'Noto Serif JP',serif; font-weight:700; }
+</style>
+</head>
+<body>
+<div id="card"><div id="bar"></div><div id="w"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '言葉の力',
+  W: 324, H: 106,
+  bg: '#ff8a3d',
+  color: '#141414',
+  marker: '#f6efe4',
+  fontSize: 38,
+  yOffset: 6,
+  padX: 12,                // 馬克筆比文字左右各多出（px）
+  barH: 46,                // 馬克筆高度（px），比字高約多 1/4
+  // 幀數（30fps）
+  drawStart: 12,           // 開始畫
+  drawFrames: [0, .03, .09, .10, .29, .50, .69, .82, .90, .95, .98, .995, 1],  // 畫的過程每幀右緣位置（0 → 1）
+  holdUntil: 47,           // 撐到第幾幀開始收
+  eraseFrames: [0, .01, .03, .06, .25, .25, .35, .51, .73, 1],                 // 收的過程每幀左緣位置（0 → 1，從左往右收）
+  loopFrames: 57,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+const bar = document.getElementById('bar');
+const w = document.getElementById('w');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+Object.assign(w.style, { fontSize: CFG.fontSize+'px', color: CFG.color, top: CFG.yOffset+'px' });
+w.textContent = CFG.text;
+const LOOP = CFG.loopFrames / 30;
+
+let x0 = 0, x1 = 0;
+function measure() {
+  const r = document.createRange(); r.selectNodeContents(w);
+  const tr = r.getBoundingClientRect(), cr = card.getBoundingClientRect(), z = cr.width / CFG.W;
+  x0 = (tr.left - cr.left) / z - CFG.padX; x1 = (tr.right - cr.left) / z + CFG.padX;
+  Object.assign(bar.style, { background: CFG.marker, height: CFG.barH+'px', top: (CFG.H/2 + CFG.yOffset - CFG.barH/2)+'px' });
+}
+
+const pick = (arr, f) => { const i = Math.floor(f), k = f - i; return i >= arr.length - 1 ? arr[arr.length-1] : arr[i] + (arr[i+1] - arr[i]) * k; };
+function render(t) {
+  const f = (t % LOOP) * 30;
+  let L = 0, R = 0;
+  const dEnd = CFG.drawStart + CFG.drawFrames.length - 1;
+  if (f < CFG.drawStart) { L = 0; R = 0; }
+  else if (f < dEnd) { L = 0; R = pick(CFG.drawFrames, f - CFG.drawStart); }
+  else if (f < CFG.holdUntil) { L = 0; R = 1; }
+  else { L = pick(CFG.eraseFrames, f - CFG.holdUntil); R = 1; }
+  const span = x1 - x0;
+  bar.style.left = (x0 + span * L) + 'px';
+  bar.style.width = Math.max(0, span * (R - L)) + 'px';
+  bar.style.display = R - L > 0.002 ? 'block' : 'none';
+}
+
+document.fonts.load(`700 ${CFG.fontSize}px "Noto Serif JP"`, CFG.text).then(() => {
+  measure();
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+});
+</script>
+</body>
+</html>
