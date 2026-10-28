@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>S75 Paper Tear</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#0f1015;}
+  body{display:flex;align-items:center;justify-content:center;min-height:100vh;}
+  #card{position:relative;width:324px;height:106px;border-radius:12px;overflow:hidden;transform-origin:center;}
+  .abs{position:absolute;left:0;top:0;width:324px;height:106px;}
+  .letter{display:flex;align-items:center;justify-content:center;font-family:"Roboto Mono",monospace;font-weight:700;}
+</style>
+</head>
+<body>
+<div id="card">
+  <div class="abs" id="aBg"></div>
+  <div class="abs letter" id="aLet"></div>
+  <div class="abs" id="bBg"></div>
+  <div class="abs letter" id="bLet"></div>
+</div>
+<script>
+/* ========== CFG：可換內容集中在這裡 ========== */
+const CFG = {
+  sceneA: { img:'img/A_scene.jpg', bg:'#f4f0e6', letter:'A', color:'#1f1e1e' },   // 轉場前的畫面（底色＋字，或圖）
+  sceneB: { img:'img/B_scene.jpg', bg:'#795400', letter:'B', color:'#f4e8d6' },   // 轉場後的畫面
+  fontSize: 54,
+  frameOpacity: 0.42,   // 內框線（字色的不透明度）
+  decoOpacity: 0.8,     // 左上圓點、右下小方塊
+  edge: '#ffffff'       // 撕口的紙纖維白邊
+};
+/* ========== 動態參數（30fps 幀為單位）==========
+   一輪 = 53 幀。兩幕直接切換：舊畫面沿卡片中央一條上下貫穿的鋸齒撕線（12 段、左右擺幅 ±8px＋小亂數）被撕成左右兩半，
+   兩半各帶著自己那一側的舊畫面內容（字也被撕成兩半），撕口有約 2.5px 的白色紙纖維邊＋一道細暗線。
+   第 12～14 幀撕線浮現；第 15.5 幀起兩半往左右拉開，越拉越快：每半位移 d ＝ 0.9 ×（幀 − 15.5）² ＋ 6 × max(0, 幀 − 22)²
+   （第 20／22／24／25／26 幀約 18／38／89／135／195px），同時微微傾斜（左半逆時針、右半順時針，每 100px 約 2.5°／2°）並略上下錯開；
+   撕開的縫隙裡露出完整的新畫面，約第 26.5 幀兩半都離開卡片。
+   入場（c<27）：A 撕開露出 B；退場（c≥27）：同樣的動作晚 27 幀，B 撕開露出 A。 */
+const LOOP = 53, EXIT = 27, CXT = 162, AMP = 8, NSEG = 12;
+const CRACK0 = 12, CRACK1 = 14, OPEN = 15.5;
+const $ = id => document.getElementById(id);
+let USEIMG = false;
+const clamp01 = v => Math.min(1, Math.max(0, v));
+function paintScene(bg, let_, s){
+  bg.innerHTML = '';
+  const img = USEIMG && s.img;
+  bg.style.background = img ? 'url('+s.img+') center/cover no-repeat' : s.bg;
+  if (!img){
+    const mk = css => { const d = document.createElement('div'); d.style.cssText = 'position:absolute;'+css; bg.appendChild(d); };
+    mk('left:9px;top:8px;width:309px;height:91px;box-sizing:border-box;border:1.5px solid '+s.color+';border-radius:6px;opacity:'+CFG.frameOpacity);
+    mk('left:18px;top:18px;width:10px;height:10px;border-radius:50%;background:'+s.color+';opacity:'+CFG.decoOpacity);
+    mk('left:298px;top:79px;width:10px;height:10px;background:'+s.color+';opacity:'+CFG.decoOpacity);
+  }
+  let_.textContent = img ? '' : s.letter; let_.style.color = s.color; let_.style.fontSize = CFG.fontSize+'px';
+}
+function sceneNode(s){   // 一整幕的複本（底＋裝飾＋字）
+  const w = document.createElement('div'); w.className = 'abs';
+  const b = document.createElement('div'); b.className = 'abs';
+  const l = document.createElement('div'); l.className = 'abs letter';
+  paintScene(b, l, s); w.appendChild(b); w.appendChild(l); return w;
+}
+const SC = { a:{bg:$('aBg'), let:$('aLet')}, b:{bg:$('bBg'), let:$('bLet')} };
+function phase(t){
+  const c = ((t*30) % LOOP + LOOP) % LOOP;
+  return c < EXIT ? { o:'a', n:'b', u:c } : { o:'b', n:'a', u:c-EXIT };
+}
+function rng(seed){ return function(){ seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const HALVES = { a:[], b:[] };
+function init(){
+  const R = rng(11), zig = [];
+  for (let i=0;i<=NSEG;i++) zig.push([CXT + (i%2 ? AMP : -AMP) + (R()-.5)*6, -6 + i*(118/NSEG)]);
+  const zs = zig.map(p => p[0].toFixed(1)+'px '+p[1].toFixed(1)+'px').join(',');
+  const zl = zig.map(p => p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+  const clips = [ 'polygon(-120px -6px,'+zs+',-120px 112px)', 'polygon(444px -6px,'+zs+',444px 112px)' ];
+  for (const key of ['a','b']){
+    const s = key === 'a' ? CFG.sceneA : CFG.sceneB;
+    clips.forEach((clip, side) => {
+      const el = document.createElement('div'); el.className = 'abs';
+      el.style.clipPath = clip; el.style.transformOrigin = CXT+'px 53px'; el.style.zIndex = 10; el.style.display = 'none';
+      el.appendChild(sceneNode(s));
+      const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+      svg.setAttribute('width', 324); svg.setAttribute('height', 106); svg.setAttribute('class','abs'); svg.style.overflow = 'visible';
+      const mkLine = (stroke, w) => { const pl = document.createElementNS('http://www.w3.org/2000/svg','polyline');
+        pl.setAttribute('points', zl); pl.setAttribute('fill','none'); pl.setAttribute('stroke', stroke); pl.setAttribute('stroke-width', w);
+        pl.setAttribute('stroke-linejoin','round'); svg.appendChild(pl); return pl; };
+      mkLine(CFG.edge, 5); mkLine('rgba(0,0,0,0.35)', 1.2);
+      el.appendChild(svg);
+      $('card').appendChild(el);
+      HALVES[key].push({ el, svg, side });
+    });
+  }
+}
+function render(t){
+  const { o, n, u } = phase(t);
+  SC[n].bg.style.zIndex = 1; SC[n].let.style.zIndex = 2; SC[n].bg.style.display = SC[n].let.style.display = '';
+  SC[o].bg.style.zIndex = 4; SC[o].let.style.zIndex = 6;
+  for (const h of HALVES[n]) h.el.style.display = 'none';
+  const whole = u < CRACK0;
+  SC[o].bg.style.display = SC[o].let.style.display = whole ? '' : 'none';
+  const d = 0.9*Math.max(0, u - OPEN)**2 + 6*Math.max(0, u - 22)**2;
+  const edge = clamp01((u - CRACK0)/(CRACK1 - CRACK0));
+  for (const h of HALVES[o]){
+    if (whole || d > 240){ h.el.style.display = 'none'; continue; }
+    h.el.style.display = ''; h.svg.style.opacity = edge;
+    h.el.style.transform = h.side === 0
+      ? 'translate('+(-d).toFixed(2)+'px,'+(-0.04*d).toFixed(2)+'px) rotate('+(-0.025*d).toFixed(2)+'deg)'
+      : 'translate('+d.toFixed(2)+'px,'+(0.03*d).toFixed(2)+'px) rotate('+(0.02*d).toFixed(2)+'deg)';
+  }
+}
+/* ========== 外殼 ========== */
+(function(){
+  const q = new URLSearchParams(location.search);
+  const card = $('card');
+  if (q.has('m')) { document.body.style.display='block'; document.body.style.minHeight='0'; } // 量測用：卡片貼左上
+  USEIMG = q.has('img');   // ?img=1：兩幕改用圖片
+  paintScene($('aBg'), $('aLet'), CFG.sceneA); paintScene($('bBg'), $('bLet'), CFG.sceneB);
+  init();
+  const z = parseFloat(q.get('z')||'1'); if (z !== 1) card.style.transform = 'scale('+z+')';
+  const start = () => {
+    if (q.has('t')) { render(parseFloat(q.get('t'))); document.title += ' ready'; return; }
+    const t0 = performance.now();
+    (function loop(){ render((performance.now()-t0)/1000); requestAnimationFrame(loop); })();
+  };
+  document.fonts.load('700 54px "Roboto Mono"', 'AB').then(start, start);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>S78 Squeeze Line</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#0f1015;}
+  body{display:flex;align-items:center;justify-content:center;min-height:100vh;}
+  #card{position:relative;width:324px;height:106px;border-radius:12px;overflow:hidden;transform-origin:center;}
+  .abs{position:absolute;left:0;top:0;width:324px;height:106px;}
+  .letter{display:flex;align-items:center;justify-content:center;font-family:"Roboto Mono",monospace;font-weight:700;}
+  .wrap{transform-origin:50% 53px;}
+  #line{position:absolute;left:0;top:52px;width:324px;height:2px;background:#fffbe8;z-index:8;display:none;}
+</style>
+</head>
+<body>
+<div id="card">
+  <div class="abs wrap" id="aWrap"><div class="abs" id="aBg"></div><div class="abs letter" id="aLet"></div></div>
+  <div class="abs wrap" id="bWrap"><div class="abs" id="bBg"></div><div class="abs letter" id="bLet"></div></div>
+  <div id="line"></div>
+</div>
+<script>
+/* ========== CFG：可換內容集中在這裡 ========== */
+const CFG = {
+  sceneA: { img:'img/A_scene.jpg', bg:'#fed03c', letter:'A', color:'#1f1911' },   // 轉場前的畫面（底色＋字，或圖）
+  sceneB: { img:'img/B_scene.jpg', bg:'#795400', letter:'B', color:'#f7cf43' },   // 轉場後的畫面
+  fontSize: 54,
+  frameOpacity: 0.42,   // 內框線（字色的不透明度）
+  decoOpacity: 0.8,     // 左上圓點、右下小方塊
+  back: '#0b0d12'       // 兩幕都被壓扁時露出的深色底
+};
+/* ========== 動態參數（30fps 幀為單位）==========
+   一輪 = 53 幀。兩幕直接切換：舊畫面整張（內容一起）以卡片水平中線為軸上下壓扁成一條線（scaleY，加速），
+   第 9／10／11／12／13／14 幀的高度比 ＝ 1／.915／.83／.64／.38／0；壓扁時上下露出深色底。
+   最扁時畫面本身就是中線上一條 2px 的線（越扁越亮，像一道光），不另外加線；第 14–15 幀這條線由舊畫面的顏色換成新畫面的顏色。
+   新畫面從同一條中線上下撐開（減速，跟壓扁對稱）：第 15／16／17／18／19／20 幀 ＝ 0／.38／.64／.83／.94／1。
+   入場（c<27）：A 壓成線、撐開成 B；退場（c≥27）：同樣的動作晚 27 幀，B → A。 */
+const LOOP = 53, EXIT = 27;
+// 舊畫面高度比（以水平中線為軸上下擠壓，加速）；最細時是 2px 的一條線，這條線就是被壓扁的畫面本身
+const SO = [[9,1],[10,.915],[11,.83],[12,.64],[13,.38],[14,.019]];
+// 新畫面從同一條線上下撐開（減速，跟擠壓對稱）
+const SN = [[15,.019],[16,.38],[17,.64],[18,.83],[19,.94],[20,1]];
+const MIN = .019;   // 2px ÷ 106px
+function lerpTab(tab, x){
+  if (x <= tab[0][0]) return tab[0][1];
+  for (let i=1;i<tab.length;i++) if (x <= tab[i][0]){ const a=tab[i-1], b=tab[i]; return a[1]+(b[1]-a[1])*(x-a[0])/(b[0]-a[0]); }
+  return tab[tab.length-1][1];
+}
+const $ = id => document.getElementById(id);
+let USEIMG = false;
+function paintScene(bg, let_, s){
+  bg.innerHTML = '';
+  const img = USEIMG && s.img;
+  bg.style.background = img ? 'url('+s.img+') center/cover no-repeat' : s.bg;
+  if (!img){
+    const mk = css => { const d = document.createElement('div'); d.style.cssText = 'position:absolute;'+css; bg.appendChild(d); };
+    mk('left:9px;top:8px;width:309px;height:91px;box-sizing:border-box;border:1.5px solid '+s.color+';border-radius:6px;opacity:'+CFG.frameOpacity);
+    mk('left:18px;top:18px;width:10px;height:10px;border-radius:50%;background:'+s.color+';opacity:'+CFG.decoOpacity);
+    mk('left:298px;top:79px;width:10px;height:10px;background:'+s.color+';opacity:'+CFG.decoOpacity);
+  }
+  let_.textContent = img ? '' : s.letter; let_.style.color = s.color; let_.style.fontSize = CFG.fontSize+'px';
+}
+const WR = { a:$('aWrap'), b:$('bWrap') };
+function phase(t){
+  const c = ((t*30) % LOOP + LOOP) % LOOP;
+  return c < EXIT ? { o:'a', n:'b', u:c } : { o:'b', n:'a', u:c-EXIT };
+}
+function init(){ $('card').style.background = CFG.back; }
+// 擠壓：高度比 s；越扁越亮（壓成線時像一道光），撐開後回到原亮度
+function squeeze(el, s){
+  if (s <= 0){ el.style.display = 'none'; return; }
+  el.style.display = '';
+  el.style.transform = 'scaleY(' + s.toFixed(4) + ')';
+  el.style.filter = 'brightness(' + (1 + 0.9 * Math.pow(1 - s, 3)).toFixed(3) + ')';
+}
+function render(t){
+  const { o, n, u } = phase(t);
+  // 第 9–14 幀舊畫面壓成線，第 14–15 幀線從舊畫面的顏色換成新畫面的顏色，第 15–20 幀新畫面從線撐開
+  if (u < 14){ squeeze(WR[o], u < 9 ? 1 : lerpTab(SO, u)); squeeze(WR[n], 0); }
+  else if (u < 15){ const k = u - 14; squeeze(WR[o], MIN); squeeze(WR[n], MIN); WR[n].style.opacity = k.toFixed(3); }
+  else { squeeze(WR[o], 0); squeeze(WR[n], lerpTab(SN, u)); }
+  if (u < 14 || u >= 15) WR[n].style.opacity = '';
+  WR[n].style.zIndex = 2; WR[o].style.zIndex = 1;
+}
+/* ========== 外殼 ========== */
+(function(){
+  const q = new URLSearchParams(location.search);
+  const card = $('card');
+  if (q.has('m')) { document.body.style.display='block'; document.body.style.minHeight='0'; } // 量測用：卡片貼左上
+  USEIMG = q.has('img');   // ?img=1：兩幕改用圖片
+  paintScene($('aBg'), $('aLet'), CFG.sceneA); paintScene($('bBg'), $('bLet'), CFG.sceneB);
+  init();
+  const z = parseFloat(q.get('z')||'1'); if (z !== 1) card.style.transform = 'scale('+z+')';
+  const start = () => {
+    if (q.has('t')) { render(parseFloat(q.get('t'))); document.title += ' ready'; return; }
+    const t0 = performance.now();
+    (function loop(){ render((performance.now()-t0)/1000); requestAnimationFrame(loop); })();
+  };
+  document.fonts.load('700 54px "Roboto Mono"', 'AB').then(start, start);
+})();
+</script>
+</body>
+</html>

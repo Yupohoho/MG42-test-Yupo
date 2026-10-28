@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>S45 Flash Cut</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#0f1015;}
+  body{display:flex;align-items:center;justify-content:center;min-height:100vh;}
+  #card{position:relative;width:324px;height:106px;border-radius:12px;overflow:hidden;transform-origin:center;}
+  .abs{position:absolute;left:0;top:0;width:324px;height:106px;}
+  .scene{position:absolute;left:0;top:0;width:324px;height:106px;overflow:hidden;transform-origin:50% 50%;}
+  .letter{display:flex;align-items:center;justify-content:center;font-family:"Roboto Mono",monospace;font-weight:700;}
+  .deco i{position:absolute;display:block;}
+  .frm{left:9px;top:9px;width:309px;height:90px;box-sizing:border-box;border:2px solid currentColor;border-radius:8px;opacity:.38;}
+  .dot{left:18px;top:18px;width:10px;height:10px;border-radius:50%;background:currentColor;opacity:.75;}
+  .sq{left:298px;top:79px;width:10px;height:10px;background:currentColor;opacity:.75;}
+</style>
+</head>
+<body>
+<div id="card">
+  <div class="scene" id="sceneA"><div class="abs" id="aBg"></div><div class="abs deco" id="aDeco"><i class="frm"></i><i class="dot"></i><i class="sq"></i></div><div class="abs letter" id="aLet"></div></div>
+  <div class="scene" id="sceneB"><div class="abs" id="bBg"></div><div class="abs deco" id="bDeco"><i class="frm"></i><i class="dot"></i><i class="sq"></i></div><div class="abs letter" id="bLet"></div></div>
+  <div class="abs" id="flash" style="z-index:8;background:#fff;pointer-events:none"></div>
+</div>
+<script>
+/* ========== CFG：可換內容集中在這裡 ========== */
+const CFG = {
+  sceneA: { img:'img/A_scene.jpg', bg:'#14181e', letter:'A', color:'#ffffff' },   // 轉場前的畫面（底色＋字，或圖）
+  sceneB: { img:'img/B_scene.jpg', bg:'#2ed7fe', letter:'B', color:'#0b0f14' },   // 轉場後的畫面
+  flashColor: '#ffffff',
+  fontSize: 52
+};
+/* ========== 動態參數（30fps 幀為單位）==========
+   一輪 52.5 幀，入場 c=0、退場 c=26.25（同一組動作，A、B 角色互換）。
+   白光整張蓋上：5 幀內從透明加速變到全白（FLASH 0→1），全白那一幀（c=5）把底下換成新畫面，
+   之後白光約 8 幀慢慢退掉（1→0，前快後慢）。 */
+const LOOP = 52.5, EXIT = 26.25, SHIFT = 8, SWAP = 5, ZOOM = 0.08;   // ZOOM：閃光時縮放幅度（8%）
+const FLASH = [[0,0],[1,.04],[2,.13],[3,.32],[4,.63],[5,1],[6,.72],[7,.52],[8,.34],[9,.22],[10,.11],[11,.06],[12,.02],[13,0]];
+function lerpTab(tab, x){
+  if (x <= tab[0][0]) return tab[0][1];
+  for (let i=1;i<tab.length;i++) if (x <= tab[i][0]){ const a=tab[i-1], b=tab[i]; return a[1]+(b[1]-a[1])*(x-a[0])/(b[0]-a[0]); }
+  return tab[tab.length-1][1];
+}
+const $ = id => document.getElementById(id);
+const SC = { A:$('sceneA'), B:$('sceneB') };
+function render(t){
+  const c = (((t*30 - SHIFT) % LOOP) + LOOP) % LOOP;
+  const inn = c < EXIT, cc = inn ? c : c - EXIT;
+  const showNew = cc >= SWAP;
+  SC[inn ? 'B' : 'A'].style.visibility = showNew ? 'visible' : 'hidden';
+  SC[inn ? 'A' : 'B'].style.visibility = showNew ? 'hidden' : 'visible';
+  $('flash').style.opacity = lerpTab(FLASH, cc);
+  /* 閃光時的小幅縮放：舊幕白光蓋上時推近（1→1+ZOOM，加速），新幕從略大縮回 1（前快後慢） */
+  const zo = 1 + ZOOM*Math.pow(Math.min(cc/SWAP,1),2);
+  const zn = 1 + ZOOM*Math.pow(1-Math.min(Math.max((cc-SWAP)/8,0),1),2);
+  SC[inn ? 'A' : 'B'].style.transform = 'scale('+zo.toFixed(4)+')';
+  SC[inn ? 'B' : 'A'].style.transform = 'scale('+zn.toFixed(4)+')';
+}
+/* ========== 外殼 ========== */
+(function(){
+  const q = new URLSearchParams(location.search);
+  const card = $('card');
+  if (q.has('m')) { document.body.style.display='block'; document.body.style.minHeight='0'; } // 量測用：卡片貼左上
+  $('flash').style.background = CFG.flashColor;
+  for (const [p, s] of [['a',CFG.sceneA],['b',CFG.sceneB]]){
+    const useImg = q.has('img') && s.img;   // ?img=1：兩幕改用圖片
+    $(p+'Bg').style.background = useImg ? 'url('+s.img+') center/cover no-repeat' : s.bg;
+    const e = $(p+'Let'); e.textContent = useImg ? '' : s.letter; e.style.color = s.color; e.style.fontSize = CFG.fontSize+'px';
+    $(p+'Deco').style.color = s.color; if (useImg) $(p+'Deco').style.display = 'none';
+  }
+  const z = parseFloat(q.get('z')||'1'); if (z !== 1) card.style.transform = 'scale('+z+')';
+  const start = () => {
+    if (q.has('t')) { render(parseFloat(q.get('t'))); document.title += ' ready'; return; }
+    const t0 = performance.now();
+    (function loop(){ render((performance.now()-t0)/1000); requestAnimationFrame(loop); })();
+  };
+  document.fonts.load('700 52px "Roboto Mono"', 'AB').then(start, start);
+})();
+</script>
+</body>
+</html>

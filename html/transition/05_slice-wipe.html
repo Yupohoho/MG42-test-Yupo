@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>S05 Slice Wipe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#0f1015;}
+  body{display:flex;align-items:center;justify-content:center;min-height:100vh;}
+  #card{position:relative;width:324px;height:106px;border-radius:12px;overflow:hidden;transform-origin:center;}
+  .abs{position:absolute;left:0;top:0;width:324px;height:106px;}
+  .letter{display:flex;align-items:center;justify-content:center;font-family:"Roboto Mono",monospace;font-weight:700;}
+</style>
+</head>
+<body>
+<div id="card">
+  <div class="abs" id="aBg"></div>
+  <div class="abs letter" id="aLet"></div>
+  <div class="abs" id="bBg"></div>
+  <div class="abs letter" id="bLet"></div>
+</div>
+<script>
+/* ========== CFG：可換內容集中在這裡 ========== */
+const CFG = {
+  sceneA: { img:'img/A_scene.jpg', bg:'#14181e', letter:'A', color:'#f4f0e6' },   // 轉場前的畫面（底色＋字，或圖）
+  sceneB: { img:'img/B_scene.jpg', bg:'#fe5c8f', letter:'B', color:'#14181e' },   // 轉場後的畫面
+  fontSize: 50
+};
+/* ========== 動態參數（30fps 幀為單位）==========
+   一輪 = 51.4 幀。兩幕直接切換，沒有任何過場色塊：斜塊的形狀本身就是「新畫面露出的範圍」。
+   斜塊：平行四邊形，向右上傾（上緣比下緣靠右）斜率 0.40 px/列，寬 78。
+   共 3 組(k=0,1,2)，組起點 c=3.5k：
+     下升塊（P）：自下往上升（上緣 y 表），同時往左滑到定位；
+     上降塊（C）：晚 1 幀，自上往下降（下緣 y 表），同時往右滑到定位。
+   新畫面露出的範圍 = 所有斜塊的聯集；蓋滿（c=12）後整張都是新畫面。
+   入場（c<20）：A 在下，B 在上；退場（c≥20）：B 在下，A 在上，同一組動作晚 27 幀。
+   定位修正：第 1 塊 P 與第 3 塊 C 的定位各外推一點，讓左上、右下角不會露出底下的畫面。 */
+const LOOP = 51.4, W = 324, H = 106, SLOPE = 0.40, BW = 78;
+const GROUP_DT = 3.5, C_DELAY = 1, EXIT = 27, PHASE = 20;
+const P_TOP   = [[-1,125],[0,57],[1,14],[2,-4]];
+const P_SLIDE = [[-0.5,45],[0,29],[1,12],[2,5],[3,2],[4,0.5],[5,0]];
+const C_BOT   = [[-0.3,-6],[0,10],[1,63],[2,99],[3,112]];
+const C_SLIDE = [[-0.3,-52],[0,-45],[1,-23],[2,-7],[3,-1],[4,0]];
+const P_FINAL = [-41, 78, 186];
+const C_FINAL = [24.6, 133, 250];
+function lerpTab(tab, x){
+  if (x <= tab[0][0]) return tab[0][1];
+  for (let i=1;i<tab.length;i++) if (x <= tab[i][0]){ const a=tab[i-1], b=tab[i]; return a[1]+(b[1]-a[1])*(x-a[0])/(b[0]-a[0]); }
+  return tab[tab.length-1][1];
+}
+const $ = id => document.getElementById(id);
+const SC = { a:{bg:$('aBg'), let:$('aLet')}, b:{bg:$('bBg'), let:$('bLet')} };
+function stage(topKey, clip){
+  const top = SC[topKey], base = SC[topKey==='b' ? 'a' : 'b'];
+  base.bg.style.zIndex = 1; base.let.style.zIndex = 2;
+  top.bg.style.zIndex = 4;  top.let.style.zIndex = 6;
+  top.bg.style.clipPath = top.let.style.clipPath = clip;
+  base.bg.style.clipPath = base.let.style.clipPath = 'none';
+}
+const lx = (left100, y) => left100 + SLOPE*(100 - y);
+function para(left100, y0, y1){
+  return [[lx(left100,y0), y0],[lx(left100,y0)+BW, y0],[lx(left100,y1)+BW, y1],[lx(left100,y1), y1]];
+}
+const pathOf = pts => 'M'+pts.map(p=>p[0].toFixed(1)+' '+p[1].toFixed(1)).join('L')+'Z';
+function region(c){   // 所有斜塊的聯集
+  let d = '';
+  for (let k=0;k<3;k++){
+    const u = c - GROUP_DT*k;
+    const yt = lerpTab(P_TOP, u);
+    if (yt < H + 2) d += pathOf(para(P_FINAL[k] + lerpTab(P_SLIDE, u), Math.max(yt,-6), 112));
+    const v = u - C_DELAY;
+    const yb = lerpTab(C_BOT, v);
+    if (yb > -5) d += pathOf(para(C_FINAL[k] + lerpTab(C_SLIDE, v), -6, Math.min(yb,112)));
+  }
+  return d ? "path('"+d+"')" : 'polygon(0 0,0 0,0 0)';
+}
+function render(t){
+  const c = ((t*30) % LOOP + LOOP) % LOOP;
+  const exit = c >= PHASE;
+  const g = exit ? c - EXIT : c;
+  let clip;
+  if (g >= 12) clip = 'none';
+  else if (g < -1) clip = 'polygon(0 0,0 0,0 0)';
+  else clip = region(g);
+  stage(exit ? 'a' : 'b', clip);
+}
+/* ========== 外殼 ========== */
+(function(){
+  const q = new URLSearchParams(location.search);
+  const card = $('card');
+  if (q.has('m')) { document.body.style.display='block'; document.body.style.minHeight='0'; } // 量測用：卡片貼左上
+  card.style.background = CFG.sceneA.bg;
+  for (const [bg, let_, s] of [['aBg','aLet',CFG.sceneA],['bBg','bLet',CFG.sceneB]]){
+    const useImg = q.has('img') && s.img;   // ?img=1：兩幕改用圖片
+    $(bg).style.background = useImg ? 'url('+s.img+') center/cover no-repeat' : s.bg;
+    const e = $(let_); e.textContent = useImg ? '' : s.letter; e.style.color = s.color; e.style.fontSize = CFG.fontSize+'px';
+  }
+  const z = parseFloat(q.get('z')||'1'); if (z !== 1) card.style.transform = 'scale('+z+')';
+  const start = () => {
+    if (q.has('t')) { render(parseFloat(q.get('t'))); document.title += ' ready'; return; }
+    const t0 = performance.now();
+    (function loop(){ render((performance.now()-t0)/1000); requestAnimationFrame(loop); })();
+  };
+  document.fonts.load('700 50px "Roboto Mono"', 'AB').then(start, start);
+})();
+</script>
+</body>
+</html>

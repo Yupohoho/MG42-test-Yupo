@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>S63 Motion Smear</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#0f1015;}
+  body{display:flex;align-items:center;justify-content:center;min-height:100vh;}
+  #card{position:relative;width:324px;height:106px;border-radius:12px;overflow:hidden;transform-origin:center;}
+  .scene{position:absolute;left:0;top:0;width:324px;height:106px;transform-origin:162px 53px;}
+  .abs{position:absolute;left:0;top:0;width:324px;height:106px;}
+  .bgx{left:-400px;width:1124px;top:-40px;height:186px;}
+  .frame{position:absolute;left:9px;top:9px;width:306px;height:87px;border:1.5px solid;border-radius:6px;}
+  .dot{position:absolute;left:18px;top:17.5px;width:11px;height:11px;border-radius:50%;}
+  .sq{position:absolute;left:298px;top:79px;width:11px;height:11px;border-radius:1px;}
+  .letter{display:flex;align-items:center;justify-content:center;font-family:"Roboto Mono",monospace;font-weight:700;}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <filter id="hbA" x="-120%" y="0" width="340%" height="100%"><feGaussianBlur id="gA" stdDeviation="0 0"/></filter>
+  <filter id="hbB" x="-120%" y="0" width="340%" height="100%"><feGaussianBlur id="gB" stdDeviation="0 0"/></filter>
+</svg>
+<div id="card">
+  <div class="scene" id="sA"><div class="abs bgx" id="aBg"></div><div class="abs" id="aDeco"><div class="frame"></div><div class="dot"></div><div class="sq"></div></div><div class="abs letter" id="aLet"></div></div>
+  <div class="scene" id="sB"><div class="abs bgx" id="bBg"></div><div class="abs" id="bDeco"><div class="frame"></div><div class="dot"></div><div class="sq"></div></div><div class="abs letter" id="bLet"></div></div>
+</div>
+<script>
+/* ========== CFG：可換內容集中在這裡 ========== */
+const CFG = {
+  // 每一幕：底色、內框線色、左上圓點與右下小方塊色、字色（示範用，可換）
+  sceneA: Object.assign({ bg:'#f4f0e6', line:'rgba(30,26,20,0.38)',   deco:'#3e3936', ink:'#111111' }, { img:'img/A_scene.jpg', letter:'A' }),   // 轉場前的畫面
+  sceneB: Object.assign({ bg:'#ff9a3e', line:'rgba(255,255,255,0.40)', deco:'#f6e2c4', ink:'#fbf1e6' }, { img:'img/B_scene.jpg', letter:'B' }),   // 轉場後的畫面
+  fontSize: 50
+};
+/* ========== 動態參數（30fps 幀為單位）==========
+   一輪 = 52.56 幀。入場（A→B）從第 9 幀開始，退場（B→A）晚 26.28 幀，是同一組動作、兩幕角色互換。
+   舊畫面往右加速滑出、帶水平動態模糊；新畫面從左側減速滑入、水平模糊逐漸消失並淡入疊在上面。兩幕的底色左右延伸，不會露出空白。
+   表格索引 = 開始後第幾幀（中間線性內插）；o = 舊畫面（離場的那幕）、i = 新畫面（進場的那幕）。
+   s 縮放、r 旋轉度數、dx/dy 位移 px、blur 模糊 px、bx 水平動態模糊 px、br 亮度倍率、op 不透明度。 */
+const LOOP = 52.56, EXIT_DT = 26.28, S = 9;
+const tb = {
+  oX:[0.7,2.5,6,13,24,39,59,90,125,165,210,260],
+  oBX:[0,0.6,1.2,2.5,4,5.5,7,10,12,14,16,18],
+  iX:[-330,-300,-260,-220,-200,-160,-120,-87,-55,-32,-18,-9,-4,-2,-0.5,0],
+  iBX:[18,18,18,18,14,13,12,11,10,7,4.5,3,1.6,0.7,0.3,0],
+  iO:[0,0,0,0,0.05,0.08,0.2,0.3,0.45,0.65,0.82,0.95,1]
+};
+function T(tab, x){
+  if (x <= 0) return tab[0];
+  if (x >= tab.length-1) return tab[tab.length-1];
+  const i = Math.floor(x), f = x - i; return tab[i] + (tab[i+1]-tab[i])*f;
+}
+function motion(p){ return { o:{ dx:T(tb.oX,p), bx:T(tb.oBX,p) }, i:{ dx:T(tb.iX,p), bx:T(tb.iBX,p), op:T(tb.iO,p) }, inTop:true }; }
+const $ = id => document.getElementById(id);
+const SC = { a:{ el:$('sA'), g:$('gA'), f:'url(#hbA)' }, b:{ el:$('sB'), g:$('gB'), f:'url(#hbB)' } };
+function apply(sc, st, z){
+  const s = st.s ?? 1, r = st.r ?? 0, dx = st.dx ?? 0, dy = st.dy ?? 0, blur = st.blur ?? 0, br = st.br ?? 1, bx = st.bx ?? 0;
+  const e = sc.el;
+  e.style.zIndex = z;
+  e.style.transform = 'translate(' + dx.toFixed(2) + 'px,' + dy.toFixed(2) + 'px) scale(' + s.toFixed(4) + ') rotate(' + r.toFixed(2) + 'deg)';
+  const f = [];
+  if (bx > 0.05) { sc.g.setAttribute('stdDeviation', bx.toFixed(2) + ' 0'); f.push(sc.f); }
+  if (blur > 0.05) f.push('blur(' + blur.toFixed(2) + 'px)');
+  if (Math.abs(br - 1) > 0.001) f.push('brightness(' + br.toFixed(3) + ')');
+  e.style.filter = f.length ? f.join(' ') : 'none';
+  e.style.opacity = (st.op ?? 1).toFixed(3);
+}
+function render(t){
+  const c = ((t*30) % LOOP + LOOP) % LOOP;
+  let p = c - S; if (p < 0) p += LOOP;
+  let o = 'a', i = 'b';
+  if (p >= EXIT_DT) { p -= EXIT_DT; o = 'b'; i = 'a'; }
+  const m = motion(p);
+  apply(SC[o], m.o, m.inTop ? 1 : 2);
+  apply(SC[i], m.i, m.inTop ? 2 : 1);
+}
+/* ========== 外殼 ========== */
+(function(){
+  const q = new URLSearchParams(location.search);
+  const card = $('card');
+  if (q.has('m')) { document.body.style.display='block'; document.body.style.minHeight='0'; } // 量測用：卡片貼左上
+  for (const [k, s] of [['a',CFG.sceneA],['b',CFG.sceneB]]){
+    const useImg = q.has('img') && s.img;   // ?img=1：兩幕改用圖片（不放裝飾與字）
+    $(k+'Bg').style.background = useImg ? 'url('+s.img+') center/cover no-repeat' : s.bg;
+    const d = $(k+'Deco'); d.style.display = useImg ? 'none' : '';
+    d.querySelector('.frame').style.borderColor = s.line;
+    d.querySelector('.dot').style.background = s.deco;
+    d.querySelector('.sq').style.background = s.deco;
+    const e = $(k+'Let'); e.textContent = useImg ? '' : s.letter; e.style.color = s.ink; e.style.fontSize = CFG.fontSize+'px';
+  }
+  const z = parseFloat(q.get('z')||'1'); if (z !== 1) card.style.transform = 'scale('+z+')';
+  const start = () => {
+    if (q.has('t')) { render(parseFloat(q.get('t'))); document.title += ' ready'; return; }
+    const t0 = performance.now();
+    (function loop(){ render((performance.now()-t0)/1000); requestAnimationFrame(loop); })();
+  };
+  document.fonts.load('700 50px "Roboto Mono"', 'AB').then(start, start);
+})();
+</script>
+</body>
+</html>

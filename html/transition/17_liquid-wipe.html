@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>S17 Liquid Wipe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#0f1015;}
+  body{display:flex;align-items:center;justify-content:center;min-height:100vh;}
+  #card{position:relative;width:324px;height:106px;border-radius:12px;overflow:hidden;transform-origin:center;}
+  .abs{position:absolute;left:0;top:0;width:324px;height:106px;}
+  .letter{display:flex;align-items:center;justify-content:center;font-family:"Roboto Mono",monospace;font-weight:700;}
+</style>
+</head>
+<body>
+<div id="card">
+  <div class="abs" id="aBg"></div>
+  <div class="abs letter" id="aLet"></div>
+  <div class="abs" id="bBg"></div>
+  <div class="abs letter" id="bLet"></div>
+</div>
+<script>
+/* ========== CFG：可換內容集中在這裡 ========== */
+const CFG = {
+  sceneA: { img:'img/A_scene.jpg', bg:'#14181e', letter:'A', color:'#f4f0e6' },   // 轉場前的畫面（底色＋字，或圖）
+  sceneB: { img:'img/B_scene.jpg', bg:'#ffc831', letter:'B', color:'#14181e' },   // 轉場後的畫面
+  fontSize: 50
+};
+/* ========== 動態參數（30fps 幀為單位）==========
+   一輪 = 50 幀。兩幕直接切換，沒有過場色塊：一條起伏的水面線從卡片下緣往上推，水面線以下就是新畫面。
+   水面線 y = 基準 + 振幅 × sin(2π·x／188 + 相位)，基準、振幅、相位逐幀見 TAB（[幀, 基準y, 振幅, 相位]），約 13 幀蓋滿。
+   入場（c<27）：A 在下，B 在上；退場（c≥27）：同一條水面線再從下緣往上推一次（晚 27 幀），這次推出的是 A。 */
+const LOOP = 50, EXIT = 27, W = 324, H = 106, LAM = 188;
+const TAB = [[-1,112,7,0.5],
+  [0,105.1,6.8,1.02],
+  [1,99.7,6,1.35],
+  [2,88.9,5.8,2.03],
+  [3,83.8,5.9,2.38],
+  [4,73.1,5.5,3.08],
+  [5,67.6,5.5,3.39],
+  [6,57,5,4.09],
+  [7,46.3,4.7,4.79],
+  [8,40.9,4.7,5.14],
+  [9,30.3,4.3,5.81],
+  [10,25.1,3.7,6.18],
+  [11,14.3,4,6.92],
+  [12,9,3.4,7.23],
+  [13,-12,3,7.7]];
+function lerpTab(tab, x){
+  if (x <= tab[0][0]) return tab[0][1];
+  for (let i=1;i<tab.length;i++) if (x <= tab[i][0]){ const a=tab[i-1], b=tab[i]; return a[1]+(b[1]-a[1])*(x-a[0])/(b[0]-a[0]); }
+  return tab[tab.length-1][1];
+}
+const $ = id => document.getElementById(id);
+const SC = { a:{bg:$('aBg'), let:$('aLet')}, b:{bg:$('bBg'), let:$('bLet')} };
+const EMPTY = 'polygon(0 0,0 0,0 0)';
+function stage(topKey, clip){
+  const top = SC[topKey], base = SC[topKey==='b' ? 'a' : 'b'];
+  base.bg.style.zIndex = 1; base.let.style.zIndex = 2;
+  top.bg.style.zIndex = 4;  top.let.style.zIndex = 6;
+  top.bg.style.clipPath = top.let.style.clipPath = clip;
+  base.bg.style.clipPath = base.let.style.clipPath = 'none';
+}
+function wavePath(c){
+  const base = lerpTab(TAB.map(r=>[r[0],r[1]]), c), amp = lerpTab(TAB.map(r=>[r[0],r[2]]), c), ph = lerpTab(TAB.map(r=>[r[0],r[3]]), c);
+  const pts = [];
+  for (let x=0; x<=W; x+=6) pts.push(x+'px '+(base + amp*Math.sin(2*Math.PI*x/LAM + ph)).toFixed(2)+'px');
+  return 'polygon('+pts.join(',')+','+W+'px '+(H+10)+'px,0px '+(H+10)+'px)';
+}
+function render(t){
+  const c = ((t*30) % LOOP + LOOP) % LOOP;
+  if (c < EXIT) stage('b', c < 0 ? EMPTY : wavePath(c));
+  else          stage('a', wavePath(c - EXIT));
+}
+/* ========== 外殼 ========== */
+(function(){
+  const q = new URLSearchParams(location.search);
+  const card = $('card');
+  if (q.has('m')) { document.body.style.display='block'; document.body.style.minHeight='0'; } // 量測用：卡片貼左上
+  card.style.background = CFG.sceneA.bg;
+  for (const [bg, let_, s] of [['aBg','aLet',CFG.sceneA],['bBg','bLet',CFG.sceneB]]){
+    const useImg = q.has('img') && s.img;   // ?img=1：兩幕改用圖片
+    $(bg).style.background = useImg ? 'url('+s.img+') center/cover no-repeat' : s.bg;
+    const e = $(let_); e.textContent = useImg ? '' : s.letter; e.style.color = s.color; e.style.fontSize = CFG.fontSize+'px';
+  }
+  const z = parseFloat(q.get('z')||'1'); if (z !== 1) card.style.transform = 'scale('+z+')';
+  const start = () => {
+    if (q.has('t')) { render(parseFloat(q.get('t'))); document.title += ' ready'; return; }
+    const t0 = performance.now();
+    (function loop(){ render((performance.now()-t0)/1000); requestAnimationFrame(loop); })();
+  };
+  document.fonts.load('700 50px "Roboto Mono"', 'AB').then(start, start);
+})();
+</script>
+</body>
+</html>

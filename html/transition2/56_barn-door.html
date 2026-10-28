@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>S56 Barn Door</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#0f1015;}
+  body{display:flex;align-items:center;justify-content:center;min-height:100vh;}
+  #card{position:relative;width:324px;height:106px;border-radius:12px;overflow:hidden;transform-origin:center;}
+  #stage{position:absolute;left:0;top:0;width:324px;height:106px;}
+  .abs{position:absolute;left:0;top:0;width:324px;height:106px;}
+  .scene{position:absolute;left:0;top:0;width:324px;height:106px;overflow:hidden;}
+  .letter{display:flex;align-items:center;justify-content:center;font-family:"Roboto Mono",monospace;font-weight:700;}
+  .frame{position:absolute;left:9px;top:9px;width:308px;height:90px;box-sizing:border-box;border:1.5px solid;border-radius:8px;}
+  .dot{position:absolute;left:18px;top:18px;width:11px;height:11px;border-radius:50%;}
+  .sq{position:absolute;left:298px;top:79px;width:11px;height:11px;}
+</style>
+</head>
+<body>
+<div id="card">
+  <div class="abs" id="base"></div>
+  <div id="stage">
+    <div class="scene" id="A"><div class="abs" id="aBg"></div><div class="abs letter" id="aLet"></div></div>
+    <div class="scene" id="B"><div class="abs" id="bBg"></div><div class="abs letter" id="bLet"></div></div>
+  </div>
+</div>
+<script>
+/* ========== CFG：可換內容集中在這裡 ========== */
+const CFG = {
+  sceneA: { img:'img/A_scene.jpg', bg:'#14181e', letter:'A', color:'#f4f4f0', line:'#666c78', deco:'#c0c1c1' },   // 轉場前的畫面（底色＋字＋內框／圓點／小方塊裝飾，或圖）
+  sceneB: { img:'img/B_scene.jpg', bg:'#c6fe3e', letter:'B', color:'#18221a', line:'#7aa516', deco:'#2e4a2c' },   // 轉場後的畫面
+  fontSize: 54,
+  deco: true        // 每一幕的內框、左上圓點、右下小方塊（屬於該幕，跟著該幕移動）
+};
+/* ========== 動態參數（30fps 幀為單位）==========
+   一輪 = 52.4 幀；u = (幀 − 8) mod 一輪。u<27：入場（A 舊→B 新）；u≥27：退場（B 舊→A 新），同一組動作晚 27 幀、方向相同。
+   穀倉門：舊畫面從正中央（x=162）切成左右兩半，像兩扇門往左右滑開（各帶著自己那半邊的內容），
+   後面不動的新畫面從中央一條細縫開始越露越寬。每扇門的位移 s 見 S 表（先慢後快再慢）。 */
+const LOOP = 52.4, C0 = 8, EXIT = 27, W = 324, H = 106;
+const S = [[0,0],[1,1.5],[2,3],[3,6],[4,12.5],[5,22.5],[6,38.5],[7,61.5],[8,92.5],[9,118],[10,137.5],[11,150],[12,158],[13,162]];
+function lerpTab(tab, x){
+  if (x <= tab[0][0]) return tab[0][1];
+  for (let i=1;i<tab.length;i++) if (x <= tab[i][0]){ const a=tab[i-1], b=tab[i]; return a[1]+(b[1]-a[1])*(x-a[0])/(b[0]-a[0]); }
+  return tab[tab.length-1][1];
+}
+const $ = id => document.getElementById(id);
+const base = $('base');
+const SC = { a:{ el:$('A'), cfg:CFG.sceneA }, b:{ el:$('B'), cfg:CFG.sceneB } };
+function put(s, x, filter){ s.el.style.transform = 'translateX(' + x + 'px)'; s.el.style.filter = filter || 'none'; }
+function order(top){ for (const k of ['a','b']) SC[k].el.style.zIndex = SC[k] === top ? 4 : 1; }
+function anim(o, n, ph){
+  const s = lerpTab(S, ph);
+  put(n, 0);
+  o.el.style.clipPath = 'inset(0 ' + (W/2) + 'px 0 0)'; put(o, -s);
+  o.twin.style.display = 'block'; o.twin.style.zIndex = 5;
+  o.twin.style.clipPath = 'inset(0 0 0 ' + (W/2) + 'px)'; o.twin.style.transform = 'translateX(' + s + 'px)';
+  n.twin.style.display = 'none';
+  n.el.style.clipPath = 'none';
+  order(o);
+}
+function render(t){
+  const f = t * 30;
+  const u = ((f - C0) % LOOP + LOOP) % LOOP;
+  const exit = u >= EXIT;
+  anim(exit ? SC.b : SC.a, exit ? SC.a : SC.b, exit ? u - EXIT : u);
+}
+/* ========== 外殼 ========== */
+(function(){
+  const q = new URLSearchParams(location.search);
+  const card = $('card');
+  if (q.has('m')) { document.body.style.display='block'; document.body.style.minHeight='0'; } // 量測用：卡片貼左上
+  base.style.background = CFG.sceneA.bg;
+  for (const [bg, let_, s] of [['aBg','aLet',CFG.sceneA],['bBg','bLet',CFG.sceneB]]){
+    const useImg = q.has('img') && s.img;   // ?img=1：兩幕改用圖片
+    $(bg).style.background = useImg ? 'url('+s.img+') center/cover no-repeat' : s.bg;
+    if (CFG.deco) $(bg).innerHTML = '<i class="frame" style="border-color:'+s.line+'"></i><i class="dot" style="background:'+s.deco+'"></i><i class="sq" style="background:'+s.deco+'"></i>';
+    const el = $(let_); el.textContent = useImg ? '' : s.letter; el.style.color = s.color; el.style.fontSize = CFG.fontSize+'px';
+  }
+  for (const k of ['a','b']){ const tw = SC[k].el.cloneNode(true); tw.removeAttribute('id'); tw.querySelectorAll('[id]').forEach(e => e.removeAttribute('id')); tw.style.display = 'none'; $('stage').appendChild(tw); SC[k].twin = tw; }
+  const z = parseFloat(q.get('z')||'1'); if (z !== 1) card.style.transform = 'scale('+z+')';
+  const start = () => {
+    if (q.has('t')) { render(parseFloat(q.get('t'))); document.title += ' ready'; return; }
+    const t0 = performance.now();
+    (function loop(){ render((performance.now()-t0)/1000); requestAnimationFrame(loop); })();
+  };
+  document.fonts.load('700 54px "Roboto Mono"', 'AB').then(start, start);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>S13 Diamond Wipe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#0f1015;}
+  body{display:flex;align-items:center;justify-content:center;min-height:100vh;}
+  #card{position:relative;width:324px;height:106px;border-radius:12px;overflow:hidden;transform-origin:center;}
+  .abs{position:absolute;left:0;top:0;width:324px;height:106px;}
+  .letter{display:flex;align-items:center;justify-content:center;font-family:"Roboto Mono",monospace;font-weight:700;}
+</style>
+</head>
+<body>
+<div id="card">
+  <div class="abs" id="aBg"></div>
+  <div class="abs letter" id="aLet"></div>
+  <div class="abs" id="bBg"></div>
+  <div class="abs letter" id="bLet"></div>
+</div>
+<script>
+/* ========== CFG：可換內容集中在這裡 ========== */
+const CFG = {
+  sceneA: { img:'img/A_scene.jpg', bg:'#14181e', letter:'A', color:'#f4f0e6' },   // 轉場前的畫面（底色＋字，或圖）
+  sceneB: { img:'img/B_scene.jpg', bg:'#2cd8c3', letter:'B', color:'#14181e' },   // 轉場後的畫面
+  fontSize: 50
+};
+/* ========== 動態參數（30fps 幀為單位）==========
+   一輪 = 48.6 幀。兩幕直接切換，沒有過場色塊：菱形的聯集就是新畫面露出的範圍。
+   許多大小不一的菱形（旋轉 45° 的方塊）從畫面中心像波浪一樣一圈圈往外彈出，第 8 幀起出現、第 16 幀蓋滿。
+   每一幀的範圍是逐幀硬切的多邊形（SHAPES，座標 px）；null＝尚未出現，'F'＝整張。
+   入場（c<27）：A 在下、B 在上，B 只在菱形範圍內露出。
+   退場（c≥27）：同一組範圍倒著放，B 的範圍從外往中心縮回，露出 A。 */
+const LOOP = 48.6, EXIT = 27;
+const SHAPES = [null,"M156 27L159 27L163 31L159 32L152 32L156 27ZM188 34L191 34L192 37L203 47L196 56L192 58L188 61L188 59L180 53L180 42L188 34ZM147 36L148 58L142 54L140 50L137 49L137 46L147 36ZM154 36L161 36L161 42L163 42L163 53L161 53L161 58L154 58L154 53L152 53L154 36ZM124 41L131 46L131 49L125 54L118 48L118 46L124 41ZM154 75L161 75L160 77L156 78L154 75Z","M156 18L159 18L172 32L179 32L188 24L188 22L190 22L196 30L202 33L204 38L206 38L212 46L221 37L232 46L231 50L222 58L212 49L212 51L197 65L204 72L204 76L190 90L175 76L164 86L164 88L161 89L156 93L156 91L140 78L140 75L138 74L146 66L137 57L128 64L136 75L124 86L113 75L113 73L121 66L120 62L118 62L104 48L104 46L106 46L106 44L108 44L108 42L110 42L112 38L122 30L122 28L126 27L137 38L156 18ZM173 65L172 67L178 67L179 65L173 65Z","M156 4L159 4L163 9L166 8L165 11L168 12L174 20L188 6L191 6L191 8L204 20L200 26L202 26L202 28L204 28L204 30L210 35L220 26L217 20L223 16L226 19L224 24L224 26L226 26L226 31L230 31L245 46L241 53L230 62L230 65L239 73L239 76L223 91L217 88L212 81L209 81L190 101L175 86L160 100L157 103L142 87L140 87L140 85L137 85L131 93L124 98L103 76L101 76L94 85L91 85L81 75L90 63L74 48L91 30L93 30L101 39L105 38L106 35L117 26L113 22L117 17L116 14L119 15L124 9L126 9L133 17L136 16L135 19L137 22L135 22L133 26L139 31L144 26L140 20L148 14L156 4ZM175 21L170 25L174 29L179 26L175 21ZM254 41L260 46L260 49L255 54L249 48L254 41ZM103 55L94 63L95 66L103 72L111 64L110 62L108 63L108 60L103 55ZM210 60L206 64L211 68L214 63L210 60Z","M120 0L131 1L139 11L150 0L166 0L173 9L175 9L183 0L196 0L208 13L223 1L226 4L226 10L233 6L240 12L240 14L242 14L242 16L244 16L244 18L247 19L247 22L241 27L243 31L238 31L243 38L249 33L249 31L260 31L275 47L275 49L260 62L260 64L270 72L270 75L256 90L244 80L233 92L231 92L231 94L228 95L226 98L227 102L223 106L217 102L218 98L209 89L200 96L203 102L198 106L180 106L178 102L175 102L178 97L177 94L173 92L173 94L169 96L169 98L172 99L172 102L168 106L147 106L142 102L145 96L141 92L138 92L133 97L135 103L132 106L118 106L116 102L113 102L114 99L116 99L115 95L113 95L105 86L101 88L93 98L91 98L69 75L66 76L61 83L58 83L50 75L58 65L69 73L79 62L76 62L77 60L69 52L61 61L58 61L46 49L46 46L58 34L61 34L69 43L82 30L83 27L77 22L77 19L80 18L89 7L93 6L100 12L100 14L102 14L102 16L105 16L120 0ZM104 25L101 29L105 31L108 30L108 28L104 25ZM244 57L239 63L245 68L250 62L244 57Z","M86 0L99 0L104 7L107 7L113 0L136 0L139 3L144 0L172 0L173 3L176 0L202 0L205 4L208 3L207 6L213 0L238 0L253 15L255 15L263 6L266 6L278 19L280 19L280 22L272 29L274 31L269 31L270 34L272 34L277 40L285 31L288 31L303 46L302 50L289 62L300 75L288 87L285 87L279 79L276 79L263 92L263 94L260 95L260 97L264 99L264 102L260 106L248 105L245 100L249 95L245 92L241 88L236 94L242 100L237 106L80 106L76 102L76 99L78 99L81 94L79 94L72 85L58 96L37 75L48 61L41 56L37 50L34 50L27 57L18 46L26 38L29 38L34 45L42 40L42 38L52 30L49 25L44 22L44 19L46 19L58 6L61 6L69 15L71 15L86 0ZM70 26L67 30L72 34L75 30L70 26ZM254 26L249 30L252 31L257 30L254 26ZM277 54L276 57L270 61L277 70L284 63L277 54ZM27 68L33 73L28 80L22 75L27 68ZM107 92L103 94L104 96L108 94L107 92ZM59 97L63 100L60 104L56 102L56 99L59 97Z","M53 0L66 0L72 7L79 0L245 0L251 7L258 0L271 0L286 16L288 16L288 14L290 14L290 12L297 6L302 13L311 20L311 22L304 27L303 31L298 32L301 33L309 43L311 43L319 34L324 38L324 57L321 60L318 60L311 52L309 52L300 62L310 73L318 65L321 65L324 68L324 80L319 84L314 78L308 77L308 79L299 86L296 91L292 95L297 100L295 103L297 106L281 106L277 101L273 106L45 106L41 102L41 98L44 98L44 94L47 94L47 92L39 84L26 94L20 86L7 75L6 72L10 72L19 61L5 48L5 46L21 31L20 27L13 22L13 20L22 13L27 6L34 12L34 14L36 14L36 16L38 16L53 0ZM37 25L33 31L37 32L38 35L41 34L42 30L37 25ZM287 25L282 30L286 31L291 31L287 25ZM275 88L271 90L270 93L277 100L282 94L280 94L275 88ZM27 96L31 99L31 102L28 105L24 102L24 99L27 96Z","M22 0L34 0L39 7L47 0L277 0L284 7L290 2L290 0L302 0L314 11L315 14L317 14L318 17L321 18L321 16L323 16L323 25L319 24L313 31L324 31L324 106L314 106L311 102L308 102L305 106L293 106L13 106L9 102L9 99L16 92L5 81L1 84L1 64L5 67L10 62L6 57L1 60L1 35L6 38L12 32L5 24L1 25L1 16L3 16L3 18L6 17L7 14L9 14L10 11L22 0ZM307 86L303 89L302 93L309 100L310 99L316 93L307 86Z","M13 0L311 0L316 8L319 6L322 7L321 4L324 3L324 106L311 106L1 106L0 3L3 4L2 7L5 6L8 8L13 0Z","F"];
+const $ = id => document.getElementById(id);
+const SC = { a:{bg:$('aBg'), let:$('aLet')}, b:{bg:$('bBg'), let:$('bLet')} };
+function lerpTab(tab, x){
+  if (x <= tab[0][0]) return tab[0][1];
+  for (let i=1;i<tab.length;i++) if (x <= tab[i][0]){ const a=tab[i-1], b=tab[i]; return a[1]+(b[1]-a[1])*(x-a[0])/(b[0]-a[0]); }
+  return tab[tab.length-1][1];
+}
+const EMPTY = 'polygon(0 0,0 0,0 0)';
+function stage(topKey, clip){   // topKey 的那一幕疊在上面，只在 clip 範圍內露出
+  const top = SC[topKey], base = SC[topKey==='b' ? 'a' : 'b'];
+  base.bg.style.zIndex = 1; base.let.style.zIndex = 2;
+  top.bg.style.zIndex = 4;  top.let.style.zIndex = 6;
+  top.bg.style.clipPath = top.let.style.clipPath = clip;
+  base.bg.style.clipPath = base.let.style.clipPath = 'none';
+  for (const e of [top.bg, top.let, base.bg, base.let]) e.style.webkitMaskImage = e.style.maskImage = 'none';
+}
+function stageMask(topKey, mask){   // 用遮罩（圓錐漸層）露出
+  const top = SC[topKey], base = SC[topKey==='b' ? 'a' : 'b'];
+  base.bg.style.zIndex = 1; base.let.style.zIndex = 2;
+  top.bg.style.zIndex = 4;  top.let.style.zIndex = 6;
+  for (const e of [top.bg, top.let, base.bg, base.let]) e.style.clipPath = 'none';
+  for (const e of [top.bg, top.let]) { e.style.webkitMaskImage = e.style.maskImage = mask; }
+  for (const e of [base.bg, base.let]) e.style.webkitMaskImage = e.style.maskImage = 'none';
+}
+function clipOf(s){ return s === null ? EMPTY : (s === 'F' ? 'none' : "path('"+s+"')"); }
+function render(t){
+  const c = ((t*30) % LOOP + LOOP) % LOOP;
+  const n = Math.floor(c), L = SHAPES.length;
+  let s;
+  if (n < EXIT) s = n < L ? SHAPES[n] : 'F';
+  else { const j = n - EXIT; s = j < L ? SHAPES[L-1-j] : null; }
+  stage('b', clipOf(s));
+}
+/* ========== 外殼 ========== */
+(function(){
+  const q = new URLSearchParams(location.search);
+  const card = $('card');
+  if (q.has('m')) { document.body.style.display='block'; document.body.style.minHeight='0'; } // 量測用：卡片貼左上
+  card.style.background = CFG.sceneA.bg;
+  for (const [bg, let_, s] of [['aBg','aLet',CFG.sceneA],['bBg','bLet',CFG.sceneB]]){
+    const useImg = q.has('img') && s.img;   // ?img=1：兩幕改用圖片
+    $(bg).style.background = useImg ? 'url('+s.img+') center/cover no-repeat' : s.bg;
+    const e = $(let_); e.textContent = useImg ? '' : s.letter; e.style.color = s.color; e.style.fontSize = CFG.fontSize+'px';
+  }
+  const z = parseFloat(q.get('z')||'1'); if (z !== 1) card.style.transform = 'scale('+z+')';
+  const start = () => {
+    if (q.has('t')) { render(parseFloat(q.get('t'))); document.title += ' ready'; return; }
+    const t0 = performance.now();
+    (function loop(){ render((performance.now()-t0)/1000); requestAnimationFrame(loop); })();
+  };
+  document.fonts.load('700 50px "Roboto Mono"', 'AB').then(start, start);
+})();
+</script>
+</body>
+</html>

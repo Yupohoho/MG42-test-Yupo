@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>S32 Checker Panels</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#0f1015;}
+  body{display:flex;align-items:center;justify-content:center;min-height:100vh;}
+  #card{position:relative;width:324px;height:106px;border-radius:12px;overflow:hidden;transform-origin:center;}
+  .abs{position:absolute;left:0;top:0;width:324px;height:106px;}
+  .letter{display:flex;align-items:center;justify-content:center;font-family:"Roboto Mono",monospace;font-weight:700;}
+</style>
+</head>
+<body>
+<div id="card">
+  <div class="abs" id="aBg"></div>
+  <div class="abs letter" id="aLet"></div>
+  <div class="abs" id="bBg"></div>
+  <div class="abs letter" id="bLet"></div>
+</div>
+<script>
+/* ========== CFG：可換內容集中在這裡 ========== */
+const CFG = {
+  sceneA: { img:'img/A_scene.jpg', bg:'#14181e', letter:'A', color:'#f4f0e6' },   // 轉場前的畫面（底色＋字，或圖）
+  sceneB: { img:'img/B_scene.jpg', bg:'#8f7cfe', letter:'B', color:'#14181e' },   // 轉場後的畫面
+  fontSize: 50
+};
+/* ========== 動態參數（30fps 幀為單位）==========
+   一輪 = 49 幀。兩幕直接切換，沒有過場色塊：卡片分成 12 欄 × 4 列的方格（每格 27 × 26.5），每一格都是一張翻卡——
+   正面是舊畫面的那一格、背面是新畫面的那一格，沿著該格的垂直中線翻 180°（用透視 perspective(260px) rotateY），翻到 90° 時立起來看不見、
+   過 90° 後露出背面（新畫面）。每格翻 DUR ＝ 7 幀（緩入緩出），整張的翻動順序從左上角往右下角斜向傳過去：
+   第 (欄 col, 列 row) 格的起始幀 ＝ 0.82×col ＋ 0.7×row ＋ （(col＋row) 為奇數的格子再晚 PD ＝ 1.5 幀，所以翻到一半新舊畫面是相間的棋盤），約第 19 幀全部翻完。
+   立起來的格子後面是深色底（BACK）。
+   入場（c<27）：每格由正面翻到背面（0° → 180°），露出 B；退場（c≥27）：同樣的順序晚 27 幀，每格接著往同一個方向再翻 180°（180° → 360°），翻回正面，露出 A。 */
+const LOOP = 49, EXIT = 27, W = 324, H = 106, NC = 12, NR = 4, CW = W/NC, CH = H/NR;
+const DX = 0.82, DY = 0.7, DUR = 7, PD = 1.5, PERSP = 260, BACK = '#0b0d12';
+function lerpTab(tab, x){
+  if (x <= tab[0][0]) return tab[0][1];
+  for (let i=1;i<tab.length;i++) if (x <= tab[i][0]){ const a=tab[i-1], b=tab[i]; return a[1]+(b[1]-a[1])*(x-a[0])/(b[0]-a[0]); }
+  return tab[tab.length-1][1];
+}
+const $ = id => document.getElementById(id);
+const SC = { a:{bg:$('aBg'), let:$('aLet')}, b:{bg:$('bBg'), let:$('bLet')} };
+const EMPTY = 'polygon(0 0,0 0,0 0)';
+function stage(topKey, clip){
+  const top = SC[topKey], base = SC[topKey==='b' ? 'a' : 'b'];
+  base.bg.style.zIndex = 1; base.let.style.zIndex = 2;
+  top.bg.style.zIndex = 4;  top.let.style.zIndex = 6;
+  top.bg.style.clipPath = top.let.style.clipPath = clip;
+  base.bg.style.clipPath = base.let.style.clipPath = 'none';
+}
+const cells = [];
+let ready = false;
+function slice(src, q, r){   // 取舊／新畫面的一格：整張場景（底＋字）往左上移，被格子裁掉
+  const wrap = document.createElement('div'); wrap.style.cssText = 'position:absolute;left:0;top:0;width:'+(CW+0.6)+'px;height:'+(CH+0.6)+'px;overflow:hidden;backface-visibility:hidden';
+  const inner = document.createElement('div'); inner.style.cssText = 'position:absolute;left:'+(-q*CW)+'px;top:'+(-r*CH)+'px;width:'+W+'px;height:'+H+'px';
+  const b = src.bg.cloneNode(false), l = src.let.cloneNode(true);
+  for (const e of [b, l]){ e.removeAttribute('id'); e.style.zIndex = ''; e.style.clipPath = 'none'; }
+  b.style.cssText = src.bg.style.cssText; l.style.cssText = src.let.style.cssText;
+  b.style.zIndex = l.style.zIndex = ''; b.style.clipPath = l.style.clipPath = 'none';
+  inner.appendChild(b); inner.appendChild(l); wrap.appendChild(inner); return wrap;
+}
+function init(){
+  $('card').style.background = BACK;
+  for (let r = 0; r < NR; r++) for (let q = 0; q < NC; q++){
+    const cell = document.createElement('div');
+    cell.style.cssText = 'position:absolute;left:'+(q*CW)+'px;top:'+(r*CH)+'px;width:'+(CW+0.6)+'px;height:'+(CH+0.6)+'px';
+    const fa = slice(SC.a, q, r), fb = slice(SC.b, q, r);
+    cell.appendChild(fa); cell.appendChild(fb); $('card').appendChild(cell);
+    cells.push({ cell, fa, fb, t0: DX*q + DY*r + ((q + r) % 2 ? PD : 0) });
+  }
+  for (const k of ['a', 'b']){ SC[k].bg.style.display = SC[k].let.style.display = 'none'; }
+  ready = true;
+}
+const smooth = u => u*u*(3 - 2*u);
+function render(t){
+  if (!ready) init();
+  const c = ((t*30) % LOOP + LOOP) % LOOP;
+  for (const k of cells){
+    let ang;
+    if (c < EXIT) ang = 180*smooth(Math.min(1, Math.max(0, (c - k.t0)/DUR)));
+    else          ang = 180 + 180*smooth(Math.min(1, Math.max(0, (c - EXIT - k.t0)/DUR)));
+    const a = ang % 360, showA = a < 90 || a >= 270, rot = showA ? (a >= 270 ? a - 360 : a) : a - 180;
+    k.fa.style.display = showA ? '' : 'none'; k.fb.style.display = showA ? 'none' : '';
+    k.cell.style.transform = 'perspective('+PERSP+'px) rotateY('+rot.toFixed(2)+'deg)';
+  }
+}
+/* ========== 外殼 ========== */
+(function(){
+  const q = new URLSearchParams(location.search);
+  const card = $('card');
+  if (q.has('m')) { document.body.style.display='block'; document.body.style.minHeight='0'; } // 量測用：卡片貼左上
+  card.style.background = CFG.sceneA.bg;
+  for (const [bg, let_, s] of [['aBg','aLet',CFG.sceneA],['bBg','bLet',CFG.sceneB]]){
+    const useImg = q.has('img') && s.img;   // ?img=1：兩幕改用圖片
+    $(bg).style.background = useImg ? 'url('+s.img+') center/cover no-repeat' : s.bg;
+    const e = $(let_); e.textContent = useImg ? '' : s.letter; e.style.color = s.color; e.style.fontSize = CFG.fontSize+'px';
+  }
+  const z = parseFloat(q.get('z')||'1'); if (z !== 1) card.style.transform = 'scale('+z+')';
+  const start = () => {
+    if (q.has('t')) { render(parseFloat(q.get('t'))); document.title += ' ready'; return; }
+    const t0 = performance.now();
+    (function loop(){ render((performance.now()-t0)/1000); requestAnimationFrame(loop); })();
+  };
+  document.fonts.load('700 50px "Roboto Mono"', 'AB').then(start, start);
+})();
+</script>
+</body>
+</html>

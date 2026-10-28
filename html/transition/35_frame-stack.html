@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>S35 Frame Stack</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#0f1015;}
+  body{display:flex;align-items:center;justify-content:center;min-height:100vh;}
+  #card{position:relative;width:324px;height:106px;border-radius:12px;overflow:hidden;transform-origin:center;}
+  .abs{position:absolute;left:0;top:0;width:324px;height:106px;}
+  .letter{display:flex;align-items:center;justify-content:center;font-family:"Roboto Mono",monospace;font-weight:700;}
+</style>
+</head>
+<body>
+<div id="card">
+  <div class="abs" id="aBg"></div>
+  <div class="abs letter" id="aLet"></div>
+  <div class="abs" id="bBg"></div>
+  <div class="abs letter" id="bLet"></div>
+</div>
+<script>
+/* ========== CFG：可換內容集中在這裡 ========== */
+const CFG = {
+  sceneA: { img:'img/A_scene.jpg', bg:'#f4f0e6', letter:'A', color:'#14181e' },   // 轉場前的畫面（底色＋字，或圖）
+  sceneB: { img:'img/B_scene.jpg', bg:'#fd7a3d', letter:'B', color:'#f4f0e6' },   // 轉場後的畫面
+  fontSize: 50
+};
+/* ========== 動態參數（30fps 幀為單位）==========
+   一輪 = 50 幀。有過場色塊的類型（四邊的色塊是真的物件）：四片色塊從四邊往中心壓縮，把舊畫面框成中央一小塊「窗」（還看得到舊畫面的矩形），
+   上片與左片是淺灰（#e6e6e6）、下片與右片是深灰（#6e6e6e）（多色用灰階）。窗的四邊逐幀往中心縮，上緣 y、下緣 y、左緣 x、右緣 x 見 TOP／BOT／LEFT／RIGHT 表
+   （先快後慢，約第 9 幀定位在 x 74–253、y 25–83），窗停住 2 幀（第 9–10 幀）。
+   第 11 幀起窗中央長出新畫面：以中心（162,53）為準的矩形，半寬 HW、半高 HH 見表（第 11 幀 40×14 → 第 12 幀 66×22 → 第 13 幀 112×40 一次越過窗的邊（窗半寬 89.5、半高 29），窗邊不會留下細細的一圈舊畫面 → 第 14 幀蓋滿），新畫面蓋在色塊上面，整張換成新畫面。
+   入場（c<27）：色塊蓋住 A，窗中心長出 B；退場（c≥27）：同樣的動作晚 27 幀再來一次，色塊蓋住 B，窗中心長出 A。 */
+const LOOP = 50, EXIT = 27, W = 324, H = 106, CX = 162, CY = 53;
+const TOP = [[-1,0],[0,12],[1,19],[2,23],[3,25]];
+const BOT = [[-1,106],[0,103],[1,102],[2,91],[3,87],[4,83]];
+const LEFT = [[2,0],[3,31],[4,54],[5,66],[6,72],[7,74]];
+const RIGHT = [[2,324],[3,319],[4,316],[5,285],[6,268],[7,259],[8,255],[9,253]];
+const HW = [[10.9,0],[11,40],[12,66],[13,112],[14,170]];
+const HH = [[10.9,0],[11,14],[12,22],[13,40],[14,58]];
+const LIGHT = '#e6e6e6', DARK = '#6e6e6e';
+function lerpTab(tab, x){
+  if (x <= tab[0][0]) return tab[0][1];
+  for (let i=1;i<tab.length;i++) if (x <= tab[i][0]){ const a=tab[i-1], b=tab[i]; return a[1]+(b[1]-a[1])*(x-a[0])/(b[0]-a[0]); }
+  return tab[tab.length-1][1];
+}
+const $ = id => document.getElementById(id);
+const SC = { a:{bg:$('aBg'), let:$('aLet')}, b:{bg:$('bBg'), let:$('bLet')} };
+const EMPTY = 'polygon(0 0,0 0,0 0)';
+function stage(topKey, clip){
+  const top = SC[topKey], base = SC[topKey==='b' ? 'a' : 'b'];
+  base.bg.style.zIndex = 1; base.let.style.zIndex = 2;
+  top.bg.style.zIndex = 4;  top.let.style.zIndex = 6;
+  top.bg.style.clipPath = top.let.style.clipPath = clip;
+  base.bg.style.clipPath = base.let.style.clipPath = 'none';
+}
+const rect = (x0, y0, x1, y1) => 'M'+x0.toFixed(2)+' '+y0.toFixed(2)+'L'+x1.toFixed(2)+' '+y0.toFixed(2)+'L'+x1.toFixed(2)+' '+y1.toFixed(2)+'L'+x0.toFixed(2)+' '+y1.toFixed(2)+'Z';
+const poly = pts => 'M'+pts.map(p => p[0].toFixed(2)+' '+p[1].toFixed(2)).join('L')+'Z';
+const clipOf = d => d ? "path('"+d+"')" : EMPTY;
+const mk = (color, z) => { const e = document.createElement('div'); e.className = 'abs'; e.style.cssText += ';pointer-events:none;z-index:'+z+';background:'+color; $('card').appendChild(e); return e; };
+const baseF = mk('#a0a0a0', 3);                  // 四片下面的灰底（外框減掉窗）：片與片的接縫透出灰色，不透出舊畫面
+const pn = { top: mk(LIGHT, 3), left: mk(LIGHT, 3), bottom: mk(DARK, 3), right: mk(DARK, 3) };
+const setR = (e, x0, y0, x1, y1) => { e.style.clipPath = (x1 > x0 && y1 > y0) ? "path('"+rect(x0, y0, x1, y1)+"')" : EMPTY; };
+function shape(c, inn){
+  const yt = lerpTab(TOP, c), yb = lerpTab(BOT, c), xl = lerpTab(LEFT, c), xr = lerpTab(RIGHT, c);
+  setR(pn.top, -5, -5, W + 5, yt); setR(pn.bottom, -5, yb, W + 5, H + 5);
+  setR(pn.left, -5, yt, xl, yb); setR(pn.right, xr, yt, W + 5, yb);
+  baseF.style.clipPath = (yt > 0 || yb < H || xl > 0 || xr < W) ? "path(evenodd,'"+rect(-5, -5, W + 5, H + 5)+rect(xl, yt, xr, yb)+"')" : EMPTY;
+  const hw = lerpTab(HW, c), hh = lerpTab(HH, c);
+  stage(inn ? 'b' : 'a', c < 11 ? EMPTY : (hw >= CX && hh >= CY ? 'none' : clipOf(rect(CX - hw, CY - hh, CX + hw, CY + hh))));
+}
+function render(t){
+  const c = ((t*30) % LOOP + LOOP) % LOOP;
+  if (c < EXIT) shape(c, true);
+  else          shape(c - EXIT, false);
+}
+/* ========== 外殼 ========== */
+(function(){
+  const q = new URLSearchParams(location.search);
+  const card = $('card');
+  if (q.has('m')) { document.body.style.display='block'; document.body.style.minHeight='0'; } // 量測用：卡片貼左上
+  card.style.background = CFG.sceneA.bg;
+  for (const [bg, let_, s] of [['aBg','aLet',CFG.sceneA],['bBg','bLet',CFG.sceneB]]){
+    const useImg = q.has('img') && s.img;   // ?img=1：兩幕改用圖片
+    $(bg).style.background = useImg ? 'url('+s.img+') center/cover no-repeat' : s.bg;
+    const e = $(let_); e.textContent = useImg ? '' : s.letter; e.style.color = s.color; e.style.fontSize = CFG.fontSize+'px';
+  }
+  const z = parseFloat(q.get('z')||'1'); if (z !== 1) card.style.transform = 'scale('+z+')';
+  const start = () => {
+    if (q.has('t')) { render(parseFloat(q.get('t'))); document.title += ' ready'; return; }
+    const t0 = performance.now();
+    (function loop(){ render((performance.now()-t0)/1000); requestAnimationFrame(loop); })();
+  };
+  document.fonts.load('700 50px "Roboto Mono"', 'AB').then(start, start);
+})();
+</script>
+</body>
+</html>

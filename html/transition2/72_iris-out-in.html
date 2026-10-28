@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>S72 Iris Out & In</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#0f1015;}
+  body{display:flex;align-items:center;justify-content:center;min-height:100vh;}
+  #card{position:relative;width:324px;height:106px;border-radius:12px;overflow:hidden;transform-origin:center;}
+  .abs{position:absolute;left:0;top:0;width:324px;height:106px;}
+  .letter{display:flex;align-items:center;justify-content:center;font-family:"Roboto Mono",monospace;font-weight:700;}
+  /* 每一幕的裝飾：內框、左上圓點、右下小方塊（屬於該幕，跟著該幕一起切換） */
+  .frm{position:absolute;left:9px;top:9px;width:305px;height:86px;border:2px solid;border-radius:6px;}
+  .dot{position:absolute;left:18px;top:18px;width:11px;height:11px;border-radius:50%;}
+  .sq{position:absolute;left:298px;top:79px;width:10px;height:10px;}
+  .fx{position:absolute;left:0;top:0;width:324px;height:106px;pointer-events:none;}
+</style>
+</head>
+<body>
+<div id="card">
+  <div class="abs" id="aBg"><div class="frm"></div><div class="dot"></div><div class="sq"></div></div>
+  <div class="abs letter" id="aLet"></div>
+  <div class="abs" id="bBg"><div class="frm"></div><div class="dot"></div><div class="sq"></div></div>
+  <div class="abs letter" id="bLet"></div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+/* ========== CFG：可換內容集中在這裡 ========== */
+const CFG = {
+  sceneA: { img:'img/A_scene.jpg', bg:'#14181e', ink:'#f1f1ea', line:'#6b6f75', dot:'#c2c5c2', letter:'A' },   // 轉場前的畫面
+  sceneB: { img:'img/B_scene.jpg', bg:'#a57bfd', ink:'#13131f', line:'#7350b4', dot:'#2f2747', letter:'B' },   // 轉場後的畫面
+  cardBg: '#0b0c10',      // 圓形外露出的黑
+  center: [162, 53],      // 圓心（卡片中央）
+  fontSize: 52
+};
+/* ========== 動態參數（30fps 幀為單位）==========
+   一輪 = 52.5 幀。圈入圈出（老式動畫結尾那種）：兩幕直接切換，圓形範圍就是畫面露出的範圍，圓外是黑。
+   轉場內第 p 幀：舊畫面的圓從蓋滿（p=5）縮到 0（p=9，全黑一瞬），
+   接著新畫面的圓從 0 長到蓋滿（p=14）。半徑見 SHRINK／GROW 表。
+   入場 p = c（舊 A → 新 B）；第 27 幀起退場 p = c − 27（舊 B → 新 A）。 */
+const LOOP = 52.5, EXIT_DT = 27, CLOSE_AT = 9;
+const SHRINK = [[5,180],[6,140],[7,95],[8,48],[9,0]];
+const GROW   = [[9,0],[10,20],[11,66],[12,115],[13,150],[14,180]];
+const circ = r => 'circle('+Math.max(0,r).toFixed(1)+'px at '+CFG.center[0]+'px '+CFG.center[1]+'px)';
+function render(t){
+  const c = ((t*30) % LOOP + LOOP) % LOOP;
+  const exit = c >= EXIT_DT, p = exit ? c - EXIT_DT : c;
+  const newer = exit ? 'a' : 'b', older = exit ? 'b' : 'a';
+  if (p < CLOSE_AT) { const r = lerpTab(SHRINK, p); show(older, r >= 180 ? 'none' : circ(r)); }
+  else              { const r = lerpTab(GROW, p);   show(newer, r >= 180 ? 'none' : circ(r)); }
+}
+/* ========== 外殼 ========== */
+const SC = { a:{bg:$('aBg'), let:$('aLet')}, b:{bg:$('bBg'), let:$('bLet')} };
+// 整幕切換：只露出一幕（clip 可選，用於只露出部分範圍）
+function show(key, clip){
+  const on = SC[key], off = SC[key==='a' ? 'b' : 'a'];
+  on.bg.style.visibility = on.let.style.visibility = 'visible';
+  off.bg.style.visibility = off.let.style.visibility = 'hidden';
+  on.bg.style.clipPath = on.let.style.clipPath = clip || 'none';
+}
+function lerpTab(tab, x){
+  if (x <= tab[0][0]) return tab[0][1];
+  for (let i=1;i<tab.length;i++) if (x <= tab[i][0]){ const a=tab[i-1], b=tab[i]; return a[1]+(b[1]-a[1])*(x-a[0])/(b[0]-a[0]); }
+  return tab[tab.length-1][1];
+}
+(function(){
+  const q = new URLSearchParams(location.search);
+  const card = $('card');
+  if (q.has('m')) { document.body.style.display='block'; document.body.style.minHeight='0'; } // 量測用：卡片貼左上
+  card.style.background = CFG.cardBg || CFG.sceneA.bg;
+  for (const [bg, let_, s] of [['aBg','aLet',CFG.sceneA],['bBg','bLet',CFG.sceneB]]){
+    const useImg = q.has('img') && s.img;   // ?img=1：兩幕改用圖片
+    const e = $(bg);
+    e.style.background = useImg ? 'url('+s.img+') center/cover no-repeat' : s.bg;
+    e.querySelector('.frm').style.borderColor = s.line;
+    e.querySelector('.dot').style.background = s.dot;
+    e.querySelector('.sq').style.background = s.dot;
+    if (useImg) for (const c of e.children) c.style.display = 'none';
+    const l = $(let_); l.textContent = useImg ? '' : s.letter; l.style.color = s.ink; l.style.fontSize = CFG.fontSize+'px';
+  }
+  if (typeof init === 'function') init(q);
+  const z = parseFloat(q.get('z')||'1'); if (z !== 1) card.style.transform = 'scale('+z+')';
+  const start = () => {
+    if (q.has('t')) { render(parseFloat(q.get('t'))); document.title += ' ready'; return; }
+    const t0 = performance.now();
+    (function loop(){ render((performance.now()-t0)/1000); requestAnimationFrame(loop); })();
+  };
+  document.fonts.load('700 52px "Roboto Mono"', 'AB').then(start, start);
+})();
+</script>
+</body>
+</html>

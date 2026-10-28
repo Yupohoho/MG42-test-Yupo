@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>S76 Domino Flip</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#0f1015;}
+  body{display:flex;align-items:center;justify-content:center;min-height:100vh;}
+  #card{position:relative;width:324px;height:106px;border-radius:12px;overflow:hidden;transform-origin:center;}
+  .abs{position:absolute;left:0;top:0;width:324px;height:106px;}
+  .letter{display:flex;align-items:center;justify-content:center;font-family:"Roboto Mono",monospace;font-weight:700;}
+</style>
+</head>
+<body>
+<div id="card">
+  <div class="abs" id="aBg"></div>
+  <div class="abs letter" id="aLet"></div>
+  <div class="abs" id="bBg"></div>
+  <div class="abs letter" id="bLet"></div>
+</div>
+<script>
+/* ========== CFG：可換內容集中在這裡 ========== */
+const CFG = {
+  sceneA: { img:'img/A_scene.jpg', bg:'#14181e', letter:'A', color:'#e3e2dd' },   // 轉場前的畫面（底色＋字，或圖）
+  sceneB: { img:'img/B_scene.jpg', bg:'#fed03c', letter:'B', color:'#241e1a' },   // 轉場後的畫面
+  fontSize: 54,
+  frameOpacity: 0.42,   // 內框線（字色的不透明度）
+  decoOpacity: 0.8      // 左上圓點、右下小方塊
+};
+/* ========== 動態參數（30fps 幀為單位）==========
+   一輪 = 53 幀。兩幕直接切換：舊畫面切成 8 條等寬直條（每條 40.5px），每條都帶著舊畫面該區的內容，像骨牌一樣由左往右依序往前（朝觀眾）倒下——
+   第 i 條以自己的底邊為軸 rotateX 0° → −90°（透視 perspective(300px)，上緣朝鏡頭倒下來；加速倒下：角度 ＝ 90° ×（經過幀數 ÷ 4.2）²），
+   倒下時越倒越暗（亮度 1 → 0.65），倒到 90° 時變成貼在底邊的一條線而消失。條的上方先空出來，所以新畫面在每格是「由上往下」露出；
+   越早倒的條越靠前（疊在右邊那條上面）。
+   第 i 條開始倒的幀 ＝ 10 ＋ 1.57 × i（i ＝ 0～7），約第 25 幀全部倒完。新畫面完整墊在底下、不動。
+   入場（c<27）：A 的直條倒下露出 B；退場（c≥27）：同樣的動作晚 27 幀，B 的直條倒下露出 A（一樣由左往右）。 */
+const LOOP = 53, EXIT = 27, NS = 8, SW = 324/NS, S0 = 10, STEP = 1.57, DUR = 4.2, PERSP = 300, SHADE = 0.35;
+const $ = id => document.getElementById(id);
+let USEIMG = false;
+const clamp01 = v => Math.min(1, Math.max(0, v));
+function paintScene(bg, let_, s){
+  bg.innerHTML = '';
+  const img = USEIMG && s.img;
+  bg.style.background = img ? 'url('+s.img+') center/cover no-repeat' : s.bg;
+  if (!img){
+    const mk = css => { const d = document.createElement('div'); d.style.cssText = 'position:absolute;'+css; bg.appendChild(d); };
+    mk('left:9px;top:8px;width:309px;height:91px;box-sizing:border-box;border:1.5px solid '+s.color+';border-radius:6px;opacity:'+CFG.frameOpacity);
+    mk('left:18px;top:18px;width:10px;height:10px;border-radius:50%;background:'+s.color+';opacity:'+CFG.decoOpacity);
+    mk('left:298px;top:79px;width:10px;height:10px;background:'+s.color+';opacity:'+CFG.decoOpacity);
+  }
+  let_.textContent = img ? '' : s.letter; let_.style.color = s.color; let_.style.fontSize = CFG.fontSize+'px';
+}
+function sceneNode(s){   // 一整幕的複本（底＋裝飾＋字）
+  const w = document.createElement('div'); w.className = 'abs';
+  const b = document.createElement('div'); b.className = 'abs';
+  const l = document.createElement('div'); l.className = 'abs letter';
+  paintScene(b, l, s); w.appendChild(b); w.appendChild(l); return w;
+}
+const SC = { a:{bg:$('aBg'), let:$('aLet')}, b:{bg:$('bBg'), let:$('bLet')} };
+function phase(t){
+  const c = ((t*30) % LOOP + LOOP) % LOOP;
+  return c < EXIT ? { o:'a', n:'b', u:c } : { o:'b', n:'a', u:c-EXIT };
+}
+const STRIPS = { a:[], b:[] };
+function init(){
+  for (const key of ['a','b']){
+    const s = key === 'a' ? CFG.sceneA : CFG.sceneB;
+    for (let i=0;i<NS;i++){
+      const el = document.createElement('div');
+      el.style.cssText = 'position:absolute;top:0;left:'+(i*SW)+'px;width:'+(SW+0.6)+'px;height:106px;overflow:hidden;transform-origin:50% 100%;z-index:'+(20-i)+';display:none';
+      const inner = sceneNode(s); inner.style.left = (-i*SW)+'px';
+      el.appendChild(inner); $('card').appendChild(el);
+      STRIPS[key].push({ el, s0: S0 + STEP*i });
+    }
+  }
+}
+function render(t){
+  const { o, n, u } = phase(t);
+  SC[n].bg.style.zIndex = 1; SC[n].let.style.zIndex = 2; SC[n].bg.style.display = SC[n].let.style.display = '';
+  SC[o].bg.style.display = SC[o].let.style.display = 'none';
+  for (const st of STRIPS[n]) st.el.style.display = 'none';
+  for (const st of STRIPS[o]){
+    const p = clamp01((u - st.s0)/DUR);
+    if (p >= 1){ st.el.style.display = 'none'; continue; }
+    st.el.style.display = '';
+    st.el.style.transform = p > 0 ? 'perspective('+PERSP+'px) rotateX('+(-90*p*p).toFixed(2)+'deg)' : 'none';
+    st.el.style.filter = p > 0 ? 'brightness('+(1 - SHADE*p).toFixed(3)+')' : 'none';
+  }
+}
+/* ========== 外殼 ========== */
+(function(){
+  const q = new URLSearchParams(location.search);
+  const card = $('card');
+  if (q.has('m')) { document.body.style.display='block'; document.body.style.minHeight='0'; } // 量測用：卡片貼左上
+  USEIMG = q.has('img');   // ?img=1：兩幕改用圖片
+  paintScene($('aBg'), $('aLet'), CFG.sceneA); paintScene($('bBg'), $('bLet'), CFG.sceneB);
+  init();
+  const z = parseFloat(q.get('z')||'1'); if (z !== 1) card.style.transform = 'scale('+z+')';
+  const start = () => {
+    if (q.has('t')) { render(parseFloat(q.get('t'))); document.title += ' ready'; return; }
+    const t0 = performance.now();
+    (function loop(){ render((performance.now()-t0)/1000); requestAnimationFrame(loop); })();
+  };
+  document.fonts.load('700 54px "Roboto Mono"', 'AB').then(start, start);
+})();
+</script>
+</body>
+</html>

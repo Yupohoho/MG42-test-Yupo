@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>S73 Page Curl</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#0f1015;}
+  body{display:flex;align-items:center;justify-content:center;min-height:100vh;}
+  #card{position:relative;width:324px;height:106px;border-radius:12px;overflow:hidden;transform-origin:center;}
+  .abs{position:absolute;left:0;top:0;width:324px;height:106px;}
+  .letter{display:flex;align-items:center;justify-content:center;font-family:"Roboto Mono",monospace;font-weight:700;}
+  #band{position:absolute;top:-77px;height:260px;transform-origin:100% 50%;z-index:8;display:none;}
+</style>
+</head>
+<body>
+<div id="card">
+  <div class="abs" id="aBg"></div>
+  <div class="abs letter" id="aLet"></div>
+  <div class="abs" id="bBg"></div>
+  <div class="abs letter" id="bLet"></div>
+  <div id="band"></div>
+</div>
+<script>
+/* ========== CFG：可換內容集中在這裡 ========== */
+const CFG = {
+  sceneA: { img:'img/A_scene.jpg', bg:'#14181e', letter:'A', color:'#e3e2dd' },   // 轉場前的畫面（底色＋字，或圖）
+  sceneB: { img:'img/B_scene.jpg', bg:'#fed03c', letter:'B', color:'#241e1a' },   // 轉場後的畫面
+  fontSize: 54,
+  frameOpacity: 0.42,   // 內框線（字色的不透明度）
+  decoOpacity: 0.8      // 左上圓點、右下小方塊
+};
+/* ========== 動態參數（30fps 幀為單位）==========
+   一輪 = 53 幀。色塊劃接型：一條斜的捲頁折線（「/」方向，與垂直夾 29.4°，水平每往上 1px 往右 0.5625px）由右往左等速掃過，
+   折線右邊露出新畫面，折線左邊緊貼一條「捲起的頁背」色帶（水平寬 72px，第 6.5～9.5 幀由 0 長到 72），色帶 ＝ 舊畫面底色蓋上白色，
+   靠前緣（左）白 80%、靠折線（右）白 55%（深底時是淺灰→中灰，黃底時是奶油白→淡黃）。
+   折線在卡片中線（y=53）的 x ＝ 201 − 21.5 ×（幀 − 14），第 6.5 幀從右外側進來，約第 26.5 幀連同色帶完全出左邊。
+   入場（c<27）：A → B；退場（c≥27）：同樣的動作晚 27 幀，B → A（方向一樣由右往左）。 */
+const LOOP = 53, EXIT = 27, SLOPE = 0.5625, ANG = Math.atan(SLOPE)*180/Math.PI, COS = Math.cos(Math.atan(SLOPE));
+const BANDW = 72, WHITE0 = 0.8, WHITE1 = 0.55;
+const $ = id => document.getElementById(id);
+let USEIMG = false;
+const clamp01 = v => Math.min(1, Math.max(0, v));
+function paintScene(bg, let_, s){
+  bg.innerHTML = '';
+  const img = USEIMG && s.img;
+  bg.style.background = img ? 'url('+s.img+') center/cover no-repeat' : s.bg;
+  if (!img){
+    const mk = css => { const d = document.createElement('div'); d.style.cssText = 'position:absolute;'+css; bg.appendChild(d); };
+    mk('left:9px;top:8px;width:309px;height:91px;box-sizing:border-box;border:1.5px solid '+s.color+';border-radius:6px;opacity:'+CFG.frameOpacity);
+    mk('left:18px;top:18px;width:10px;height:10px;border-radius:50%;background:'+s.color+';opacity:'+CFG.decoOpacity);
+    mk('left:298px;top:79px;width:10px;height:10px;background:'+s.color+';opacity:'+CFG.decoOpacity);
+  }
+  let_.textContent = img ? '' : s.letter; let_.style.color = s.color; let_.style.fontSize = CFG.fontSize+'px';
+}
+const SC = { a:{bg:$('aBg'), let:$('aLet')}, b:{bg:$('bBg'), let:$('bLet')} };
+const EMPTY = 'polygon(0 0,0 0,0 0)';
+function stage(topKey, clip){
+  const top = SC[topKey], base = SC[topKey==='b' ? 'a' : 'b'];
+  base.bg.style.zIndex = 1; base.let.style.zIndex = 2;
+  top.bg.style.zIndex = 4;  top.let.style.zIndex = 6;
+  top.bg.style.clipPath = top.let.style.clipPath = clip;
+  base.bg.style.clipPath = base.let.style.clipPath = 'none';
+}
+function phase(t){
+  const c = ((t*30) % LOOP + LOOP) % LOOP;
+  return c < EXIT ? { o:'a', n:'b', u:c } : { o:'b', n:'a', u:c-EXIT };
+}
+function init(){ $('band').style.transform = 'rotate('+ANG.toFixed(3)+'deg)'; }
+function render(t){
+  const { o, n, u } = phase(t), band = $('band');
+  const m = 201 - 21.5*(u - 14);
+  if (u < 6.5){ stage(n, EMPTY); band.style.display = 'none'; return; }
+  if (m < -60){ stage(n, 'none'); band.style.display = 'none'; return; }
+  const xt = m + SLOPE*53, xb = m - SLOPE*53;
+  stage(n, 'polygon('+xt.toFixed(2)+'px 0px,340px 0px,340px 106px,'+xb.toFixed(2)+'px 106px)');
+  const pw = BANDW*clamp01((u - 6.5)/3)*COS;
+  const oldBg = (o === 'a' ? CFG.sceneA : CFG.sceneB).bg;
+  band.style.display = 'block';
+  band.style.left = (m - pw).toFixed(2)+'px'; band.style.width = pw.toFixed(2)+'px';
+  band.style.background = 'linear-gradient(to right, rgba(255,255,255,'+WHITE0+'), rgba(255,255,255,'+WHITE1+')), '+oldBg;
+}
+/* ========== 外殼 ========== */
+(function(){
+  const q = new URLSearchParams(location.search);
+  const card = $('card');
+  if (q.has('m')) { document.body.style.display='block'; document.body.style.minHeight='0'; } // 量測用：卡片貼左上
+  USEIMG = q.has('img');   // ?img=1：兩幕改用圖片
+  paintScene($('aBg'), $('aLet'), CFG.sceneA); paintScene($('bBg'), $('bLet'), CFG.sceneB);
+  init();
+  const z = parseFloat(q.get('z')||'1'); if (z !== 1) card.style.transform = 'scale('+z+')';
+  const start = () => {
+    if (q.has('t')) { render(parseFloat(q.get('t'))); document.title += ' ready'; return; }
+    const t0 = performance.now();
+    (function loop(){ render((performance.now()-t0)/1000); requestAnimationFrame(loop); })();
+  };
+  document.fonts.load('700 54px "Roboto Mono"', 'AB').then(start, start);
+})();
+</script>
+</body>
+</html>

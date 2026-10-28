@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>S47 Cube Rotate</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#0f1015;}
+  body{display:flex;align-items:center;justify-content:center;min-height:100vh;}
+  #card{position:relative;width:324px;height:106px;border-radius:12px;overflow:hidden;transform-origin:center;}
+  .abs{position:absolute;left:0;top:0;width:324px;height:106px;}
+  .scene{position:absolute;left:0;top:0;width:324px;height:106px;overflow:hidden;backface-visibility:hidden;}
+  .letter{display:flex;align-items:center;justify-content:center;font-family:"Roboto Mono",monospace;font-weight:700;}
+  .deco i{position:absolute;display:block;}
+  .frm{left:9px;top:9px;width:309px;height:90px;box-sizing:border-box;border:2px solid currentColor;border-radius:8px;opacity:.38;}
+  .dot{left:18px;top:18px;width:10px;height:10px;border-radius:50%;background:currentColor;opacity:.75;}
+  .sq{left:298px;top:79px;width:10px;height:10px;background:currentColor;opacity:.75;}
+  .shade{background:#000;opacity:0;pointer-events:none;}
+  #persp{perspective:800px;perspective-origin:162px 53px;}
+  #cube{transform-style:preserve-3d;transform-origin:162px 53px;}
+</style>
+</head>
+<body>
+<div id="card">
+  <div class="abs" id="wrap"><div class="abs" id="persp"><div class="abs" id="cube">
+    <div class="scene" id="sceneA"><div class="abs" id="aBg"></div><div class="abs deco" id="aDeco"><i class="frm"></i><i class="dot"></i><i class="sq"></i></div><div class="abs letter" id="aLet"></div><div class="abs shade" id="aShade"></div></div>
+    <div class="scene" id="sceneB"><div class="abs" id="bBg"></div><div class="abs deco" id="bDeco"><i class="frm"></i><i class="dot"></i><i class="sq"></i></div><div class="abs letter" id="bLet"></div><div class="abs shade" id="bShade"></div></div>
+  </div></div></div>
+</div>
+<script>
+/* ========== CFG：可換內容集中在這裡 ========== */
+const CFG = {
+  sceneA: { img:'img/A_scene.jpg', bg:'#f4f0e6', letter:'A', color:'#111111' },   // 轉場前的畫面（底色＋字，或圖）
+  sceneB: { img:'img/B_scene.jpg', bg:'#00546f', letter:'B', color:'#ffffff' },   // 轉場後的畫面
+  stage: '#f4f0e6',   // 方塊轉動時後面露出的底色
+  fontSize: 52
+};
+/* ========== 動態參數（30fps 幀為單位）==========
+   一輪 52.5 幀，入場 c=0、退場 c=26.25（同一組動作，A、B 角色互換）。
+   兩幕是一個橫放方塊（底面 324×324）的正面與右側面，兩個面都填滿卡片、不縮小。方塊以垂直軸往左轉 90°（ROT 0→-90，約 c=4 開始、c=17 轉完，前慢中快後慢），新畫面從右側轉到正面，
+   轉離正面的面會變暗（越斜越暗，最多約 45% 黑）。透視約 800px。 */
+const LOOP = 52.5, EXIT = 26.25, SHIFT = 7, HALF = 162;
+const ROT   = [[4,0],[5,-6],[7,-28],[9,-55],[11,-73],[13,-83],[15,-88],[17,-90]];
+function lerpTab(tab, x){
+  if (x <= tab[0][0]) return tab[0][1];
+  for (let i=1;i<tab.length;i++) if (x <= tab[i][0]){ const a=tab[i-1], b=tab[i]; return a[1]+(b[1]-a[1])*(x-a[0])/(b[0]-a[0]); }
+  return tab[tab.length-1][1];
+}
+const $ = id => document.getElementById(id);
+const SC = { A:$('sceneA'), B:$('sceneB') }, SH = { A:$('aShade'), B:$('bShade') };
+function render(t){
+  const c = (((t*30 - SHIFT) % LOOP) + LOOP) % LOOP;
+  const inn = c < EXIT, cc = inn ? c : c - EXIT;
+  const ko = inn ? 'A' : 'B', ki = inn ? 'B' : 'A';
+  const r = lerpTab(ROT, cc);
+  $('cube').style.transform = 'translateZ(-'+HALF+'px) rotateY('+r.toFixed(2)+'deg)';
+  SC[ko].style.transform = 'translateZ('+HALF+'px)';
+  SC[ki].style.transform = 'rotateY(90deg) translateZ('+HALF+'px)';
+  SC[ko].style.visibility = r <= -89.9 ? 'hidden' : 'visible';
+  SC[ki].style.visibility = r >= -0.1 ? 'hidden' : 'visible';
+  SH[ko].style.opacity = (0.45*Math.sin(-r*Math.PI/180)).toFixed(3);
+  SH[ki].style.opacity = (0.45*Math.cos(-r*Math.PI/180)).toFixed(3);
+}
+/* ========== 外殼 ========== */
+(function(){
+  const q = new URLSearchParams(location.search);
+  const card = $('card');
+  if (q.has('m')) { document.body.style.display='block'; document.body.style.minHeight='0'; } // 量測用：卡片貼左上
+  card.style.background = CFG.stage;
+  for (const [p, s] of [['a',CFG.sceneA],['b',CFG.sceneB]]){
+    const useImg = q.has('img') && s.img;   // ?img=1：兩幕改用圖片
+    $(p+'Bg').style.background = useImg ? 'url('+s.img+') center/cover no-repeat' : s.bg;
+    const e = $(p+'Let'); e.textContent = useImg ? '' : s.letter; e.style.color = s.color; e.style.fontSize = CFG.fontSize+'px';
+    $(p+'Deco').style.color = s.color; if (useImg) $(p+'Deco').style.display = 'none';
+  }
+  const z = parseFloat(q.get('z')||'1'); if (z !== 1) card.style.transform = 'scale('+z+')';
+  const start = () => {
+    if (q.has('t')) { render(parseFloat(q.get('t'))); document.title += ' ready'; return; }
+    const t0 = performance.now();
+    (function loop(){ render((performance.now()-t0)/1000); requestAnimationFrame(loop); })();
+  };
+  document.fonts.load('700 52px "Roboto Mono"', 'AB').then(start, start);
+})();
+</script>
+</body>
+</html>

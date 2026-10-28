@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>S24 Circle Split (Detail)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#0f1015;}
+  body{display:flex;align-items:center;justify-content:center;min-height:100vh;}
+  #card{position:relative;width:324px;height:106px;border-radius:12px;overflow:hidden;transform-origin:center;}
+  .abs{position:absolute;left:0;top:0;width:324px;height:106px;}
+  .letter{display:flex;align-items:center;justify-content:center;font-family:"Roboto Mono",monospace;font-weight:700;}
+</style>
+</head>
+<body>
+<div id="card">
+  <div class="abs" id="aBg"></div>
+  <div class="abs letter" id="aLet"></div>
+  <div class="abs" id="bBg"></div>
+  <div class="abs letter" id="bLet"></div>
+</div>
+<script>
+/* ========== CFG：可換內容集中在這裡 ========== */
+const CFG = {
+  sceneA: { img:'img/A_scene.jpg', bg:'#14181e', letter:'A', color:'#f4f0e6' },   // 轉場前的畫面（底色＋字，或圖）
+  sceneB: { img:'img/B_scene.jpg', bg:'#f4f0e6', letter:'B', color:'#14181e' },   // 轉場後的畫面
+  fontSize: 50
+};
+/* ========== 動態參數（30fps 幀為單位）==========
+   一輪 = 50 幀。S24 圓形分割的細節版：轉場裡有一個真的圓形物件（兩個半圓，單一色塊用白、多色用灰階，所以一半白、一半淺灰），
+   整套動作以卡片中心為軸，像拔掉浴缸塞子，水流螺旋往中心聚合：
+   ① c 0～9.5：兩個半圓在中心的兩側（點對稱，各在離中心 ρ 的地方，平邊都朝向中心）由小到大長出來（半徑 0→24，約 8 幀長到全大，先快後慢），
+      兩個半圓朝同一個方向（順時針）繞著中心轉 PHI 度（起始角 PHI0 = 60°，轉完剛好是 360°，所以拼合時的分界線是垂直的：白半圓在右、灰半圓在左）（角度 φ，緩入緩出），同時螺旋往中心靠攏：ρ = RHO0 × (1−p)^1.3，p = 轉過的比例；
+      半圓的兩個尖角在結合前是圓的（圓角半徑 = 0.42×半徑×(1−p)，p 到 1 時變 0，拼成圓時沒有缺口），呈現甩動的速度感；
+      每個半圓後面拖兩層殘影（落後 0.45、0.9 幀，不透明 0.35、0.16）；
+   ② c 9.5：兩個半圓在中心拼成完整的圓，拼好就不再轉，直接縮小，c 9.5～13 縮到不見（緩入）；
+   ③ c 13～19：同一個位置再長出一個圓往外擴張，圓裡面就是新畫面（半徑 GROW 表）。
+   入場（c<27）：A 在下，圓裡露出 B；退場（c≥27）：整套動作晚 27 幀再來一次，圓裡露出 A。 */
+const LOOP = 50, EXIT = 27, W = 324, H = 106, CX = 162, CY = 53, R0 = 24, RHO0 = 38, PHI = 300, PHI0 = 60, K = 0.42, MERGE = 9.5;
+const GROW = [[13,0],[14,16],[15,42],[16,82],[17,132],[18,188],[19,240]];
+const OBJ = ['#ffffff', '#bdbdbd'];   // 半圓 1、半圓 2
+const GHOST = [[0.45, 0.35], [0.9, 0.16]];   // [落後幀數, 不透明度]
+function lerpTab(tab, x){
+  if (x <= tab[0][0]) return tab[0][1];
+  for (let i=1;i<tab.length;i++) if (x <= tab[i][0]){ const a=tab[i-1], b=tab[i]; return a[1]+(b[1]-a[1])*(x-a[0])/(b[0]-a[0]); }
+  return tab[tab.length-1][1];
+}
+const $ = id => document.getElementById(id);
+const SC = { a:{bg:$('aBg'), let:$('aLet')}, b:{bg:$('bBg'), let:$('bLet')} };
+const EMPTY = 'polygon(0 0,0 0,0 0)';
+function stage(topKey, clip){
+  const top = SC[topKey], base = SC[topKey==='b' ? 'a' : 'b'];
+  base.bg.style.zIndex = 1; base.let.style.zIndex = 2;
+  top.bg.style.zIndex = 4;  top.let.style.zIndex = 6;
+  top.bg.style.clipPath = top.let.style.clipPath = clip;
+  base.bg.style.clipPath = base.let.style.clipPath = 'none';
+}
+// 半圓（平邊朝向中心，凸向 ψ 方向）：中心在 (CX,CY) + ρ·(cosψ, sinψ)，兩個尖角用半徑 k 的圓弧倒圓
+function half(r, psi, rho, k){
+  const a = psi*Math.PI/180, co = Math.cos(a), s = Math.sin(a), f = v => v.toFixed(2);
+  k = Math.min(k, r*0.49);
+  const rounded = k > 0.05;
+  const yc = rounded ? -Math.sqrt(Math.max(0, (r-k)*(r-k) - k*k)) : -r;   // 倒角圓心 (k, yc)
+  const sc = rounded ? r/(r-k) : 1;
+  const cx = CX + rho*co, cy = CY + rho*s;
+  const w = ([x, y]) => f(cx + x*co - y*s) + ' ' + f(cy + x*s + y*co);
+  const T1 = w([0, yc]), P1 = w([k*sc, yc*sc]), P2 = w([k*sc, -yc*sc]), T2 = w([0, -yc]);
+  if (!rounded) return "path('M"+T1+'A'+r+' '+r+' 0 0 1 '+T2+"Z')";
+  return "path('M"+T1+'A'+k+' '+k+' 0 0 1 '+P1+'A'+r+' '+r+' 0 0 1 '+P2+'A'+k+' '+k+' 0 0 1 '+T2+"Z')";
+}
+function mk(color, op, z){ const e = document.createElement('div'); e.className = 'abs'; e.style.cssText += ';pointer-events:none;z-index:'+z+';background:'+color+';opacity:'+op; $('card').appendChild(e); return e; }
+const main = [mk(OBJ[0], 1, 8), mk(OBJ[1], 1, 8)];
+const ghosts = GHOST.map(([dt, op]) => ({ dt, e: [mk(OBJ[0], op, 7), mk(OBJ[1], op, 7)] }));
+const ease = p => p*p*(3 - 2*p);
+// 物件在 cc 幀的狀態：[半徑, 繞行角 φ, 離中心距離 ρ, 圓角 k]；null = 不存在
+function state(cc){
+  if (cc < 0 || cc >= 13) return null;
+  const p = Math.min(1, cc/MERGE), q = Math.min(1, cc/8);
+  let r = R0 * (1 - (1-q)*(1-q)), phi, rho, k;
+  if (cc < MERGE){ phi = PHI0 + PHI*ease(p); rho = RHO0*Math.pow(1 - ease(p), 1.3); k = K*r*(1 - ease(p)); }
+  else {
+    phi = PHI0 + PHI; rho = 0; k = 0;           // 拼成圓後不再轉，直接縮小
+    const u = Math.min(1, (cc - MERGE)/3.5); r = R0*(1 - u*u);
+  }
+  return [r, phi, rho, k];
+}
+function draw(els, st){
+  if (!st || st[0] <= 0.3){ els[0].style.clipPath = els[1].style.clipPath = EMPTY; return; }
+  const [r, phi, rho, k] = st;
+  els[0].style.clipPath = half(r, phi, rho, k);
+  els[1].style.clipPath = half(r, phi + 180, rho, k);
+}
+function render(t){
+  const c = ((t*30) % LOOP + LOOP) % LOOP;
+  const inn = c < EXIT, cc = inn ? c : c - EXIT;
+  const g = cc < GROW[0][0] ? 0 : lerpTab(GROW, cc);
+  stage(inn ? 'b' : 'a', g > 0 ? 'circle('+g.toFixed(2)+'px at '+CX+'px '+CY+'px)' : EMPTY);
+  draw(main, state(cc));
+  for (const gh of ghosts) draw(gh.e, cc < MERGE ? state(cc - gh.dt) : null);
+}
+/* ========== 外殼 ========== */
+(function(){
+  const q = new URLSearchParams(location.search);
+  const card = $('card');
+  if (q.has('m')) { document.body.style.display='block'; document.body.style.minHeight='0'; } // 量測用：卡片貼左上
+  card.style.background = CFG.sceneA.bg;
+  for (const [bg, let_, s] of [['aBg','aLet',CFG.sceneA],['bBg','bLet',CFG.sceneB]]){
+    const useImg = q.has('img') && s.img;   // ?img=1：兩幕改用圖片
+    $(bg).style.background = useImg ? 'url('+s.img+') center/cover no-repeat' : s.bg;
+    const e = $(let_); e.textContent = useImg ? '' : s.letter; e.style.color = s.color; e.style.fontSize = CFG.fontSize+'px';
+  }
+  const z = parseFloat(q.get('z')||'1'); if (z !== 1) card.style.transform = 'scale('+z+')';
+  const start = () => {
+    if (q.has('t')) { render(parseFloat(q.get('t'))); document.title += ' ready'; return; }
+    const t0 = performance.now();
+    (function loop(){ render((performance.now()-t0)/1000); requestAnimationFrame(loop); })();
+  };
+  document.fonts.load('700 50px "Roboto Mono"', 'AB').then(start, start);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>S34 Mosaic Flash</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#0f1015;}
+  body{display:flex;align-items:center;justify-content:center;min-height:100vh;}
+  #card{position:relative;width:324px;height:106px;border-radius:12px;overflow:hidden;transform-origin:center;}
+  .abs{position:absolute;left:0;top:0;width:324px;height:106px;}
+  .letter{display:flex;align-items:center;justify-content:center;font-family:"Roboto Mono",monospace;font-weight:700;}
+</style>
+</head>
+<body>
+<div id="card">
+  <div class="abs" id="aBg"></div>
+  <div class="abs letter" id="aLet"></div>
+  <div class="abs" id="bBg"></div>
+  <div class="abs letter" id="bLet"></div>
+</div>
+<script>
+/* ========== CFG：可換內容集中在這裡 ========== */
+const CFG = {
+  sceneA: { img:'img/A_scene.jpg', bg:'#fd7a3d', letter:'A', color:'#14181e' },   // 轉場前的畫面（底色＋字，或圖）
+  sceneB: { img:'img/B_scene.jpg', bg:'#f4f0e6', letter:'B', color:'#fd7a3d' },   // 轉場後的畫面
+  fontSize: 50
+};
+/* ========== 動態參數（30fps 幀為單位）==========
+   一輪 = 50 幀。有過場色塊的類型（色塊是真的物件，先蓋住舊畫面，不是直接露出新畫面）：卡片被切成 6 塊大小不一的馬賽克色塊
+   （左欄 0–130 分成上 0–60／下 60–106、中欄 130–243 分成上 0–32／下 32–106、右欄 243–324 分成上 0–32／下 32–106（右欄與中欄的上下分界都在 y＝32，邊線對齊））。
+   每塊在 pop 幀整塊蓋上舊畫面，蓋住的期間隨拍子換色（多色用灰階：淺灰 #f0f0f0、中灰 #9d9d9d、深灰 #6a6a6a、近黑 #222，每塊的換色時間見 BLOCKS 的 seq），
+   到 end 幀這一塊離開，下面就是新畫面。蓋上順序：左上 0、中上 1、右上 1、中下 2、右下 3、左下 4（pop）；離開順序：右上 7、中上 8、左上 12、中下 14、右下 15、左下 16（end），約第 16 幀全部換成新畫面。
+   入場（c<27）：色塊蓋住 A，離開後露出 B；退場（c≥27）：同樣的色塊動作晚 27 幀再來一次，蓋住 B，離開後露出 A。 */
+const LOOP = 50, EXIT = 27, W = 324, H = 106;
+const GRAY = { C: '#f0f0f0', O: '#9d9d9d', B: '#6a6a6a', K: '#222222' };
+const BLOCKS = [ // [x0, y0, x1, y1, pop, end, seq（[起始幀, 灰階色]）]
+  [0, 0, 130, 60, 0, 12, [[0,'C'],[4,'O'],[7,'K']]],
+  [130, 0, 243, 32, 1, 8, [[1,'B'],[5,'K']]],
+  [243, 0, 324, 32, 1, 7, [[1,'B'],[5,'K']]],
+  [130, 32, 243, 106, 2, 14, [[2,'C'],[9,'B']]],
+  [243, 32, 324, 106, 3, 15, [[3,'B'],[6,'O'],[9,'B']]],
+  [0, 60, 130, 106, 4, 16, [[4,'K']]]];
+function lerpTab(tab, x){
+  if (x <= tab[0][0]) return tab[0][1];
+  for (let i=1;i<tab.length;i++) if (x <= tab[i][0]){ const a=tab[i-1], b=tab[i]; return a[1]+(b[1]-a[1])*(x-a[0])/(b[0]-a[0]); }
+  return tab[tab.length-1][1];
+}
+const $ = id => document.getElementById(id);
+const SC = { a:{bg:$('aBg'), let:$('aLet')}, b:{bg:$('bBg'), let:$('bLet')} };
+const EMPTY = 'polygon(0 0,0 0,0 0)';
+function stage(topKey, clip){
+  const top = SC[topKey], base = SC[topKey==='b' ? 'a' : 'b'];
+  base.bg.style.zIndex = 1; base.let.style.zIndex = 2;
+  top.bg.style.zIndex = 4;  top.let.style.zIndex = 6;
+  top.bg.style.clipPath = top.let.style.clipPath = clip;
+  base.bg.style.clipPath = base.let.style.clipPath = 'none';
+}
+const rect = (x0, y0, x1, y1) => 'M'+x0.toFixed(2)+' '+y0.toFixed(2)+'L'+x1.toFixed(2)+' '+y0.toFixed(2)+'L'+x1.toFixed(2)+' '+y1.toFixed(2)+'L'+x0.toFixed(2)+' '+y1.toFixed(2)+'Z';
+const poly = pts => 'M'+pts.map(p => p[0].toFixed(2)+' '+p[1].toFixed(2)).join('L')+'Z';
+const clipOf = d => d ? "path('"+d+"')" : EMPTY;
+const mk = (color, z) => { const e = document.createElement('div'); e.className = 'abs'; e.style.cssText += ';pointer-events:none;z-index:'+z+';background:'+color; $('card').appendChild(e); return e; };
+const base34 = mk('#9d9d9d', 3);                 // 色塊下面的灰底：相鄰色塊的接縫透出灰色，不透出舊畫面
+const objs = BLOCKS.map(() => mk('#fff', 3));
+function shape(c, inn){
+  let d = '', cover = '';
+  BLOCKS.forEach(([x0, y0, x1, y1, pop, end, seq], i) => {
+    const on = c >= pop && c < end;
+    const ex0 = x0 === 0 ? -5 : x0, ey0 = y0 === 0 ? -5 : y0, ex1 = x1 === W ? W + 5 : x1, ey1 = y1 === H ? H + 5 : y1;   // 邊線用整數座標，卡片外緣往外多留
+    if (c >= end) d += rect(ex0, ey0, ex1, ey1);                               // 色塊離開：露出新畫面
+    const e = objs[i];
+    if (on) cover += rect(ex0, ey0, ex1, ey1);
+    e.style.clipPath = on ? "path('"+rect(ex0, ey0, ex1, ey1)+"')" : EMPTY;
+    if (on){ let key = seq[0][1]; for (const [t, k] of seq) if (c >= t) key = k; e.style.background = GRAY[key]; }
+  });
+  base34.style.clipPath = clipOf(cover);
+  stage(inn ? 'b' : 'a', clipOf(d));
+}
+function render(t){
+  const c = ((t*30) % LOOP + LOOP) % LOOP;
+  if (c < EXIT) shape(c, true);
+  else          shape(c - EXIT, false);
+}
+/* ========== 外殼 ========== */
+(function(){
+  const q = new URLSearchParams(location.search);
+  const card = $('card');
+  if (q.has('m')) { document.body.style.display='block'; document.body.style.minHeight='0'; } // 量測用：卡片貼左上
+  card.style.background = CFG.sceneA.bg;
+  for (const [bg, let_, s] of [['aBg','aLet',CFG.sceneA],['bBg','bLet',CFG.sceneB]]){
+    const useImg = q.has('img') && s.img;   // ?img=1：兩幕改用圖片
+    $(bg).style.background = useImg ? 'url('+s.img+') center/cover no-repeat' : s.bg;
+    const e = $(let_); e.textContent = useImg ? '' : s.letter; e.style.color = s.color; e.style.fontSize = CFG.fontSize+'px';
+  }
+  const z = parseFloat(q.get('z')||'1'); if (z !== 1) card.style.transform = 'scale('+z+')';
+  const start = () => {
+    if (q.has('t')) { render(parseFloat(q.get('t'))); document.title += ' ready'; return; }
+    const t0 = performance.now();
+    (function loop(){ render((performance.now()-t0)/1000); requestAnimationFrame(loop); })();
+  };
+  document.fonts.load('700 50px "Roboto Mono"', 'AB').then(start, start);
+})();
+</script>
+</body>
+</html>

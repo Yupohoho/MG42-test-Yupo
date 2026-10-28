@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>S42 Zoom Burst</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#0f1015;}
+  body{display:flex;align-items:center;justify-content:center;min-height:100vh;}
+  #card{position:relative;width:324px;height:106px;border-radius:12px;overflow:hidden;transform-origin:center;}
+  .abs{position:absolute;left:0;top:0;width:324px;height:106px;}
+  .scene{position:absolute;left:0;top:0;width:324px;height:106px;overflow:hidden;}
+  .letter{display:flex;align-items:center;justify-content:center;font-family:"Roboto Mono",monospace;font-weight:700;}
+  .deco i{position:absolute;display:block;}
+  .frm{left:9px;top:9px;width:309px;height:90px;box-sizing:border-box;border:2px solid currentColor;border-radius:8px;opacity:.38;}
+  .dot{left:18px;top:18px;width:10px;height:10px;border-radius:50%;background:currentColor;opacity:.75;}
+  .sq{left:298px;top:79px;width:10px;height:10px;background:currentColor;opacity:.75;}
+</style>
+</head>
+<body>
+<div id="card">
+  <div class="scene" id="sceneA"><div class="abs" id="aBg"></div><div class="abs deco" id="aDeco"><i class="frm"></i><i class="dot"></i><i class="sq"></i></div><div class="abs letter" id="aLet"></div></div>
+  <div class="scene" id="sceneB"><div class="abs" id="bBg"></div><div class="abs deco" id="bDeco"><i class="frm"></i><i class="dot"></i><i class="sq"></i></div><div class="abs letter" id="bLet"></div></div>
+  <svg class="abs" id="burst" viewBox="0 0 324 106" style="z-index:5;pointer-events:none;overflow:visible"></svg>
+</div>
+<script>
+/* ========== CFG：可換內容集中在這裡 ========== */
+const CFG = {
+  sceneA: { img:'img/A_scene.jpg', bg:'#2ed7fe', letter:'A', color:'#0b0f14' },   // 轉場前的畫面（底色＋字，或圖）
+  sceneB: { img:'img/B_scene.jpg', bg:'#00546f', letter:'B', color:'#54e3fd' },   // 轉場後的畫面
+  stage: '#00546f',
+  fontSize: 52,
+  burstColor: '#ffffff'   // 放射集中線的顏色
+};
+/* ========== 動態參數（30fps 幀為單位）==========
+   一輪 52.5 幀，入場 c=0、退場 c=26.25（同一組動作，A、B 角色互換）。
+   c=1 起，32 條白色放射集中線從字的周圍爆開（RIN/ROUT 半徑表，約 4 幀往外擴散並淡掉）；
+   同時舊畫面往鏡頭衝（SCALE_OUT 1→1.6）並逐漸模糊（BLUR_OUT 0→6px）；
+   c=7 起新畫面在上面淡入（OP_IN 約 6 幀），從 0.9 倍略小、帶模糊，收回 1 倍並變清楚。 */
+const LOOP = 52.5, EXIT = 26.25, SHIFT = 9, CX = 162, CY = 53, N = 32;
+const SCALE_OUT = [[0,1],[1,1.01],[2,1.025],[3,1.04],[4,1.1],[5,1.16],[6,1.24],[7,1.29],[8,1.36],[9,1.43],[10,1.5],[12,1.6]];
+const BLUR_OUT  = [[3,0],[4,1],[6,2.5],[8,4],[12,6]];
+const OP_IN     = [[7,0],[8,.11],[9,.22],[10,.38],[11,.57],[12,.8],[13,1]];
+const SCALE_IN  = [[7,.9],[8,.92],[9,.95],[10,.96],[11,.98],[12,1]];
+const BLUR_IN   = [[7,4],[10,2.5],[12,1],[13,0]];
+const RIN  = [[0.5,18],[1,24],[2,55],[3,95],[4,130]];
+const ROUT = [[0.5,24],[1,38],[2,160],[3,220],[4,260]];
+const BOP  = [[0.5,0],[1,1],[2,.9],[3,.45],[4,0]];
+function lerpTab(tab, x){
+  if (x <= tab[0][0]) return tab[0][1];
+  for (let i=1;i<tab.length;i++) if (x <= tab[i][0]){ const a=tab[i-1], b=tab[i]; return a[1]+(b[1]-a[1])*(x-a[0])/(b[0]-a[0]); }
+  return tab[tab.length-1][1];
+}
+const $ = id => document.getElementById(id);
+const SC = { A:$('sceneA'), B:$('sceneB') };
+const rays = [];
+for (let i=0;i<N;i++){
+  const l = document.createElementNS('http://www.w3.org/2000/svg','line');
+  l.setAttribute('stroke', CFG.burstColor); l.setAttribute('stroke-width', i%2 ? 1.5 : 2.2); l.setAttribute('stroke-linecap','round');
+  $('burst').appendChild(l); rays.push({ el:l, a:(i/N)*Math.PI*2 + (i%3)*0.03, k: i%2 ? 0.8 : 1 });
+}
+function render(t){
+  const c = (((t*30 - SHIFT) % LOOP) + LOOP) % LOOP;
+  const inn = c < EXIT, cc = inn ? c : c - EXIT;
+  const out = SC[inn ? 'A' : 'B'], inc = SC[inn ? 'B' : 'A'];
+  out.style.zIndex = 1; inc.style.zIndex = 2;
+  out.style.opacity = 1;
+  out.style.transform = 'scale('+lerpTab(SCALE_OUT, cc).toFixed(4)+')';
+  const bo = lerpTab(BLUR_OUT, cc); out.style.filter = bo > 0.05 ? 'blur('+bo.toFixed(2)+'px)' : 'none';
+  const oi = lerpTab(OP_IN, cc);
+  inc.style.opacity = oi;
+  inc.style.transform = 'scale('+lerpTab(SCALE_IN, cc).toFixed(4)+')';
+  const bi = lerpTab(BLUR_IN, cc); inc.style.filter = bi > 0.05 ? 'blur('+bi.toFixed(2)+'px)' : 'none';
+  const bop = cc < 0.5 || cc > 4 ? 0 : lerpTab(BOP, cc), r1 = lerpTab(RIN, cc), r2 = lerpTab(ROUT, cc);
+  $('burst').style.opacity = bop;
+  rays.forEach(r => {
+    const ca = Math.cos(r.a), sa = Math.sin(r.a), a = r1, b = r1 + (r2 - r1)*r.k;
+    r.el.setAttribute('x1', (CX+ca*a).toFixed(1)); r.el.setAttribute('y1', (CY+sa*a).toFixed(1));
+    r.el.setAttribute('x2', (CX+ca*b).toFixed(1)); r.el.setAttribute('y2', (CY+sa*b).toFixed(1));
+  });
+}
+/* ========== 外殼 ========== */
+(function(){
+  const q = new URLSearchParams(location.search);
+  const card = $('card');
+  if (q.has('m')) { document.body.style.display='block'; document.body.style.minHeight='0'; } // 量測用：卡片貼左上
+  card.style.background = CFG.stage;
+  for (const [p, s] of [['a',CFG.sceneA],['b',CFG.sceneB]]){
+    const useImg = q.has('img') && s.img;   // ?img=1：兩幕改用圖片
+    $(p+'Bg').style.background = useImg ? 'url('+s.img+') center/cover no-repeat' : s.bg;
+    const e = $(p+'Let'); e.textContent = useImg ? '' : s.letter; e.style.color = s.color; e.style.fontSize = CFG.fontSize+'px';
+    $(p+'Deco').style.color = s.color; if (useImg) $(p+'Deco').style.display = 'none';
+  }
+  const z = parseFloat(q.get('z')||'1'); if (z !== 1) card.style.transform = 'scale('+z+')';
+  const start = () => {
+    if (q.has('t')) { render(parseFloat(q.get('t'))); document.title += ' ready'; return; }
+    const t0 = performance.now();
+    (function loop(){ render((performance.now()-t0)/1000); requestAnimationFrame(loop); })();
+  };
+  document.fonts.load('700 52px "Roboto Mono"', 'AB').then(start, start);
+})();
+</script>
+</body>
+</html>

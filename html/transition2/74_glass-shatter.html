@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>S74 Glass Shatter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#0f1015;}
+  body{display:flex;align-items:center;justify-content:center;min-height:100vh;}
+  #card{position:relative;width:324px;height:106px;border-radius:12px;overflow:hidden;transform-origin:center;}
+  .abs{position:absolute;left:0;top:0;width:324px;height:106px;}
+  .letter{display:flex;align-items:center;justify-content:center;font-family:"Roboto Mono",monospace;font-weight:700;}
+</style>
+</head>
+<body>
+<div id="card">
+  <div class="abs" id="aBg"></div>
+  <div class="abs letter" id="aLet"></div>
+  <div class="abs" id="bBg"></div>
+  <div class="abs letter" id="bLet"></div>
+</div>
+<script>
+/* ========== CFG：可換內容集中在這裡 ========== */
+const CFG = {
+  sceneA: { img:'img/A_scene.jpg', bg:'#fed03c', letter:'A', color:'#1f1911' },   // 轉場前的畫面（底色＋字，或圖）
+  sceneB: { img:'img/B_scene.jpg', bg:'#795400', letter:'B', color:'#f7cf43' },   // 轉場後的畫面
+  fontSize: 54,
+  frameOpacity: 0.42,   // 內框線（字色的不透明度）
+  decoOpacity: 0.8,     // 左上圓點、右下小方塊
+  crackOpacity: 0.6     // 裂痕線（字色的不透明度）
+};
+/* ========== 動態參數（30fps 幀為單位）==========
+   一輪 = 53 幀。兩幕直接切換：舊畫面以卡片中心（162, 53）為撞擊點碎成放射狀玻璃碎片——11 條放射線 × 5 圈橢圓環（x 方向拉長 2.6 倍）切成 55 片，
+   每片都帶著舊畫面該區的內容（底色、框、字）。第 8～9.5 幀裂痕線（字色 60%、1.2px，沿每片的邊）浮現；
+   第 9.5 幀起各片依「由內圈往外圈」（每圈晚 0.6 幀）開始飛散：沿放射方向往外（每幀 1～3px，水平較快），加重力往下掉（每幀² 0.45px），各自旋轉（每幀 ±4°），
+   同時變透明（開始後 0／2／4／6／8／10／12／13 幀 → 不透明度 1／.95／.8／.6／.4／.2／.05／0），碎片後面就是完整的新畫面。約第 24 幀碎片全部消失。
+   入場（c<27）：A 碎掉露出 B；退場（c≥27）：同樣的動作晚 27 幀，B 碎掉露出 A。 */
+const LOOP = 53, EXIT = 27, CX = 162, CY = 53, XS = 2.6;
+const RINGS = [0, 14, 34, 62, 100, 260], NRAY = 11, G = 0.45;
+const CRACK0 = 8, CRACK1 = 9.5, START = 9.5, RING_STEP = 0.6;
+const OP = [[0,1],[2,.95],[4,.8],[6,.6],[8,.4],[10,.2],[12,.05],[13,0]];
+function lerpTab(tab, x){
+  if (x <= tab[0][0]) return tab[0][1];
+  for (let i=1;i<tab.length;i++) if (x <= tab[i][0]){ const a=tab[i-1], b=tab[i]; return a[1]+(b[1]-a[1])*(x-a[0])/(b[0]-a[0]); }
+  return tab[tab.length-1][1];
+}
+const $ = id => document.getElementById(id);
+let USEIMG = false;
+const clamp01 = v => Math.min(1, Math.max(0, v));
+function paintScene(bg, let_, s){
+  bg.innerHTML = '';
+  const img = USEIMG && s.img;
+  bg.style.background = img ? 'url('+s.img+') center/cover no-repeat' : s.bg;
+  if (!img){
+    const mk = css => { const d = document.createElement('div'); d.style.cssText = 'position:absolute;'+css; bg.appendChild(d); };
+    mk('left:9px;top:8px;width:309px;height:91px;box-sizing:border-box;border:1.5px solid '+s.color+';border-radius:6px;opacity:'+CFG.frameOpacity);
+    mk('left:18px;top:18px;width:10px;height:10px;border-radius:50%;background:'+s.color+';opacity:'+CFG.decoOpacity);
+    mk('left:298px;top:79px;width:10px;height:10px;background:'+s.color+';opacity:'+CFG.decoOpacity);
+  }
+  let_.textContent = img ? '' : s.letter; let_.style.color = s.color; let_.style.fontSize = CFG.fontSize+'px';
+}
+function sceneNode(s){   // 一整幕的複本（底＋裝飾＋字）
+  const w = document.createElement('div'); w.className = 'abs';
+  const b = document.createElement('div'); b.className = 'abs';
+  const l = document.createElement('div'); l.className = 'abs letter';
+  paintScene(b, l, s); w.appendChild(b); w.appendChild(l); return w;
+}
+const SC = { a:{bg:$('aBg'), let:$('aLet')}, b:{bg:$('bBg'), let:$('bLet')} };
+function phase(t){
+  const c = ((t*30) % LOOP + LOOP) % LOOP;
+  return c < EXIT ? { o:'a', n:'b', u:c } : { o:'b', n:'a', u:c-EXIT };
+}
+function rng(seed){ return function(){ seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const SETS = { a:[], b:[] };
+function init(){
+  const R = rng(7);
+  const ang = []; for (let j=0;j<NRAY;j++) ang.push((j + (R()-.5)*.6)/NRAY*Math.PI*2);
+  const P = RINGS.map((r,k) => ang.map(a => { const rr = k===0 ? 0 : r*(1 + (R()-.5)*.35); return [CX + Math.cos(a)*rr*XS, CY + Math.sin(a)*rr]; }));
+  const polys = [];
+  for (let k=0;k<RINGS.length-1;k++) for (let j=0;j<NRAY;j++){
+    const j2 = (j+1) % NRAY;
+    const pts = k===0 ? [P[0][0], P[1][j], P[1][j2]] : [P[k][j], P[k][j2], P[k+1][j2], P[k+1][j]];
+    // 旋轉支點：多邊形落在卡片內那部分的大約中心
+    let gx=0, gy=0; for (const p of pts){ gx += Math.min(324, Math.max(0, p[0])); gy += Math.min(106, Math.max(0, p[1])); } gx /= pts.length; gy /= pts.length;
+    let dx = gx - CX, dy = (gy - CY)*XS; const d = Math.hypot(dx, dy) || 1; dx /= d; dy /= d;
+    polys.push({ pts, gx, gy, k, vx: dx*(1 + R()*2), vy: dy*(0.4 + R()*0.8) - 0.3, w: (R()-.5)*8 });
+  }
+  for (const key of ['a','b']){
+    const s = key === 'a' ? CFG.sceneA : CFG.sceneB;
+    for (const p of polys){
+      const el = document.createElement('div'); el.className = 'abs';
+      const pstr = p.pts.map(q => q[0].toFixed(1)+'px '+q[1].toFixed(1)+'px').join(',');
+      el.style.clipPath = 'polygon('+pstr+')';
+      el.style.transformOrigin = p.gx.toFixed(1)+'px '+p.gy.toFixed(1)+'px';
+      el.appendChild(sceneNode(s));
+      const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+      svg.setAttribute('width', 324); svg.setAttribute('height', 106); svg.setAttribute('class','abs'); svg.style.overflow = 'visible';
+      const pg = document.createElementNS('http://www.w3.org/2000/svg','polygon');
+      pg.setAttribute('points', p.pts.map(q => q[0].toFixed(1)+','+q[1].toFixed(1)).join(' '));
+      pg.setAttribute('fill','none'); pg.setAttribute('stroke', s.color); pg.setAttribute('stroke-width', 1.2); pg.setAttribute('stroke-linejoin','round');
+      svg.appendChild(pg); el.appendChild(svg);
+      el.style.zIndex = 10; el.style.display = 'none';
+      $('card').appendChild(el);
+      SETS[key].push(Object.assign({ el, line: pg }, p));
+    }
+  }
+}
+function render(t){
+  const { o, n, u } = phase(t);
+  // 新畫面完整墊底，舊畫面在上
+  SC[n].bg.style.zIndex = 1; SC[n].let.style.zIndex = 2; SC[n].bg.style.display = SC[n].let.style.display = '';
+  SC[o].bg.style.zIndex = 4; SC[o].let.style.zIndex = 6;
+  for (const sh of SETS[n]) sh.el.style.display = 'none';
+  const whole = u < CRACK0;
+  SC[o].bg.style.display = SC[o].let.style.display = whole ? '' : 'none';
+  const crack = clamp01((u - CRACK0)/(CRACK1 - CRACK0))*CFG.crackOpacity;
+  for (const sh of SETS[o]){
+    if (whole){ sh.el.style.display = 'none'; continue; }
+    const tau = u - (START + sh.k*RING_STEP);
+    const op = tau <= 0 ? 1 : lerpTab(OP, tau);
+    if (op <= 0){ sh.el.style.display = 'none'; continue; }
+    sh.el.style.display = ''; sh.el.style.opacity = op;
+    sh.line.setAttribute('stroke-opacity', crack);
+    if (tau <= 0){ sh.el.style.transform = 'none'; continue; }
+    const x = sh.vx*tau, y = sh.vy*tau + 0.5*G*tau*tau, r = sh.w*tau;
+    sh.el.style.transform = 'translate('+x.toFixed(2)+'px,'+y.toFixed(2)+'px) rotate('+r.toFixed(2)+'deg)';
+  }
+}
+/* ========== 外殼 ========== */
+(function(){
+  const q = new URLSearchParams(location.search);
+  const card = $('card');
+  if (q.has('m')) { document.body.style.display='block'; document.body.style.minHeight='0'; } // 量測用：卡片貼左上
+  USEIMG = q.has('img');   // ?img=1：兩幕改用圖片
+  paintScene($('aBg'), $('aLet'), CFG.sceneA); paintScene($('bBg'), $('bLet'), CFG.sceneB);
+  init();
+  const z = parseFloat(q.get('z')||'1'); if (z !== 1) card.style.transform = 'scale('+z+')';
+  const start = () => {
+    if (q.has('t')) { render(parseFloat(q.get('t'))); document.title += ' ready'; return; }
+    const t0 = performance.now();
+    (function loop(){ render((performance.now()-t0)/1000); requestAnimationFrame(loop); })();
+  };
+  document.fonts.load('700 54px "Roboto Mono"', 'AB').then(start, start);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>S27 Triple Split</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#0f1015;}
+  body{display:flex;align-items:center;justify-content:center;min-height:100vh;}
+  #card{position:relative;width:324px;height:106px;border-radius:12px;overflow:hidden;transform-origin:center;}
+  .abs{position:absolute;left:0;top:0;width:324px;height:106px;}
+  .letter{display:flex;align-items:center;justify-content:center;font-family:"Roboto Mono",monospace;font-weight:700;}
+</style>
+</head>
+<body>
+<div id="card">
+  <div class="abs" id="aBg"></div>
+  <div class="abs letter" id="aLet"></div>
+  <div class="abs" id="bBg"></div>
+  <div class="abs letter" id="bLet"></div>
+</div>
+<script>
+/* ========== CFG：可換內容集中在這裡 ========== */
+const CFG = {
+  sceneA: { img:'img/A_scene.jpg', bg:'#f4f0e6', letter:'A', color:'#14181e' },   // 轉場前的畫面（底色＋字，或圖）
+  sceneB: { img:'img/B_scene.jpg', bg:'#8f7cfe', letter:'B', color:'#f4f0e6' },   // 轉場後的畫面
+  fontSize: 50
+};
+/* ========== 動態參數（30fps 幀為單位）==========
+   一輪 = 49.5 幀。兩幕直接切換，沒有過場色塊：三片斜面板（邊都往右上傾，每往下 1 px 往左偏約 0.31 px）依序從上緣往下落，像骨牌，新畫面就是面板的範圍。
+   面板 1（左，右緣在 y=0 的 x=117.5）、面板 2（中，左緣 86.6、右緣 225.5）、面板 3（右，左緣 194.5，往右到卡片外），三片互相重疊，疊起來剛好蓋滿。
+   每片落下分三步：下緣 y 依序是 FR 表的三個值，第 1、2、3 片各晚 4 幀（第 0、4、8 幀起）。
+   入場（c<27）：A 在下，B 在上；退場（c≥27）：同樣的動作晚 27 幀再來一次，露出 A。 */
+const LOOP = 49.5, EXIT = 27, W = 324, H = 106;
+const FR = [[0,0],[1,40],[2,80],[3,108]];     // 落下進度 → 下緣 y（第 1 片；第 2、3 片的第一步是 62、88 再蓋滿，見 STEP）
+const STEP = [ [[0,0],[1,40],[2,80],[3,108]], [[0,0],[1,62],[2,88],[3,108]], [[0,0],[1,62],[2,88],[3,108]] ];
+const START = [0, 4, 8];
+function lerpTab(tab, x){
+  if (x <= tab[0][0]) return tab[0][1];
+  for (let i=1;i<tab.length;i++) if (x <= tab[i][0]){ const a=tab[i-1], b=tab[i]; return a[1]+(b[1]-a[1])*(x-a[0])/(b[0]-a[0]); }
+  return tab[tab.length-1][1];
+}
+const $ = id => document.getElementById(id);
+const SC = { a:{bg:$('aBg'), let:$('aLet')}, b:{bg:$('bBg'), let:$('bLet')} };
+const EMPTY = 'polygon(0 0,0 0,0 0)';
+function stage(topKey, clip){
+  const top = SC[topKey], base = SC[topKey==='b' ? 'a' : 'b'];
+  base.bg.style.zIndex = 1; base.let.style.zIndex = 2;
+  top.bg.style.zIndex = 4;  top.let.style.zIndex = 6;
+  top.bg.style.clipPath = top.let.style.clipPath = clip;
+  base.bg.style.clipPath = base.let.style.clipPath = 'none';
+}
+const rect = (x0, y0, x1, y1) => 'M'+x0.toFixed(2)+' '+y0.toFixed(2)+'L'+x1.toFixed(2)+' '+y0.toFixed(2)+'L'+x1.toFixed(2)+' '+y1.toFixed(2)+'L'+x0.toFixed(2)+' '+y1.toFixed(2)+'Z';
+const poly = pts => 'M'+pts.map(p => p[0].toFixed(2)+' '+p[1].toFixed(2)).join('L')+'Z';
+const clipOf = d => d ? "path('"+d+"')" : EMPTY;
+function shape(c){
+  let d = '';
+  const f1 = lerpTab(STEP[0], c - START[0] + 1), f2 = lerpTab(STEP[1], c - START[1] + 1), f3 = lerpTab(STEP[2], c - START[2] + 1);
+  if (c >= START[0] - 1 && f1 > 0) d += poly([[-10,-10],[120.6,-10],[117.5 - 0.31*f1, f1],[-10,f1]]);
+  if (c >= START[1] - 1 && f2 > 0) d += poly([[89.9,-10],[228.5,-10],[225.5 - 0.3*f2, f2],[86.6 - 0.33*f2, f2]]);
+  if (c >= START[2] - 1 && f3 > 0) d += poly([[197.7,-10],[340,-10],[340,f3],[194.5 - 0.32*f3, f3]]);
+  return clipOf(d);
+}
+function render(t){
+  const c = ((t*30) % LOOP + LOOP) % LOOP;
+  if (c < EXIT) stage('b', shape(c));
+  else          stage('a', shape(c - EXIT));
+}
+/* ========== 外殼 ========== */
+(function(){
+  const q = new URLSearchParams(location.search);
+  const card = $('card');
+  if (q.has('m')) { document.body.style.display='block'; document.body.style.minHeight='0'; } // 量測用：卡片貼左上
+  card.style.background = CFG.sceneA.bg;
+  for (const [bg, let_, s] of [['aBg','aLet',CFG.sceneA],['bBg','bLet',CFG.sceneB]]){
+    const useImg = q.has('img') && s.img;   // ?img=1：兩幕改用圖片
+    $(bg).style.background = useImg ? 'url('+s.img+') center/cover no-repeat' : s.bg;
+    const e = $(let_); e.textContent = useImg ? '' : s.letter; e.style.color = s.color; e.style.fontSize = CFG.fontSize+'px';
+  }
+  const z = parseFloat(q.get('z')||'1'); if (z !== 1) card.style.transform = 'scale('+z+')';
+  const start = () => {
+    if (q.has('t')) { render(parseFloat(q.get('t'))); document.title += ' ready'; return; }
+    const t0 = performance.now();
+    (function loop(){ render((performance.now()-t0)/1000); requestAnimationFrame(loop); })();
+  };
+  document.fonts.load('700 50px "Roboto Mono"', 'AB').then(start, start);
+})();
+</script>
+</body>
+</html>

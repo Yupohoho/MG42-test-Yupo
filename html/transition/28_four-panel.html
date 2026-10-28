@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>S28 Four Panel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#0f1015;}
+  body{display:flex;align-items:center;justify-content:center;min-height:100vh;}
+  #card{position:relative;width:324px;height:106px;border-radius:12px;overflow:hidden;transform-origin:center;}
+  .abs{position:absolute;left:0;top:0;width:324px;height:106px;}
+  .letter{display:flex;align-items:center;justify-content:center;font-family:"Roboto Mono",monospace;font-weight:700;}
+</style>
+</head>
+<body>
+<div id="card">
+  <div class="abs" id="aBg"></div>
+  <div class="abs letter" id="aLet"></div>
+  <div class="abs" id="bBg"></div>
+  <div class="abs letter" id="bLet"></div>
+</div>
+<script>
+/* ========== CFG：可換內容集中在這裡 ========== */
+const CFG = {
+  sceneA: { img:'img/A_scene.jpg', bg:'#14181e', letter:'A', color:'#f4f0e6' },   // 轉場前的畫面（底色＋字，或圖）
+  sceneB: { img:'img/B_scene.jpg', bg:'#8f7cfe', letter:'B', color:'#14181e' },   // 轉場後的畫面
+  fontSize: 50
+};
+/* ========== 動態參數（30fps 幀為單位）==========
+   一輪 = 49.5 幀。兩幕直接切換，沒有過場色塊：卡片分成 2×2 四塊（各 162×53），新畫面的四塊面板依序從自己的角落斜向滑進來：
+   左上（第 0 幀起）→ 右上（第 3.5 幀起）→ 右下（第 7 幀起）→ 左下（第 10.5 幀起），每塊的動作放慢 1.5 倍（SPRING 表的 1 幀 ＝ 1.5 幀），每塊約 15 幀才定位，整套約第 25 幀結束。
+   每塊的位置進度 s 見 SPRING 表（以放慢前的幀數為單位，0 → 1，稍微衝過中線（最高 1.06，約 10 px）再彈回、微微低於 1（0.99）、再輕輕彈一下（1.01）才定位，像有彈性的板塊）：左上塊的右緣 x ＝ 162×s、下緣 y ＝ 53×s，
+   其餘三塊以各自角落對稱（右上：左緣 ＝ 324 − 162×s；右下：左緣 ＝ 324 − 162×s、上緣 ＝ 106 − 53×s；左下：右緣 ＝ 162×s、上緣 ＝ 106 − 53×s），塊往卡片外側延伸，衝過頭時不會露出舊畫面。
+   入場（c<27）：A 在下，B 在上；退場（c≥27）：同樣的動作晚 27 幀再來一次，露出 A。 */
+const LOOP = 49.5, EXIT = 27, W = 324, H = 106, MX = 162, MY = 53;
+const SPRING = [[-1,0],[0,0.45],[1,0.88],[2,1.04],[3,1.06],[4,1.02],[5,0.99],[6,0.99],[7,1.005],[8,1.01],[9,1.0],[10,1]];
+const START = [0, 3.5, 7, 10.5];   // 左上、右上、右下、左下
+const TS = 1.5;                    // 每塊的動作放慢倍率（SPRING 表的 1 幀 ＝ 1.5 幀）
+function lerpTab(tab, x){
+  if (x <= tab[0][0]) return tab[0][1];
+  for (let i=1;i<tab.length;i++) if (x <= tab[i][0]){ const a=tab[i-1], b=tab[i]; return a[1]+(b[1]-a[1])*(x-a[0])/(b[0]-a[0]); }
+  return tab[tab.length-1][1];
+}
+const $ = id => document.getElementById(id);
+const SC = { a:{bg:$('aBg'), let:$('aLet')}, b:{bg:$('bBg'), let:$('bLet')} };
+const EMPTY = 'polygon(0 0,0 0,0 0)';
+function stage(topKey, clip){
+  const top = SC[topKey], base = SC[topKey==='b' ? 'a' : 'b'];
+  base.bg.style.zIndex = 1; base.let.style.zIndex = 2;
+  top.bg.style.zIndex = 4;  top.let.style.zIndex = 6;
+  top.bg.style.clipPath = top.let.style.clipPath = clip;
+  base.bg.style.clipPath = base.let.style.clipPath = 'none';
+}
+const rect = (x0, y0, x1, y1) => 'M'+x0.toFixed(2)+' '+y0.toFixed(2)+'L'+x1.toFixed(2)+' '+y0.toFixed(2)+'L'+x1.toFixed(2)+' '+y1.toFixed(2)+'L'+x0.toFixed(2)+' '+y1.toFixed(2)+'Z';
+const poly = pts => 'M'+pts.map(p => p[0].toFixed(2)+' '+p[1].toFixed(2)).join('L')+'Z';
+const clipOf = d => d ? "path('"+d+"')" : EMPTY;
+function shape(c){
+  const s = START.map(t => lerpTab(SPRING, (c - t)/TS));
+  const big = 400;
+  let d = '';
+  if (c >= START[0]) d += rect(-big, -big, MX*s[0] + 0.6, MY*s[0] + 0.6);                    // 左上
+  if (c >= START[1]) d += rect(W - MX*s[1] - 0.6, -big, W + big, MY*s[1] + 0.6);             // 右上
+  if (c >= START[2]) d += rect(W - MX*s[2] - 0.6, H - MY*s[2] - 0.6, W + big, H + big);      // 右下
+  if (c >= START[3]) d += rect(-big, H - MY*s[3] - 0.6, MX*s[3] + 0.6, H + big);             // 左下
+  return clipOf(d);
+}
+function render(t){
+  const c = ((t*30) % LOOP + LOOP) % LOOP;
+  if (c < EXIT) stage('b', shape(c));
+  else          stage('a', shape(c - EXIT));
+}
+/* ========== 外殼 ========== */
+(function(){
+  const q = new URLSearchParams(location.search);
+  const card = $('card');
+  if (q.has('m')) { document.body.style.display='block'; document.body.style.minHeight='0'; } // 量測用：卡片貼左上
+  card.style.background = CFG.sceneA.bg;
+  for (const [bg, let_, s] of [['aBg','aLet',CFG.sceneA],['bBg','bLet',CFG.sceneB]]){
+    const useImg = q.has('img') && s.img;   // ?img=1：兩幕改用圖片
+    $(bg).style.background = useImg ? 'url('+s.img+') center/cover no-repeat' : s.bg;
+    const e = $(let_); e.textContent = useImg ? '' : s.letter; e.style.color = s.color; e.style.fontSize = CFG.fontSize+'px';
+  }
+  const z = parseFloat(q.get('z')||'1'); if (z !== 1) card.style.transform = 'scale('+z+')';
+  const start = () => {
+    if (q.has('t')) { render(parseFloat(q.get('t'))); document.title += ' ready'; return; }
+    const t0 = performance.now();
+    (function loop(){ render((performance.now()-t0)/1000); requestAnimationFrame(loop); })();
+  };
+  document.fonts.load('700 50px "Roboto Mono"', 'AB').then(start, start);
+})();
+</script>
+</body>
+</html>

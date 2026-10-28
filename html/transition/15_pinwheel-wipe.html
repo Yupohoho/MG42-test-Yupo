@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>S15 Pinwheel Wipe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#0f1015;}
+  body{display:flex;align-items:center;justify-content:center;min-height:100vh;}
+  #card{position:relative;width:324px;height:106px;border-radius:12px;overflow:hidden;transform-origin:center;}
+  .abs{position:absolute;left:0;top:0;width:324px;height:106px;}
+  .letter{display:flex;align-items:center;justify-content:center;font-family:"Roboto Mono",monospace;font-weight:700;}
+</style>
+</head>
+<body>
+<div id="card">
+  <div class="abs" id="aBg"></div>
+  <div class="abs letter" id="aLet"></div>
+  <div class="abs" id="bBg"></div>
+  <div class="abs letter" id="bLet"></div>
+</div>
+<script>
+/* ========== CFG：可換內容集中在這裡 ========== */
+const CFG = {
+  sceneA: { img:'img/A_scene.jpg', bg:'#f4f0e6', letter:'A', color:'#14181e' },   // 轉場前的畫面（底色＋字，或圖）
+  sceneB: { img:'img/B_scene.jpg', bg:'#00645b', letter:'B', color:'#f4f0e6' },   // 轉場後的畫面
+  fontSize: 50
+};
+/* ========== 動態參數（30fps 幀為單位）==========
+   一輪 = 49.6 幀。兩幕直接切換，沒有過場色塊：風車的 4 片羽根（扇形）就是新畫面露出的範圍。
+   4 片羽根每片相隔 90°，以卡片中心為圓心；每幀的起邊角 A_ 與終邊角 B_（度，從 12 點鐘順時針，
+   第 0 幀為第一片的角度，其餘三片各加 90°）。羽根越來越寬、同時整體順時針轉，第 15 幀寬度超過 90° 蓋滿。
+   入場（c<27）：A 在下、B 在上；退場（c≥27）：A 在上，同樣的風車晚 27 幀轉出，露出 A。 */
+const LOOP = 49.6, EXIT = 27;
+const A_ = [5.5,11,15,21,25,30,34,40,46,49,56,58,65,68,73];
+const B_ = [7.5,21,28,40,48,61,67,80,93,98,114,120,132,139,151];
+function conic(segs){   // segs: [[起角,終角],...] 度，從 12 點鐘順時針；回傳遮罩
+  const arr = [];
+  for (let [a,b] of segs){
+    const w = b - a; if (w >= 359.9) return 'none';
+    if (w <= 0) continue;
+    a = ((a%360)+360)%360; b = a + w;
+    if (b > 360){ arr.push([a,360]); arr.push([0,b-360]); } else arr.push([a,b]);
+  }
+  if (!arr.length) return 'conic-gradient(transparent 0deg 360deg)';
+  arr.sort((p,q)=>p[0]-q[0]);
+  const st = []; let pos = 0;
+  for (let [a,b] of arr){ if (b <= pos) continue; if (a < pos) a = pos;
+    if (a > pos) st.push('transparent '+pos.toFixed(2)+'deg '+a.toFixed(2)+'deg');
+    st.push('#000 '+a.toFixed(2)+'deg '+b.toFixed(2)+'deg'); pos = b; }
+  if (pos < 360) st.push('transparent '+pos.toFixed(2)+'deg 360deg');
+  return 'conic-gradient(from 0deg at 162.5px 53px,'+st.join(',')+')';
+}
+const $ = id => document.getElementById(id);
+const SC = { a:{bg:$('aBg'), let:$('aLet')}, b:{bg:$('bBg'), let:$('bLet')} };
+function lerpTab(tab, x){
+  if (x <= tab[0][0]) return tab[0][1];
+  for (let i=1;i<tab.length;i++) if (x <= tab[i][0]){ const a=tab[i-1], b=tab[i]; return a[1]+(b[1]-a[1])*(x-a[0])/(b[0]-a[0]); }
+  return tab[tab.length-1][1];
+}
+const EMPTY = 'polygon(0 0,0 0,0 0)';
+function stage(topKey, clip){   // topKey 的那一幕疊在上面，只在 clip 範圍內露出
+  const top = SC[topKey], base = SC[topKey==='b' ? 'a' : 'b'];
+  base.bg.style.zIndex = 1; base.let.style.zIndex = 2;
+  top.bg.style.zIndex = 4;  top.let.style.zIndex = 6;
+  top.bg.style.clipPath = top.let.style.clipPath = clip;
+  base.bg.style.clipPath = base.let.style.clipPath = 'none';
+  for (const e of [top.bg, top.let, base.bg, base.let]) e.style.webkitMaskImage = e.style.maskImage = 'none';
+}
+function stageMask(topKey, mask){   // 用遮罩（圓錐漸層）露出
+  const top = SC[topKey], base = SC[topKey==='b' ? 'a' : 'b'];
+  base.bg.style.zIndex = 1; base.let.style.zIndex = 2;
+  top.bg.style.zIndex = 4;  top.let.style.zIndex = 6;
+  for (const e of [top.bg, top.let, base.bg, base.let]) e.style.clipPath = 'none';
+  for (const e of [top.bg, top.let]) { e.style.webkitMaskImage = e.style.maskImage = mask; }
+  for (const e of [base.bg, base.let]) e.style.webkitMaskImage = e.style.maskImage = 'none';
+}
+function render(t){
+  const c = ((t*30) % LOOP + LOOP) % LOOP;
+  const top = c < EXIT ? 'b' : 'a';
+  const n = Math.floor(c < EXIT ? c : c - EXIT);
+  if (c >= EXIT && n < 0) { stageMask(top, conic([])); return; }
+  if (n >= A_.length) { stageMask(top, 'none'); return; }
+  const segs = []; for (let k=0;k<4;k++) segs.push([A_[n]+90*k, B_[n]+90*k]);
+  stageMask(top, conic(segs));
+}
+/* ========== 外殼 ========== */
+(function(){
+  const q = new URLSearchParams(location.search);
+  const card = $('card');
+  if (q.has('m')) { document.body.style.display='block'; document.body.style.minHeight='0'; } // 量測用：卡片貼左上
+  card.style.background = CFG.sceneA.bg;
+  for (const [bg, let_, s] of [['aBg','aLet',CFG.sceneA],['bBg','bLet',CFG.sceneB]]){
+    const useImg = q.has('img') && s.img;   // ?img=1：兩幕改用圖片
+    $(bg).style.background = useImg ? 'url('+s.img+') center/cover no-repeat' : s.bg;
+    const e = $(let_); e.textContent = useImg ? '' : s.letter; e.style.color = s.color; e.style.fontSize = CFG.fontSize+'px';
+  }
+  const z = parseFloat(q.get('z')||'1'); if (z !== 1) card.style.transform = 'scale('+z+')';
+  const start = () => {
+    if (q.has('t')) { render(parseFloat(q.get('t'))); document.title += ' ready'; return; }
+    const t0 = performance.now();
+    (function loop(){ render((performance.now()-t0)/1000); requestAnimationFrame(loop); })();
+  };
+  document.fonts.load('700 50px "Roboto Mono"', 'AB').then(start, start);
+})();
+</script>
+</body>
+</html>

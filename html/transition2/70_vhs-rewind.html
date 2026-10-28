@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>S70 VHS Rewind</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#0f1015;}
+  body{display:flex;align-items:center;justify-content:center;min-height:100vh;}
+  #card{position:relative;width:324px;height:106px;border-radius:12px;overflow:hidden;transform-origin:center;}
+  .abs{position:absolute;left:0;top:0;width:324px;height:106px;}
+  .letter{display:flex;align-items:center;justify-content:center;font-family:"Roboto Mono",monospace;font-weight:700;}
+  /* 每一幕的裝飾：內框、左上圓點、右下小方塊（屬於該幕，跟著該幕一起切換） */
+  .frm{position:absolute;left:9px;top:9px;width:305px;height:86px;border:2px solid;border-radius:6px;}
+  .dot{position:absolute;left:18px;top:18px;width:11px;height:11px;border-radius:50%;}
+  .sq{position:absolute;left:298px;top:79px;width:10px;height:10px;}
+  .fx{position:absolute;left:0;top:0;width:324px;height:106px;pointer-events:none;}
+</style>
+</head>
+<body>
+<div id="card">
+  <div class="abs" id="aBg"><div class="frm"></div><div class="dot"></div><div class="sq"></div></div>
+  <div class="abs letter" id="aLet"></div>
+  <div class="abs" id="bBg"><div class="frm"></div><div class="dot"></div><div class="sq"></div></div>
+  <div class="abs letter" id="bLet"></div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+/* ========== CFG：可換內容集中在這裡 ========== */
+const CFG = {
+  sceneA: { img:'img/A_scene.jpg', bg:'#a57bfd', ink:'#13131f', line:'rgba(30,0,90,0.4)', dot:'#2f2747', letter:'A' },          // 轉場前的畫面
+  sceneB: { img:'img/B_scene.jpg', bg:'#f4f0e6', ink:'#a57bfd', line:'rgba(120,90,200,0.22)', dot:'#b093ef', letter:'B' },    // 轉場後的畫面
+  tint: { D:'#9360fe', P:'#fe99fe', G:'#d0cabc', W:'#ffffff' },   // 雜訊幀的底色：D 暗紫、P 粉紅、G 灰（B 變暗）、W 白閃
+  whiteInk: '#f9a0ee',      // 白閃幀裡殘留的粉紅字
+  bar: 'rgba(255,255,255,0.78)',   // 掃過的白色橫條
+  fontSize: 52
+};
+/* ========== 動態參數（30fps 幀為單位）==========
+   一輪 = 52.5 幀。VHS 倒帶：每幀硬切，不用緩動。底色跳色、內容（字、內框、圓點、小方塊）左右錯位與斜切、
+   一條約 9px 高的白色橫條由下往上掃過。
+   入場（第 0–15 幀）：A 在暗紫／粉紅間亂跳並錯位，白條從底部爬到頂部，第 10 幀換成 B，再抖幾下後停住。
+   退場（第 27–42 幀）：B 變灰、白閃交錯，白條再由下往上掃，第 37 幀換回 A，抖幾下後停住。
+   VHS 表：[幕, 底色（null＝原色）, 水平位移 px, 斜切 deg, 白條 y, 白條高]。 */
+const LOOP = 52.5;
+const VHS = {
+   0:['a','D', 6,-3],        1:['a','D', 6,-3],        2:['a','P', 5, 0],
+   3:['a','D',-6, 2,102,4],  4:['a','P',-2, 0, 92,10], 5:['a','D', 8, 0, 81,9],
+   6:['a','P', 2, 3, 70,9],  7:['a','P', 2, 3, 60,9],  8:['a','D',-8, 0, 49,9],
+   9:['a','P',-2, 0, 37,11],10:['b',null,-2,-2, 24,9], 11:['b',null,-2,-2, 12,9],
+  12:['b',null, 4, 0,  0,8], 13:['b',null,-2,-2],      14:['b',null, 4, 0],
+  15:['b',null, 4, 0],
+  27:['b','G', 0, 0],       28:['b','G', 0, 0],       29:['b','W', 3, 0],
+  30:['b','G', 2, 0,102,4], 31:['b','W',-3, 0],       32:['b','G',-4, 0, 81,10],
+  33:['b','W', 4, 0],       34:['b','W',-2, 0],       35:['b','G', 0, 0, 48,10],
+  36:['b','W', 3, 0],       37:['a',null,-1,-2, 26,10],38:['a',null,-1,-1, 16,10],
+  39:['a',null,-4,-1, 4,11], 40:['a',null,-3, 0, 0,4], 41:['a',null,-4,-1],
+  42:['a',null,-4,-1]
+};
+let bar;
+function init(){
+  bar = document.createElement('div');
+  Object.assign(bar.style, { position:'absolute', left:0, width:'324px', background:CFG.bar, zIndex:8, pointerEvents:'none' });
+  $('card').appendChild(bar);
+}
+function setScene(key, row){
+  const s = key==='a' ? CFG.sceneA : CFG.sceneB, el = SC[key];
+  const tint = row && row[1] ? CFG.tint[row[1]] : null;
+  if (!el.bg.style.backgroundImage || !el.bg.style.backgroundImage.includes('url')) el.bg.style.background = tint || s.bg;
+  const tf = row ? 'translateX('+row[2]+'px) skewX('+row[3]+'deg)' : 'none';
+  for (const c of el.bg.children) c.style.transform = tf;
+  el.let.style.transform = tf;
+  const white = row && row[1]==='W';
+  el.let.style.color = white ? CFG.whiteInk : s.ink;
+  for (const c of el.bg.children) c.style.opacity = white ? 0.25 : 1;
+}
+function render(t){
+  const f = Math.floor(((t*30) % LOOP + LOOP) % LOOP);
+  const row = VHS[f] || null;
+  const key = row ? row[0] : (f >= 16 && f < 37 ? 'b' : 'a');
+  show(key); setScene(key, row);
+  if (row && row.length > 4) { bar.style.display = 'block'; bar.style.top = row[4]+'px'; bar.style.height = row[5]+'px'; }
+  else bar.style.display = 'none';
+}
+/* ========== 外殼 ========== */
+const SC = { a:{bg:$('aBg'), let:$('aLet')}, b:{bg:$('bBg'), let:$('bLet')} };
+// 整幕切換：只露出一幕（clip 可選，用於只露出部分範圍）
+function show(key, clip){
+  const on = SC[key], off = SC[key==='a' ? 'b' : 'a'];
+  on.bg.style.visibility = on.let.style.visibility = 'visible';
+  off.bg.style.visibility = off.let.style.visibility = 'hidden';
+  on.bg.style.clipPath = on.let.style.clipPath = clip || 'none';
+}
+function lerpTab(tab, x){
+  if (x <= tab[0][0]) return tab[0][1];
+  for (let i=1;i<tab.length;i++) if (x <= tab[i][0]){ const a=tab[i-1], b=tab[i]; return a[1]+(b[1]-a[1])*(x-a[0])/(b[0]-a[0]); }
+  return tab[tab.length-1][1];
+}
+(function(){
+  const q = new URLSearchParams(location.search);
+  const card = $('card');
+  if (q.has('m')) { document.body.style.display='block'; document.body.style.minHeight='0'; } // 量測用：卡片貼左上
+  card.style.background = CFG.cardBg || CFG.sceneA.bg;
+  for (const [bg, let_, s] of [['aBg','aLet',CFG.sceneA],['bBg','bLet',CFG.sceneB]]){
+    const useImg = q.has('img') && s.img;   // ?img=1：兩幕改用圖片
+    const e = $(bg);
+    e.style.background = useImg ? 'url('+s.img+') center/cover no-repeat' : s.bg;
+    e.querySelector('.frm').style.borderColor = s.line;
+    e.querySelector('.dot').style.background = s.dot;
+    e.querySelector('.sq').style.background = s.dot;
+    if (useImg) for (const c of e.children) c.style.display = 'none';
+    const l = $(let_); l.textContent = useImg ? '' : s.letter; l.style.color = s.ink; l.style.fontSize = CFG.fontSize+'px';
+  }
+  if (typeof init === 'function') init(q);
+  const z = parseFloat(q.get('z')||'1'); if (z !== 1) card.style.transform = 'scale('+z+')';
+  const start = () => {
+    if (q.has('t')) { render(parseFloat(q.get('t'))); document.title += ' ready'; return; }
+    const t0 = performance.now();
+    (function loop(){ render((performance.now()-t0)/1000); requestAnimationFrame(loop); })();
+  };
+  document.fonts.load('700 52px "Roboto Mono"', 'AB').then(start, start);
+})();
+</script>
+</body>
+</html>
