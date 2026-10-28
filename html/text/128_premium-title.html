@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>128 Premium Title</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400&family=JetBrains+Mono:wght@600&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#f6f4f2; }
+  /* ?z=2 放大觀看；?t=0.5 定格；?m=1 量測用（卡片貼左上） */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  svg { position:absolute; inset:0; }
+</style>
+</head>
+<body>
+<div id="card">
+<svg id="sv" width="284" height="158" viewBox="0 0 284 158">
+  <defs><filter id="bl" x="-30%" y="-60%" width="160%" height="220%"><feGaussianBlur id="blv" stdDeviation="0"/></filter></defs>
+  <rect id="lT" y="42" height="1"/>
+  <rect id="lB" y="114.5" height="1"/>
+  <text id="cap" x="142" y="33" text-anchor="middle"></text>
+  <g id="txt" filter="url(#bl)"></g>
+</svg>
+</div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 284, H: 158,
+  bg: '#fcfcf9',
+  ink: '#202028',
+  accent: '#b8963e',          // 字逐一變金色的顏色
+  line: '#c9a95a',            // 上下金色細線
+  title: 'PREMIUM',           // Playfair Display 400，字距寬
+  cap: 'OPENING',
+  size: 40,
+  width: 200,                 // 字最後的總寬（字身寬）
+  baseline: 94,
+};
+// =================================
+const LOOP = 120;   // 幀（30fps）：約 0.7 秒聚焦、1.4～2.2 秒金色由左掃到右，停住到 4 秒再重播
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), $ = id => document.getElementById(id);
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+$('lT').style.fill = $('lB').style.fill = CFG.line;
+$('cap').textContent = CFG.cap;
+Object.assign($('cap').style, { font: '600 5.5px "JetBrains Mono"', letterSpacing: '2.9px', fill: '#8b8b88' });
+const CX = 142.5;
+
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const lerp = (a, b, k) => a + (b - a) * k;
+function tab(arr, s, f) { const i = f - s, n = arr.length - 1; if (i <= 0) return arr[0]; if (i >= n) return arr[n]; const k = Math.floor(i); return lerp(arr[k], arr[k + 1], i - k); }
+const hex = h => [1, 3, 5].map(i => parseInt(h.substr(i, 2), 16));
+
+// 量測值（我方幀 = 原片幀 + 1）
+const LINE = [0,5.5,9.5,14.5,23.5,37.5,51.5,59.5,65.5,69.5,71.5,73.5,74.5,75.5];        // 第 0 幀起：金線半寬，由中央向兩側
+const SPREAD = [.64,.68,.72,.76,.8,.83,.86,.88,.9,.92,.93,.94,.95,.96,.97,.975,.98,.985,.988,.99,.992,.993,.995,.996,.997,.998,.999,1]; // 第 1 幀起：字距
+const BLUR = [7.5,7,6.3,5.6,4.9,4.2,3.5,2.9,2.2,1.8,1.4,1,.6,.4,.2,.1,0];              // 第 1 幀起：模糊 px
+const OP = [0,.3,.42,.55,.65,.75,.83,.9,.95,1];                                           // 第 0 幀起
+const WAVE = [0,.5,.85,1,1,1,1,.85,.5,0];                                              // 每個字變金色的曲線（10 幀）
+
+let letters = [];
+function build() {
+  const g = $('txt'), chars = [...CFG.title];
+  const tmp = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  tmp.style.font = `400 ${CFG.size}px "Playfair Display"`; g.appendChild(tmp);
+  const adv = chars.map(c => { tmp.textContent = c; return tmp.getComputedTextLength(); });
+  g.removeChild(tmp);
+  const ls = (CFG.width - adv.reduce((a, b) => a + b, 0)) / (chars.length - 1);
+  let x = CX - CFG.width / 2;
+  chars.forEach((c, i) => {
+    const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    t.textContent = c; t.setAttribute('y', CFG.baseline); t.setAttribute('text-anchor', 'middle');
+    t.style.font = `400 ${CFG.size}px "Playfair Display"`;
+    g.appendChild(t); letters.push({ el: t, cx: x + adv[i] / 2 }); x += adv[i] + ls;
+  });
+}
+
+function render(t) {
+  const f = t * 30;
+  const h = tab(LINE, 0, f);
+  for (const id of ['lT', 'lB']) { $(id).setAttribute('x', CX - h); $(id).setAttribute('width', 2 * h); }
+  $('cap').style.opacity = clamp((f - 6) / 15);
+  const k = tab(SPREAD, 1, f);
+  const ink = hex(CFG.ink), gold = hex(CFG.accent);
+  letters.forEach((L, i) => {
+    L.el.setAttribute('x', CX + (L.cx - CX) * k);
+    const w = tab(WAVE, 42 + 2.75 * i, f);         // 金色由左到右逐字掃過
+    L.el.style.fill = `rgb(${ink.map((v, j) => Math.round(v + (gold[j] - v) * w)).join(',')})`;
+  });
+  $('txt').style.opacity = tab(OP, 0, f);
+  $('blv').setAttribute('stdDeviation', tab(BLUR, 1, f));
+}
+
+Promise.all([
+  document.fonts.load(`400 ${CFG.size}px "Playfair Display"`, CFG.title),
+  document.fonts.load('600 6px "JetBrains Mono"', CFG.cap),
+]).then(() => {
+  build();
+  if (q.has('t')) render((+q.get('t') * 30 % LOOP) / 30);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000 * 30 % LOOP) / 30); requestAnimationFrame(f); })(t0); }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>TL03 Gradient Impact</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #word { position:absolute; left:0; top:0; width:0; height:0; transform-origin:0 0; }
+  #word svg { position:absolute; left:0; top:0; width:1px; height:1px; overflow:visible; }
+</style>
+</head>
+<body>
+<div id="card"><div id="word"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '大絶賛',
+  W: 324, H: 106,
+  bg: '#f4f0e6',
+  top: '#cc4a5a',          // 字內漸層：亮色
+  bottom: '#2a1317',       // 字內漸層：暗色（亮→暗→亮 循環）
+  outline: '#0f0f0c',      // 外框色
+  outlineW: 4,             // 外框寬度（px，往外長）
+  fontSize: 66,
+  spacing: -6,             // 字距（px）
+  cx: .506, cy: .504,      // 字中心（畫面比例，停住時）
+  // 彈出：從第 4 幀起，每幀（縮放，往下偏移 px）—— 從下方放大升起，過衝一點再回穩
+  pop: [[.858,13.5],[.914,8],[.954,4.5],[.985,1],[1.005,-.5],[1.02,-1.5],[1.03,-2],[1.025,-2.5],[1.025,-2],[1.015,-1.5],[1.005,-.5],[.995,0]],
+  // 淡出：第 55–57 幀變淡、縮小、微微下沉，第 58 幀消失
+  fade: [[.85,.995,0],[.62,.97,.5],[.35,.915,2]],
+  fadeFrom: 55,
+  // 漸層滾動：第 8–13 幀靜止（上亮下暗），第 14→44 幀整條漸層往上滾約一個字高（先慢後快再慢），之後停住（上暗下亮）
+  flow: { from: 14, to: 44, dist: 62 },
+  inkTop: -31, inkH: 62,   // 字的墨跡上緣（相對字中心）與高度，漸層以此對齊
+  popAt: 4,
+  loopFrames: 59,          // 一輪 59 幀（約 1.97 秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), word = document.getElementById('word');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+word.style.left = (CFG.cx*CFG.W)+'px'; word.style.top = CFG.cy*CFG.H+'px';
+// 描邊字用 SVG 文字＋圓角連接（HTML 文字的描邊轉折會長尖刺）；字內漸層用可滾動的 SVG 漸層
+const NS = 'http://www.w3.org/2000/svg';
+const svg = document.createElementNS(NS, 'svg');
+const defs = document.createElementNS(NS, 'defs'), grad = document.createElementNS(NS, 'linearGradient');
+for (const [k, v] of Object.entries({ id: 'g', gradientUnits: 'userSpaceOnUse', x1: 0, x2: 0, y1: CFG.inkTop, y2: CFG.inkTop + CFG.inkH * 2, spreadMethod: 'repeat' })) grad.setAttribute(k, v);
+for (const [off, col] of [[0, CFG.top], [.5, CFG.bottom], [1, CFG.top]]) {
+  const st = document.createElementNS(NS, 'stop'); st.setAttribute('offset', off); st.setAttribute('stop-color', col); grad.appendChild(st);
+}
+defs.appendChild(grad); svg.appendChild(defs);
+for (const [fill, sw] of [[CFG.outline, CFG.outlineW*2], ['url(#g)', 0]]) {
+  const tx = document.createElementNS(NS, 'text'); tx.textContent = CFG.text;
+  for (const [k, v] of Object.entries({ x: CFG.spacing/2, y: 0, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-family': "'Dela Gothic One',sans-serif",
+    'font-size': CFG.fontSize, 'letter-spacing': CFG.spacing, fill, stroke: sw ? CFG.outline : 'none', 'stroke-width': sw,
+    'stroke-linejoin': 'round', 'stroke-linecap': 'round', 'paint-order': 'stroke fill' })) tx.setAttribute(k, v);
+  svg.appendChild(tx);
+}
+word.appendChild(svg);
+
+function render(t) {
+  const fr = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  let s = 1, dy = 0, op = 1;
+  const k = fr - CFG.popAt;
+  if (k < 0) op = 0;
+  else if (k < CFG.pop.length) [s, dy] = CFG.pop[k];
+  if (fr >= CFG.fadeFrom) {
+    const j = fr - CFG.fadeFrom;
+    if (j < CFG.fade.length) [op, s, dy] = CFG.fade[j]; else op = 0;
+  }
+  const u = Math.max(0, Math.min(1, (fr - CFG.flow.from) / (CFG.flow.to - CFG.flow.from)));
+  grad.setAttribute('gradientTransform', 'translate(0,' + (-CFG.flow.dist * u * u * (3 - 2 * u)) + ')');
+  word.style.opacity = op;
+  word.style.transform = `translateY(${dy}px) scale(${s})`;
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function r(now){ render((now - t0) / 1000); requestAnimationFrame(r); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "Dela Gothic One"`, CFG.text).then(start);
+</script>
+</body>
+</html>

@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>122 Cinematic Line</title>
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@600&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#f6f4f2; }
+  /* ?z=2 放大觀看；?t=0.5 定格；?m=1 量測用（卡片貼左上） */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  svg { position:absolute; inset:0; }
+</style>
+</head>
+<body>
+<div id="card">
+<svg id="sv" width="284" height="158" viewBox="0 0 284 158">
+  <defs>
+    <filter id="bl" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur id="blv" stdDeviation="0 0"/></filter>
+    <linearGradient id="shine" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#fff" stop-opacity="0"/>
+      <stop offset=".5" stop-color="#fff" stop-opacity=".88"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect id="gl" y="77.5" height="1" x="0" width="0"/>
+  <g id="txt" filter="url(#bl)"></g>
+  <rect id="sh" y="44" height="66" width="30" fill="url(#shine)" transform="skewX(-12)"/>
+  <rect id="barT" x="0" y="0" width="284" height="0"/>
+  <rect id="barB" x="0" y="158" width="284" height="0"/>
+</svg>
+</div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 284, H: 158,
+  bg: '#fcfbfa',
+  bar: '#242830',            // 上下電影黑邊
+  ink: '#2f2e33',            // 字色
+  accent: '#b69c50',         // 中央金色細線
+  text: 'COMING SOON',
+  size: 58,                  // Antonio 600
+  width: 268,                // 字散開後的總寬
+  baseline: 102.5,
+};
+// =================================
+const LOOP = 120;   // 幀（30fps）：約 2.1 秒播完，停住到 4 秒再重播
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), $ = id => document.getElementById(id);
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+$('barT').style.fill = $('barB').style.fill = CFG.bar; $('gl').style.fill = CFG.accent;
+
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const lerp = (a, b, k) => a + (b - a) * k;
+function tab(arr, s, f) { const i = f - s, n = arr.length - 1; if (i <= 0) return arr[0]; if (i >= n) return arr[n]; const k = Math.floor(i); return lerp(arr[k], arr[k + 1], i - k); }
+
+// 量測值（我方幀 = 原片幀 + 4）
+const BAR_T = [0,1,8,13,16,19,20,22,23,23,24,24,25];            // 第 6 幀起：上黑邊厚度
+const BAR_B = [0,3,9,14,18,20,22,23,24,25,26,26,26];            // 第 6 幀起：下黑邊厚度
+const SPREAD = [0,.02,.17,.32,.46,.59,.67,.73,.78,.83,.847,.873,.894,.915,.932,.941,.953,.966,.97,.975,.983,.988,.992,.994,.996,.998,.999,1]; // 第 11 幀起：字距散開比例
+const OP = [0,.25,.38,.5,.58,.65,.7,.75,.8,.85,.88,.9,.92,.93,.94,.96,.97,.98,1]; // 第 11 幀起
+const BLUR = [3,3,2.6,2.2,1.8,1.5,1.2,1,.8,.6,.45,.3,.15,0];    // 第 12 幀起：水平模糊 px
+const LINE_OP = [1,.65,.3,0];                                    // 第 20 幀起：金線消失
+
+let letters = [], cx = CFG.W / 2;
+function build() {
+  const g = $('txt');
+  const chars = [...CFG.text];
+  const tmp = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  tmp.style.font = `600 ${CFG.size}px Antonio`; g.appendChild(tmp);
+  const adv = chars.map(c => { tmp.textContent = c; return c === ' ' ? CFG.size * 0.22 : tmp.getComputedTextLength(); });
+  g.removeChild(tmp);
+  const sum = adv.reduce((a, b) => a + b, 0), ls = (CFG.width - sum) / (chars.length - 1);
+  let x = cx - CFG.width / 2;
+  chars.forEach((c, i) => {
+    const centerX = x + adv[i] / 2; x += adv[i] + ls;
+    if (c === ' ') return;
+    const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    t.textContent = c; t.setAttribute('y', CFG.baseline); t.setAttribute('text-anchor', 'middle');
+    t.style.font = `600 ${CFG.size}px Antonio`; t.style.fill = CFG.ink;
+    g.appendChild(t); letters.push({ el: t, cx: centerX });
+  });
+}
+
+function render(t) {
+  const f = t * 30;
+  $('barT').setAttribute('height', tab(BAR_T, 6, f));
+  const bb = tab(BAR_B, 6, f); $('barB').setAttribute('y', CFG.H - bb); $('barB').setAttribute('height', bb);
+  // 金線：開頭由中央向兩側展開，字出來後淡出
+  const gw = CFG.W * clamp(f / 4) ** 0.6; $('gl').setAttribute('x', cx - gw / 2); $('gl').setAttribute('width', gw);
+  $('gl').style.opacity = tab(LINE_OP, 20, f);
+  const k = tab(SPREAD, 11, f);
+  letters.forEach(L => L.el.setAttribute('x', cx + (L.cx - cx) * k));
+  $('txt').style.opacity = tab(OP, 11, f);
+  $('blv').setAttribute('stdDeviation', `${tab(BLUR, 12, f)} ${tab(BLUR, 12, f) * 0.3}`);
+  // 光澤掃過：第 51～63 幀由左到右
+  const sx = 18 + 21.5 * (f - 51);
+  const sh = $('sh'); sh.style.display = (f > 49 && f < 65) ? '' : 'none';
+  sh.setAttribute('x', sx - 15 + 0.21 * 77);   // skewX 補償，讓光帶中心落在 sx
+}
+
+document.fonts.load(`600 ${CFG.size}px Antonio`, CFG.text).then(() => {
+  build();
+  if (q.has('t')) render((+q.get('t') * 30 % LOOP) / 30);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000 * 30 % LOOP) / 30); requestAnimationFrame(f); })(t0); }
+});
+</script>
+</body>
+</html>

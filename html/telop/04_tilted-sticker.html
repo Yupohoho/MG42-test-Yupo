@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>TL04 Tilted Sticker</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #grp { position:absolute; left:0; top:0; width:0; height:0; }
+  #tilt { position:absolute; left:0; top:0; }
+  #body { position:absolute; display:flex; align-items:center; justify-content:center; box-sizing:border-box; border-radius:6px;
+          font-family:'Dela Gothic One',sans-serif; white-space:nowrap; line-height:1; }
+  #tape { position:absolute; border-radius:2px; }
+</style>
+</head>
+<body>
+<div id="card"><div id="grp"><div id="tilt"><div id="body"></div><div id="tape"></div></div></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: 'ここ重要！',
+  W: 324, H: 106,
+  bg: '#14161c',
+  paper: '#e9e4d9',        // 貼紙底色
+  ink: '#1b1c21',          // 字色
+  tape: 'rgba(255,90,95,.9)', // 膠帶色
+  bodyW: 182, bodyH: 50,   // 貼紙大小
+  fontSize: 30, spacing: 3,
+  cx: 162, cy: 57,         // 貼紙中心
+  rot: -3,                 // 貼紙傾斜（度）
+  tapeW: 40, tapeH: 17, tapeX: -6, tapeY: -29, tapeRot: -6,  // 膠帶位置（相對貼紙中心）
+  // 彈出：從第 4 幀起，橫向／縱向縮放（以貼紙中心為準），過衝後回穩
+  popX: [.34,.61,.83,.98,1.09,1.15,1.18,1.19,1.18,1.15,1.11,1.07,1.03,1.01,1.0],
+  popY: [.46,.69,.87,.99,1.06,1.09,1.11,1.11,1.11,1.09,1.07,1.06,1.01,1.0,1.0],
+  // 停住後慢慢旋轉：第 19→42 幀從 -3° 轉到 -1.4°（往水平方向回正），之後停住
+  spin: { from: 19, to: 42, deg: -1.4 },
+  // 淡出：第 54–57 幀逐步變淡，第 58 幀消失
+  fade: [.8,.56,.34,.19], fadeFrom: 54,
+  popAt: 4,
+  loopFrames: 59,          // 一輪 59 幀（約 1.97 秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), grp = document.getElementById('grp'), tilt = document.getElementById('tilt');
+const body = document.getElementById('body'), tape = document.getElementById('tape');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+grp.style.left = CFG.cx+'px'; grp.style.top = CFG.cy+'px';
+tilt.style.transform = `rotate(${CFG.rot}deg)`;
+Object.assign(body.style, { left: -CFG.bodyW/2+'px', top: -CFG.bodyH/2+'px', width: CFG.bodyW+'px', height: CFG.bodyH+'px',
+  background: CFG.paper, color: CFG.ink, fontSize: CFG.fontSize+'px', letterSpacing: CFG.spacing+'px', paddingLeft: CFG.spacing+'px' });
+body.textContent = CFG.text;
+Object.assign(tape.style, { left: (CFG.tapeX - CFG.tapeW/2)+'px', top: (CFG.tapeY - CFG.tapeH/2)+'px', width: CFG.tapeW+'px', height: CFG.tapeH+'px',
+  background: CFG.tape, transform: `rotate(${CFG.tapeRot}deg)` });
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  let sx = 1, sy = 1, o = 1;
+  const k = f - CFG.popAt;
+  if (k < 0) o = 0;
+  else if (k < CFG.popX.length) { sx = CFG.popX[k]; sy = CFG.popY[k]; }
+  const sp = CFG.spin, u = Math.max(0, Math.min(1, (f - sp.from) / (sp.to - sp.from)));
+  tilt.style.transform = 'rotate(' + (CFG.rot + (sp.deg - CFG.rot) * u) + 'deg)';
+  if (f >= CFG.fadeFrom) { const j = f - CFG.fadeFrom; o = j < CFG.fade.length ? CFG.fade[j] : 0; }
+  grp.style.opacity = o;
+  grp.style.transform = `scale(${sx},${sy})`;
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function r(now){ render((now - t0) / 1000); requestAnimationFrame(r); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "Dela Gothic One"`, CFG.text).then(start);
+</script>
+</body>
+</html>

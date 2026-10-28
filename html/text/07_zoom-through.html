@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>07 Text Zoom Through</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .w { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; line-height:1;
+       font-family:'Dela Gothic One','Noto Sans JP',sans-serif; }
+</style>
+</head>
+<body>
+<div id="card"></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#f3efe6',
+  fontSize: 78,
+  // in = 出現時間；zoom = 開始穿越時間（秒）。下一個詞在上一個詞穿越時從中央長出來
+  words: [
+    { text: '未来', color: '#151515', in: 0.033, zoom: 0.60 },
+    { text: '光',   color: '#ef4444', in: 0.60,  zoom: 1.20 },
+    { text: '次元', color: '#151515', in: 1.25,  zoom: 1.833 },
+  ],
+  appearDur: 0.25,
+  loop: 2.233,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const els = CFG.words.map((w, i) => {
+  const d = document.createElement('div'); d.className = 'w'; d.textContent = w.text;
+  Object.assign(d.style, { fontSize: CFG.fontSize+'px', color: w.color, zIndex: i + 1 });
+  card.appendChild(d); return d;
+});
+
+// 穿越曲線（距 zoom 開始的秒數 → 倍率/不透明度）：先慢慢放大，再突然爆大並變淡
+const ZOOM = [[0,1,1],[.067,1.05,1],[.133,1.15,1],[.167,1.25,1],[.2,2.2,.85],[.233,3.2,.7],[.267,4,.55],[.33,4.6,.35],[.4,5,.15],[.45,5.2,0]];
+const lerp3 = (tbl, x) => {
+  for (let i = 1; i < tbl.length; i++) if (x < tbl[i][0]) {
+    const a = tbl[i-1], b = tbl[i], k = (x - a[0]) / (b[0] - a[0]);
+    return [a[1] + (b[1]-a[1])*k, a[2] + (b[2]-a[2])*k];
+  }
+  return [tbl[tbl.length-1][1], tbl[tbl.length-1][2]];
+};
+const easeOut = k => 1 - Math.pow(1 - k, 3);
+
+function render(t) {
+  CFG.words.forEach((w, i) => {
+    const el = els[i];
+    let s, o;
+    if (t < w.in) { el.style.opacity = 0; return; }
+    if (t < w.zoom) {
+      const k = Math.min(1, (t - w.in) / CFG.appearDur);   // 從中央小字長大
+      s = .25 + .75 * easeOut(k); o = .25 + .75 * k;
+    } else {
+      [s, o] = lerp3(ZOOM, t - w.zoom);
+    }
+    el.style.transform = `scale(${s})`;
+    el.style.opacity = o;
+  });
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(f); })(t0); }
+};
+document.fonts.ready.then(start);
+</script>
+</body>
+</html>

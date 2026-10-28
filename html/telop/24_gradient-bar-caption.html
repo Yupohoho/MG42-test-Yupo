@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>TL24 Gradient Bar Caption</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@900&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #shade { position:absolute; left:0; top:0; right:0; bottom:0; }
+  #bar { position:absolute; }
+  #sub { position:absolute; left:0; top:0; width:0; height:0; }
+  #sub svg { position:absolute; left:0; top:0; width:1px; height:1px; overflow:visible; }
+</style>
+</head>
+<body>
+<div id="card"><div id="shade"></div><div id="bar"></div><div id="sub"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: 'グラデーションで自然に載せる',
+  W: 324, H: 106,
+  bg: '#14181e',
+  // 下方的黑色漸層（由上往下越來越黑）：[位置 y(px), 黑的不透明度]
+  shade: [[50,0],[60,.1],[70,.25],[85,.45],[98,.65],[103,.95],[106,1]],
+  color: '#ffffff', stroke: '#000000', strokeW: 1.5,   // 字色與黑色描邊
+  fontSize: 17, cx: 162, cy: 83.5,
+  // 底部的青綠色細進度條：第 5 幀起從左往右等速走（約每幀 6.8px），第 50 幀走到最右，第 56 幀消失
+  barColor: '#2ed3bc', barX: 8, barY: 104, barH: 2, barFrom: 5, barSpeed: 6.8, barFront0: 11, barMax: 313, barEnd: 56,
+  // 字入場：第 7 幀起由淡到實（8 幀）並由下往上微升
+  inFrom: 7, inOpacity: [.25,.44,.6,.72,.81,.89,.96,1.0], inRise: [6,5,3.5,3,2,1,.5,0],
+  // 淡出：第 55–59 幀逐步變淡，第 60 幀消失
+  fade: [.94,.75,.6,.34,.23], fadeFrom: 55,
+  loopFrames: 61,          // 一輪 61 幀（約 2.03 秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), shade = document.getElementById('shade'), bar = document.getElementById('bar'), sub = document.getElementById('sub');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+shade.style.background = `linear-gradient(to bottom, ${CFG.shade.map(([y, a]) => `rgba(0,0,0,${a}) ${y}px`).join(',')})`;
+Object.assign(bar.style, { left: CFG.barX+'px', top: CFG.barY+'px', height: CFG.barH+'px', background: CFG.barColor });
+sub.style.left = CFG.cx+'px'; sub.style.top = CFG.cy+'px';
+// 描邊字用 SVG 文字＋圓角連接（HTML 文字的描邊轉折會長尖刺）
+const NS = 'http://www.w3.org/2000/svg';
+const svg = document.createElementNS(NS, 'svg');
+for (const [fill, sw] of [[CFG.stroke, CFG.strokeW*2], [CFG.color, 0]]) {
+  const tx = document.createElementNS(NS, 'text'); tx.textContent = CFG.text;
+  for (const [k, v] of Object.entries({ x: 0, y: 0, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-family': "'Noto Sans JP',sans-serif", 'font-weight': 900,
+    'font-size': CFG.fontSize, fill, stroke: sw ? fill : 'none', 'stroke-width': sw, 'stroke-linejoin': 'round', 'stroke-linecap': 'round', 'paint-order': 'stroke fill' })) tx.setAttribute(k, v);
+  svg.appendChild(tx);
+}
+sub.appendChild(svg);
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  // 進度條
+  let w = 0;
+  if (f >= CFG.barFrom && f < CFG.barEnd) w = Math.min(CFG.barMax, CFG.barFront0 + (f - CFG.barFrom) * CFG.barSpeed) - CFG.barX + 1;
+  bar.style.width = Math.max(0, w)+'px';
+  // 字
+  const k = f - CFG.inFrom;
+  let o = 0, dy = 0;
+  if (k >= 0) { const i = Math.min(k, CFG.inOpacity.length - 1); o = CFG.inOpacity[i]; dy = CFG.inRise[i]; }
+  if (f >= CFG.fadeFrom) o = f - CFG.fadeFrom < CFG.fade.length ? CFG.fade[f - CFG.fadeFrom] : 0;
+  sub.style.opacity = o; sub.style.transform = `translateY(${dy}px)`;
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function r(now){ render((now - t0) / 1000); requestAnimationFrame(r); })(t0); }
+};
+document.fonts.load(`900 ${CFG.fontSize}px "Noto Sans JP"`, CFG.text).then(start);
+</script>
+</body>
+</html>

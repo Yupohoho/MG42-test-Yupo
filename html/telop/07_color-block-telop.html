@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>TL07 Color Block Telop</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .blk { position:absolute; display:flex; align-items:center; justify-content:center; box-sizing:border-box;
+         font-family:'Dela Gothic One',sans-serif; white-space:nowrap; line-height:1; }
+</style>
+</head>
+<body>
+<div id="card"><div id="a" class="blk"></div><div id="b" class="blk"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#f4f0e6',
+  a: { text: '今日の', bg: '#ff5a5f', color: '#111111', x: 82, y: 13, w: 124, h: 35, fontSize: 27, spacing: 5 },   // 上方色塊（終點位置）
+  b: { text: 'お題',   bg: '#0f0f0f', color: '#f4f0e6', x: 128, y: 48, w: 111, h: 54, fontSize: 38, spacing: 4 },  // 下方色塊（終點位置）
+  // 從左邊滑進來：各色塊的起點偏移（px，往左）、開始滑動的幀、每幀走完的比例（先快後慢）
+  startOffset: 161,
+  aFrom: 4, aProg: [.354,.596,.758,.863,.932,.963,.981,.994,1],
+  bFrom: 8, bProg: [.19,.49,.69,.82,.91,.95,.98,.99,1],
+  // 淡出：第 54–57 幀整組逐步變淡，第 58 幀消失（第 58 幀＆下一輪第 0 幀空白）
+  fade: [.82,.56,.35,.2], fadeFrom: 54,
+  loopFrames: 59,          // 一輪 59 幀（約 1.97 秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const els = {};
+for (const id of ['a', 'b']) {
+  const c = CFG[id], el = els[id] = document.getElementById(id);
+  Object.assign(el.style, { left: c.x+'px', top: c.y+'px', width: c.w+'px', height: c.h+'px', background: c.bg, color: c.color,
+    fontSize: c.fontSize+'px', letterSpacing: c.spacing+'px', paddingLeft: c.spacing+'px' });
+  el.textContent = c.text;
+}
+const pos = (f, from, prog) => { const k = f - from; const p = k < 0 ? 0 : k >= prog.length ? 1 : prog[k]; return -CFG.startOffset * (1 - p); };
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  let o = 1;
+  if (f === 0 || f >= CFG.fadeFrom + CFG.fade.length) o = 0;
+  else if (f >= CFG.fadeFrom) o = CFG.fade[f - CFG.fadeFrom];
+  els.a.style.transform = `translateX(${pos(f, CFG.aFrom, CFG.aProg)}px)`;
+  els.b.style.transform = `translateX(${pos(f, CFG.bFrom, CFG.bProg)}px)`;
+  els.a.style.opacity = els.b.style.opacity = o;
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function r(now){ render((now - t0) / 1000); requestAnimationFrame(r); })(t0); }
+};
+document.fonts.load('38px "Dela Gothic One"', CFG.a.text + CFG.b.text).then(start);
+</script>
+</body>
+</html>

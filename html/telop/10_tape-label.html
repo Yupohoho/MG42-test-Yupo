@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>TL10 Tape Label</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #rot { position:absolute; left:0; top:0; width:0; height:0; }
+  #tape { position:absolute; transform-origin:0 50%; }
+  #bg { position:absolute; inset:0; }
+  #txt { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; white-space:nowrap; line-height:1;
+         font-family:'Dela Gothic One',sans-serif; }
+</style>
+</head>
+<body>
+<div id="card"><div id="rot"><div id="tape"><div id="bg"></div><div id="txt"></div></div></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '注意',
+  W: 324, H: 106,
+  bg: '#fdc941',           // 底色
+  tapeColor: 'rgba(255,255,255,.4)',   // 膠帶（半透明白）
+  ink: '#432e00',          // 字色
+  tapeW: 132, tapeH: 49,   // 膠帶大小
+  cx: 161.5, cy: 48.5,     // 膠帶中心（停住初期）
+  fontSize: 30, spacing: 8,
+  jag: [[0,5],[3,0],[6,5],[9,1],[12,4],[16,0],[20,3],[26,0]],   // 左上角鋸齒邊 [x, y]（px），其餘邊是直的
+  // 展開：從第 4 幀起，膠帶（連字）以左緣為準橫向展開，字跟著被壓縮
+  openX: [.32,.55,.71,.82,.90,.95,.97,1.0],
+  // 傾斜：第 0–24 幀 −3°，第 24→42 幀慢慢轉到 −2.2° 並往下沉 2px，之後停住
+  rot: -3, rotTo: -2.2, drift: 2, driftFrom: 24, driftTo: 42,
+  // 收尾：第 54–57 幀膠帶先淡掉；字慢一點淡出，並越來越模糊，第 58 幀消失
+  tapeFade: [.9,.6,.3,0], textFade: [.85,.6,.38,.16], blur: [1,2,3.5,5], fadeFrom: 54,
+  popAt: 4,
+  loopFrames: 59,          // 一輪 59 幀（約 1.97 秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), rot = document.getElementById('rot'), tape = document.getElementById('tape');
+const bgEl = document.getElementById('bg'), txt = document.getElementById('txt');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+rot.style.left = CFG.cx+'px'; rot.style.top = CFG.cy+'px';
+Object.assign(tape.style, { left: -CFG.tapeW/2+'px', top: -CFG.tapeH/2+'px', width: CFG.tapeW+'px', height: CFG.tapeH+'px' });
+const pts = CFG.jag.map(([x, y]) => `${x}px ${y}px`).concat([`${CFG.tapeW}px 0`, `${CFG.tapeW}px ${CFG.tapeH}px`, `0 ${CFG.tapeH}px`]);
+Object.assign(bgEl.style, { background: CFG.tapeColor, clipPath: `polygon(${pts.join(',')})` });
+txt.textContent = CFG.text;
+Object.assign(txt.style, { color: CFG.ink, fontSize: CFG.fontSize+'px', letterSpacing: CFG.spacing+'px', paddingLeft: CFG.spacing+'px' });
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  const k = f - CFG.popAt;
+  let sx = 1, to = 1, xo = 1, bl = 0;
+  if (k < 0 || f >= CFG.fadeFrom + CFG.blur.length) { to = 0; xo = 0; }
+  else if (k < CFG.openX.length) sx = CFG.openX[k];
+  if (f >= CFG.fadeFrom && f < CFG.fadeFrom + CFG.blur.length) { const j = f - CFG.fadeFrom; to = CFG.tapeFade[j]; xo = CFG.textFade[j]; bl = CFG.blur[j]; }
+  const u = Math.max(0, Math.min(1, (f - CFG.driftFrom) / (CFG.driftTo - CFG.driftFrom)));
+  rot.style.transform = `translateY(${CFG.drift * u}px) rotate(${CFG.rot + (CFG.rotTo - CFG.rot) * u}deg)`;
+  tape.style.transform = `scaleX(${sx})`;
+  bgEl.style.opacity = to; txt.style.opacity = xo;
+  txt.style.filter = bl ? `blur(${bl}px)` : 'none';
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function r(now){ render((now - t0) / 1000); requestAnimationFrame(r); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "Dela Gothic One"`, CFG.text).then(start);
+</script>
+</body>
+</html>

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>TL28 Chrome Metal</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #txt { position:absolute; white-space:nowrap; line-height:1; font-family:'Dela Gothic One',sans-serif;
+         -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; color:transparent; }
+</style>
+</head>
+<body>
+<div id="card"><div id="txt"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '銀河系',
+  W: 324, H: 106,
+  bg: '#14181e',
+  fontSize: 63.7, flatten: 1.0, cx: 162, cy: 53.5,   // 字級、橫向拉寬、字中心
+  inkTop: 9.3, inkH: 51,       // 字的墨跡在字盒內的上緣與高度（漸層以此對齊）
+  // 鉻金屬：由上往下的亮—暗—亮漸層（位置 0–1 是墨跡由上到下）：上半偏亮、中間有一條暗色地平線、下半最亮
+  chrome: [[0,'#5a5d63'],[.06,'#c0c3cc'],[.12,'#b4b9c4'],[.18,'#aeb3bf'],[.24,'#9fa5b2'],[.30,'#898e9b'],[.36,'#6a707e'],[.41,'#525765'],[.47,'#787e8b'],[.53,'#c5cad8'],[.59,'#c0c5d2'],[.65,'#c7cbd7'],[.71,'#cdd1db'],[.76,'#d1d5db'],[.82,'#dde1e7'],[.88,'#d8dce2'],[.94,'#d3d7dc'],[1,'#8b909a']],
+  // 入場：第 4 幀起，不透明度與大小逐幀（先小一點再回穩）
+  inFrom: 4, inOpacity: [.35,.64,.91,1,1,1], inScale: [.95,.96,.99,1.0,1.02,1.015,1.01,1.005],
+  // 光澤：第 22–40 幀一道白色亮帶由左往右掃過整個字（約每幀 14.7px，微斜），最亮時白色疊 85%
+  shine: { x26: 85, speed: 14.7, from: 20, to: 41, halfW: 38, peak: .85, tilt: 105 },
+  // 收尾：第 54–58 幀逐步變暗消失，第 59 幀（下一輪第 0 幀）起空白
+  fade: [.79,.56,.32,.19,.05], fadeFrom: 54,
+  loopFrames: 59,          // 一輪 59 幀（約 1.97 秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), txt = document.getElementById('txt');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+txt.textContent = CFG.text; txt.style.fontSize = CFG.fontSize+'px';
+const grad = `linear-gradient(to bottom, ${CFG.chrome.map(([u, c]) => `${c} ${(CFG.inkTop + u * CFG.inkH).toFixed(1)}px`).join(',')})`;
+let boxW = 0, boxL = 0;
+function place() { boxW = txt.offsetWidth; boxL = CFG.cx - boxW/2; txt.style.left = boxL+'px'; txt.style.top = (CFG.cy - txt.offsetHeight/2)+'px'; }
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  const k = f - CFG.inFrom;
+  let o = 0, s = 1;
+  if (k >= 0) { o = k < CFG.inOpacity.length ? CFG.inOpacity[k] : 1; s = k < CFG.inScale.length ? CFG.inScale[k] : 1; }
+  if (f >= CFG.fadeFrom) o = f - CFG.fadeFrom < CFG.fade.length ? CFG.fade[f - CFG.fadeFrom] : 0;
+  // 亮帶位置（畫面 x → 字盒內 x，字盒橫向拉寬 flatten 倍後，位置以畫面為準）
+  const sh = CFG.shine;
+  let bg = grad;
+  if (f >= sh.from && f <= sh.to) {
+    const px = boxW / 2 + (sh.x26 + sh.speed * (f - 26) - CFG.cx) / CFG.flatten;   // 畫面 x 換算回字盒座標（以字盒中心為支點縮放）
+    const hw = sh.halfW / CFG.flatten;
+    bg = `linear-gradient(${sh.tilt}deg, rgba(255,255,255,0) ${(px - hw).toFixed(1)}px, rgba(255,255,255,${sh.peak}) ${px.toFixed(1)}px, rgba(255,255,255,0) ${(px + hw).toFixed(1)}px), ${grad}`;
+  }
+  txt.style.backgroundImage = bg;
+  txt.style.opacity = o; txt.style.transform = `scale(${CFG.flatten * s}, ${s})`;
+}
+
+const start = () => {
+  place();
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function r(now){ render((now - t0) / 1000); requestAnimationFrame(r); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "Dela Gothic One"`, CFG.text).then(start);
+</script>
+</body>
+</html>

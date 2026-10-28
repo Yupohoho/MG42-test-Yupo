@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>106 Parallax Reveal</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Oswald:wght@700&display=block" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  svg { position:absolute; left:0; top:0; overflow:visible; }
+</style>
+</head>
+<body>
+<div id="card"><svg id="sv"></svg></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 284, H: 158,
+  bg: '#FCFCF9',
+  ink: '#24242F',
+  accent: '#EE7493',
+  back: '#F9E1E5',                     // 背景大字的淡粉紅
+  // 各層：停住時的位置＋出發時往右偏的距離（越前面的層移動越多＝視差）
+  backText: { text: 'NEW', box: [16, 5, 262, 150], from: 152 },
+  title:    { text: 'DROP', box: [39, 53, 245, 100], from: 278 },
+  dots: [
+    { cx: 42.5, cy: 37.5, r: 26,  fill: 'accent', from: 180 },   // 實心粉紅圓
+    { cx: 241,  cy: 32,   r: 19,  line: 'accent', from: 178 },   // 粉紅外框圓
+    { cx: 88.5, cy: 120,  r: 11.5, line: 'accent', from: 180 },  // 小粉紅外框圓
+  ],
+  topDot: { cx: 224.5, cy: 114.5, r: 15.5, line: 'ink', from: 162 }, // 深色外框圓（疊在字上）
+  slowFrames: 30,                      // 背景字與圓：30 幀滑入
+  fastFrames: 20,                      // 主標題：20 幀就到位（較快）
+};
+const LOOP = 120;                      // 一輪幀數（30fps）
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), sv = document.getElementById('sv');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+sv.setAttribute('width', CFG.W); sv.setAttribute('height', CFG.H);
+const NS = 'http://www.w3.org/2000/svg';
+const mk = (tag, attrs, p = sv) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); p.appendChild(e); return e; };
+const cv = document.createElement('canvas').getContext('2d');
+function fitText(t, str, font, box, mode) {
+  cv.font = `${font.w} 100px ${font.f}`; const m = cv.measureText(str);
+  const fs = (box[3]-box[1]) / (m.actualBoundingBoxAscent + m.actualBoundingBoxDescent) * 100, k = fs/100;
+  const inkW = (m.actualBoundingBoxLeft + m.actualBoundingBoxRight) * k, bw = box[2]-box[0];
+  t.textContent = str;
+  Object.entries({ 'font-family': font.f.replace(/"/g,''), 'font-weight': font.w, 'font-size': fs,
+    x: box[0] + m.actualBoundingBoxLeft*k, y: box[1] + m.actualBoundingBoxAscent*k }).forEach(([a,v]) => t.setAttribute(a, v));
+  if (mode === 'ls') t.setAttribute('letter-spacing', (bw-inkW) / Math.max(1, [...str].length-1));
+  else t.setAttribute('transform', `translate(${box[0]} 0) scale(${bw/inkW} 1) translate(${-box[0]} 0)`);
+}
+const col = (c) => CFG[c];
+const layers = [];   // [g, from, frames]
+function layer(from, frames) { const g = mk('g', {}); layers.push([g, from, frames]); return g; }
+function dot(d) {
+  const g = layer(d.from, CFG.slowFrames);
+  mk('circle', d.fill ? { cx: d.cx, cy: d.cy, r: d.r, fill: col(d.fill) }
+                      : { cx: d.cx, cy: d.cy, r: d.r - 1, fill: 'none', stroke: col(d.line), 'stroke-width': 2 }, g);
+}
+// expo out：一出發就很快、尾段急煞
+const easeOutExpo = (p) => { p = Math.min(1, Math.max(0, p)); return p >= 1 ? 1 : 1 - Math.pow(2, -10 * p); };
+
+function build() {
+  const bt = mk('text', { fill: CFG.back }, layer(CFG.backText.from, CFG.slowFrames));
+  fitText(bt, CFG.backText.text, { f: '"Oswald"', w: 700 }, CFG.backText.box, 'ls');
+  CFG.dots.forEach(dot);
+  const tt = mk('text', { fill: CFG.ink }, layer(CFG.title.from, CFG.fastFrames));
+  fitText(tt, CFG.title.text, { f: '"Archivo Black"', w: 400 }, CFG.title.box, 'ls');
+  dot(CFG.topDot);
+}
+
+function render(t) {
+  const f = ((t * 30) % LOOP + LOOP) % LOOP;
+  // 每層從右邊滑入、減速停住；同時出發，但移動距離與時間不同
+  for (const [g, from, frames] of layers) g.setAttribute('transform', `translate(${from * (1 - easeOutExpo(f / frames))} 0)`);
+}
+
+Promise.all([document.fonts.load('400 50px "Archivo Black"', 'DROP'), document.fonts.load('700 50px "Oswald"', 'NEW')]).then(() => {
+  build();
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+});
+</script>
+</body>
+</html>

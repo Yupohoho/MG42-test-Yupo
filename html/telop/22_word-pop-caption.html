@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>TL22 Word Pop Caption</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .word { position:absolute; width:0; height:0; }
+  .box { position:absolute; }
+  .txt { position:absolute; white-space:nowrap; line-height:1; font-family:'Dela Gothic One',sans-serif; }
+</style>
+</head>
+<body>
+<div id="card"></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#2cd8c3',           // 底色（青綠）
+  inactive: '#156962',     // 還沒輪到的字（深青綠）
+  active: '#f7fbff',       // 輪到的字（白）
+  box: '#00655d',          // 強調用的深色底框
+  // 字（中心 x）、底框寬（px）
+  words: [
+    { text: 'これは', cx: 59.5,  bw: 114 },
+    { text: 'すごい', cx: 154.5, bw: 113 },
+    { text: '発見',   cx: 247.5, bw: 84 },
+  ],
+  fontSize: 24.5, cy: 54.5,            // 平常字級與字的垂直中心
+  boxH: 44, boxCy: 53.5, radius: 10,   // 底框高度、垂直中心、圓角
+  activeScale: 1.135,                  // 輪到時字放大倍率
+  // 輪流強調：每個字開始的幀；每個字亮 12 幀，接著 3 幀退場（第 12、13 幀逐步淡掉，第 14 幀回到平常）
+  starts: [7, 22, 37], hold: 12,
+  exitBox: [.6, .25], exitScale: [1.1, 1.05], exitMix: [.5, .85], exitBlur: [1, 1.5], exitBoxScale: [.96, .94],
+  loopFrames: 52,          // 一輪 52 幀（約 1.73 秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const hex = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
+const mix = (a, b, t) => { const A = hex(a), B = hex(b); return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(',')})`; };
+const els = CFG.words.map(w => {
+  const g = document.createElement('div'); g.className = 'word'; g.style.left = w.cx+'px'; g.style.top = '0px';
+  const box = document.createElement('div'); box.className = 'box';
+  Object.assign(box.style, { left: -w.bw/2+'px', top: (CFG.boxCy - CFG.boxH/2)+'px', width: w.bw+'px', height: CFG.boxH+'px', background: CFG.box, borderRadius: CFG.radius+'px', transformOrigin: '50% 50%' });
+  const txt = document.createElement('div'); txt.className = 'txt'; txt.textContent = w.text; txt.style.fontSize = CFG.fontSize+'px';
+  g.appendChild(box); g.appendChild(txt); card.appendChild(g); return { w, box, txt };
+});
+function place() { for (const e of els) { e.txt.style.left = (-e.txt.offsetWidth/2)+'px'; e.txt.style.top = (CFG.cy - e.txt.offsetHeight/2)+'px'; } }
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  els.forEach((e, i) => {
+    const d = f - CFG.starts[i];
+    let bo = 0, bs = 1, ts = 1, col = CFG.inactive, bl = 0;
+    if (d >= 0 && d < CFG.hold) { bo = d === 0 ? .9 : 1; ts = CFG.activeScale; col = CFG.active; bl = d === 0 ? 1.5 : 0; }
+    else if (d >= CFG.hold && d < CFG.hold + 2) { const j = d - CFG.hold; bo = CFG.exitBox[j]; bs = CFG.exitBoxScale[j]; ts = CFG.exitScale[j]; col = mix(CFG.active, CFG.inactive, CFG.exitMix[j]); bl = CFG.exitBlur[j]; }
+    e.box.style.opacity = bo; e.box.style.transform = `scale(${bs})`;
+    e.txt.style.color = col; e.txt.style.transform = `scale(${ts})`; e.txt.style.filter = bl ? `blur(${bl}px)` : 'none';
+  });
+}
+
+const start = () => {
+  place();
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function r(now){ render((now - t0) / 1000); requestAnimationFrame(r); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "Dela Gothic One"`, 'これはすごい発見').then(start);
+</script>
+</body>
+</html>

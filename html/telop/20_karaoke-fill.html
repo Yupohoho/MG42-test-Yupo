@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>TL20 Karaoke Fill</title>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@700;900&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #card > div { position:absolute; white-space:nowrap; line-height:1; font-family:'Zen Maru Gothic',sans-serif; font-weight:900; }
+</style>
+</head>
+<body>
+<div id="card"><div id="base"></div><div id="fill"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '歌詞が色で塗られていく',
+  W: 324, H: 106,
+  bg: '#14181e',
+  base: '#70747b',         // 還沒唱到的字（灰）
+  fill: '#2bd6bd',         // 唱到的字（青綠）
+  fontSize: 29.6, cx: 160.5, cy: 55.5,
+  // 填色：第 7 幀起，青綠色由左往右等速刷過整句（約每幀 7.5px），第 48 幀刷到最右
+  fillFrom: 7, front0: 9, speed: 7.5, left: 3, right: 318,
+  // 收尾：第 54–58 幀整句逐步變暗淡出（青綠與灰一起），第 58 幀後空白
+  fade: [.97,.75,.53,.26,.05], fadeFrom: 54,
+  loopFrames: 59,          // 一輪 59 幀（約 1.97 秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), base = document.getElementById('base'), fill = document.getElementById('fill');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+for (const [el, col] of [[base, CFG.base], [fill, CFG.fill]]) { el.textContent = CFG.text; Object.assign(el.style, { color: col, fontSize: CFG.fontSize+'px' }); }
+let boxL = 0, boxW = 0;
+function place() {
+  boxW = base.offsetWidth; boxL = CFG.cx - boxW/2;
+  for (const el of [base, fill]) { el.style.left = boxL+'px'; el.style.top = (CFG.cy - el.offsetHeight/2)+'px'; }
+}
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  let o = 1;
+  if (f >= CFG.fadeFrom) o = f - CFG.fadeFrom < CFG.fade.length ? CFG.fade[f - CFG.fadeFrom] : 0;
+  // 青綠色填色的前緣（畫面 x）；還沒開始時前緣在字的左邊之外
+  const front = f < CFG.fillFrom ? boxL - 1 : CFG.front0 + (f - CFG.fillFrom) * CFG.speed;
+  const visible = Math.max(0, Math.min(boxW, front - boxL));
+  fill.style.clipPath = `inset(0 ${boxW - visible}px 0 0)`;
+  base.style.opacity = o; fill.style.opacity = o;
+}
+
+const start = () => {
+  place();
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function r(now){ render((now - t0) / 1000); requestAnimationFrame(r); })(t0); }
+};
+document.fonts.load(`900 ${CFG.fontSize}px "Zen Maru Gothic"`, CFG.text).then(start);
+</script>
+</body>
+</html>

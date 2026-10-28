@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>TL11 Ribbon Banner</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@900&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #grp { position:absolute; left:0; top:0; width:0; height:0; transform-origin:0 0; }
+  #grp svg { position:absolute; overflow:visible; filter:drop-shadow(0 3px 2px rgba(60,40,0,.22)); }
+  #txt { position:absolute; white-space:nowrap; line-height:1; text-align:center; font-family:'Noto Serif JP',serif; font-weight:900; }
+</style>
+</head>
+<body>
+<div id="card"><div id="grp"><svg id="rb"></svg><div id="txt"></div></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '祝 開店',
+  W: 324, H: 106,
+  bg: '#f4f0e6',
+  ribbon: '#795400',       // 緞帶色
+  ink: '#fffdf2',          // 字色
+  rbW: 224, rbH: 57,       // 緞帶大小
+  notch: 10,               // 兩端燕尾缺口深度
+  cx: 163.5, cy: 52.5,     // 緞帶中心
+  fontSize: 34, spacing: -1, wordSpacing: 13, textCy: 55.5,
+  // 展開：從第 4 幀起，整條緞帶（連字）從中心橫向撐開，過衝後回穩（高度不變）
+  openX: [.31,.55,.74,.88,.98,1.04,1.08,1.085,1.07,1.05,1.03,1.01,1.0],
+  // 收尾：第 54–57 幀整條逐步變淡、微微模糊，第 58 幀消失
+  fade: [.88,.64,.43,.25], blur: [.5,1,2,3], fadeFrom: 54,
+  popAt: 4,
+  loopFrames: 59,          // 一輪 59 幀（約 1.97 秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), grp = document.getElementById('grp'), rb = document.getElementById('rb'), txt = document.getElementById('txt');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+grp.style.left = CFG.cx+'px'; grp.style.top = CFG.cy+'px';
+const w = CFG.rbW, h = CFG.rbH, n = CFG.notch;
+Object.assign(rb.style, { left: -w/2+'px', top: -h/2+'px' });
+rb.setAttribute('width', w); rb.setAttribute('height', h);
+rb.innerHTML = `<polygon points="0,0 ${w},0 ${w-n},${h/2} ${w},${h} 0,${h} ${n},${h/2}" fill="${CFG.ribbon}"/>`;
+txt.textContent = CFG.text;
+Object.assign(txt.style, { color: CFG.ink, fontSize: CFG.fontSize+'px', letterSpacing: CFG.spacing+'px', wordSpacing: CFG.wordSpacing+'px' });
+
+function place() { txt.style.left = (-txt.offsetWidth/2 + CFG.spacing/2)+'px'; txt.style.top = (CFG.textCy - CFG.cy - txt.offsetHeight/2)+'px'; }
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  const k = f - CFG.popAt;
+  let sx = 1, o = 1, bl = 0;
+  if (k < 0 || f >= CFG.fadeFrom + CFG.fade.length) o = 0;
+  else if (k < CFG.openX.length) sx = CFG.openX[k];
+  if (f >= CFG.fadeFrom && f < CFG.fadeFrom + CFG.fade.length) { const j = f - CFG.fadeFrom; o = CFG.fade[j]; bl = CFG.blur[j]; }
+  grp.style.opacity = o;
+  grp.style.transform = `scaleX(${sx})`;
+  grp.style.filter = bl ? `blur(${bl}px)` : 'none';
+}
+
+const start = () => {
+  place();
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function r(now){ render((now - t0) / 1000); requestAnimationFrame(r); })(t0); }
+};
+document.fonts.load(`900 ${CFG.fontSize}px "Noto Serif JP"`, CFG.text).then(start);
+</script>
+</body>
+</html>

@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>112 Spin Reveal</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=block" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .L { position:absolute; left:0; top:0; }
+  svg { position:absolute; left:0; top:0; overflow:visible; }
+</style>
+</head>
+<body>
+<div id="card">
+  <div id="scene" class="L"><div id="spin" class="L"><svg id="sv"><g id="gd"><text id="td"></text></g><text id="tp"></text></svg></div></div>
+  <svg id="su"><rect id="bar"></rect></svg>
+</div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 284, H: 158,
+  bg: '#FCFCF9',
+  ink: '#24242F',
+  accent: '#EE7493',
+  text: 'GO!',
+  backBox:  [78, 53, 208, 101],         // 旋轉中後面深色字撐開的墨跡框（同字形、字距較寬）
+  frontBox: [97, 53, 189, 101],         // 前面粉紅字的墨跡框（兩層同中心）
+  bar: [86, 121, 115, 4],               // 底線（不轉）x, y, 寬, 高
+  // 旋轉：一開始快速轉、越轉越慢停正（指數減速）
+  turnsLeft: 1077,                      // 開始時離停正還差幾度（約 3 圈）
+  decay: 0.107,                         // 每幀減速係數：剩餘角度 × e^(-decay)
+  blurFrom: 15, blurPer: 8, blurMax: 4, // 角速度超過 15°/幀才有動態模糊，每 8°/幀 +1px
+  perspective: 900,
+  mergeFrom: 400,                       // 剩不到 400° 停正時開始，隨著減速深色層逐步收攏、淡出，停正那一刻剛好只剩粉紅字
+};
+const LOOP = 120;                       // 一輪幀數（30fps）
+// =================================
+
+const q = new URLSearchParams(location.search);
+const $ = (id) => document.getElementById(id);
+const card = $('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+['sv', 'su'].forEach(id => { $(id).setAttribute('width', CFG.W); $(id).setAttribute('height', CFG.H); });
+['scene', 'spin'].forEach(id => Object.assign($(id).style, { width: CFG.W+'px', height: CFG.H+'px' }));
+const cx = (CFG.backBox[0] + CFG.backBox[2]) / 2, cy = (CFG.backBox[1] + CFG.backBox[3]) / 2;
+Object.assign($('scene').style, { perspective: CFG.perspective + 'px', perspectiveOrigin: `${cx}px ${cy}px` });
+$('spin').style.transformOrigin = `${cx}px ${cy}px`;
+const [bx, by, bw, bh] = CFG.bar;
+Object.entries({ x: bx, y: by, width: bw, height: bh, rx: 1, fill: CFG.accent }).forEach(([a,v]) => $('bar').setAttribute(a, v));
+const cv = document.createElement('canvas').getContext('2d');
+function fitText(t, str, font, box, mode) {
+  cv.font = `${font.w} 100px ${font.f}`; const m = cv.measureText(str);
+  const fs = (box[3]-box[1]) / (m.actualBoundingBoxAscent + m.actualBoundingBoxDescent) * 100, k = fs/100;
+  const inkW = (m.actualBoundingBoxLeft + m.actualBoundingBoxRight) * k, bw = box[2]-box[0];
+  t.textContent = str;
+  Object.entries({ 'font-family': font.f.replace(/"/g,''), 'font-weight': font.w, 'font-size': fs,
+    x: box[0] + m.actualBoundingBoxLeft*k, y: box[1] + m.actualBoundingBoxAscent*k }).forEach(([a,v]) => t.setAttribute(a, v));
+  if (mode === 'ls') t.setAttribute('letter-spacing', (bw-inkW) / Math.max(1, [...str].length-1));
+  else t.setAttribute('transform', `translate(${box[0]} 0) scale(${bw/inkW} 1) translate(${-box[0]} 0)`);
+}
+
+// 深色層＝粉紅字的複本，只多了字距（往兩側撐開）；extra 是撐到 backBox 寬度需要的額外字距
+let extra = 0, sx = 1;
+const N = [...CFG.text].length;
+
+function render(t) {
+  const f = ((t * 30) % LOOP + LOOP) % LOOP;
+  let rest = CFG.turnsLeft * Math.exp(-CFG.decay * f);       // 還差幾度停正
+  if (rest < 0.3) rest = 0;
+  const vel = CFG.decay * rest;                               // 目前角速度（°/幀）
+  const blur = Math.min(CFG.blurMax, Math.max(0, (vel - CFG.blurFrom) / CFG.blurPer));
+  $('spin').style.transform = `rotateY(${-rest}deg)`;
+  $('spin').style.filter = blur > 0.05 ? `blur(${blur.toFixed(2)}px)` : 'none';
+  // 收攏：字距縮回、往中心對齊、同時淡出
+  const mix = Math.pow(Math.min(1, rest / CFG.mergeFrom), 0.8);
+  const ls = extra * mix, shift = ls * sx * (N - 1) / 2;
+  $('td').setAttribute('letter-spacing', ls);
+  $('gd').setAttribute('transform', `translate(${-shift} 0)`);
+  $('gd').setAttribute('opacity', mix);
+}
+
+document.fonts.load('400 50px "Archivo Black"', CFG.text).then(() => {
+  // 兩層同字形、同字級；後層只把字距拉開
+  const font = { f: '"Archivo Black"', w: 400 };
+  $('tp').setAttribute('fill', CFG.accent); fitText($('tp'), CFG.text, font, CFG.frontBox, 'sx');
+  $('td').setAttribute('fill', CFG.ink);    fitText($('td'), CFG.text, font, CFG.frontBox, 'sx');
+  sx = +/scale\(([\d.]+) 1\)/.exec($('tp').getAttribute('transform'))[1];
+  extra = ((CFG.backBox[2] - CFG.backBox[0]) - (CFG.frontBox[2] - CFG.frontBox[0])) / sx / (N - 1);
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+});
+</script>
+</body>
+</html>

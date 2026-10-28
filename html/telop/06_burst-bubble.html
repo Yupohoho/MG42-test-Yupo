@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>TL06 Burst Bubble</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #grp { position:absolute; left:0; top:0; width:0; height:0; }
+  #grp svg { position:absolute; left:0; top:0; overflow:visible; transform:translate(-50%,-50%); }
+  #grp .txt { position:absolute; left:0; top:0; width:0; height:0; }
+  #grp .txt svg { position:absolute; left:0; top:0; width:1px; height:1px; overflow:visible; }
+</style>
+</head>
+<body>
+<div id="card"><div id="grp"><svg id="star"></svg><div class="txt" id="txt"></div></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '衝撃',
+  W: 324, H: 106,
+  bg: '#ff5a5f',
+  burst: '#f4efe4',        // 爆炸框填色
+  edge: '#14161c',         // 爆炸框黑邊、字色
+  edgeW: 4,                // 爆炸框黑邊寬
+  ring: '#f4efe4',         // 字的外框
+  burstW: 150, burstH: 96, // 爆炸框外徑（尖角到尖角）；星形在「圓」的空間裡旋轉，再把 x 拉寬，所以外輪廓不動、尖角繞著轉
+  spikes: 16, inner: .74,  // 尖角數、內凹比例（越小缺口越深）
+  fontSize: 38, spacing: 3, ringW: 3,
+  cx: 162, cy: 52.5,
+  // 彈出：從第 4 幀起，橫向／縱向縮放（以中心為準），過衝後回穩
+  popX: [.33,.60,.81,.95,1.05,1.11,1.14,1.14,1.12,1.09,1.05,1.02,1.01,1.0],
+  popY: [.40,.66,.88,1.0,1.05,1.11,1.14,1.14,1.12,1.09,1.05,1.02,1.01,1.0],
+  // 收尾：第 56 幀略縮，第 57 幀縮成 66% 並往左上偏，第 58 幀消失
+  exit: { 56: [.96,0,0], 57: [.66,-16.5,-4.5] }, exitEnd: 58,
+  // 文字是獨立一層：比爆炸框晚 1 幀彈出、過衝更大（硬切不用緩動）
+  textFrom: 5, textPop: [.3,.62,.9,1.08,1.2,1.18,1.12,1.06,1.02,1.0],
+  // 爆炸框入場後慢慢順時針轉，一輪 59 幀剛好轉一個尖角間距，循環銜接無縫
+  spinPerLoop: 360 / 16,
+  popAt: 4,
+  loopFrames: 59,          // 一輪 59 幀（約 1.97 秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), grp = document.getElementById('grp'), svg = document.getElementById('star');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+// 爆炸框：交錯的外／內頂點；在圓的空間裡算角度（可旋轉），x 再依寬高比拉寬
+const rc = CFG.burstH/2 - CFG.edgeW, kx = (CFG.burstW/2 - CFG.edgeW) / rc, n = CFG.spikes * 2;
+svg.setAttribute('width', CFG.burstW); svg.setAttribute('height', CFG.burstH);
+svg.setAttribute('viewBox', `${-CFG.burstW/2} ${-CFG.burstH/2} ${CFG.burstW} ${CFG.burstH}`);
+const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+for (const [k, v] of Object.entries({ fill: CFG.burst, stroke: CFG.edge, 'stroke-width': CFG.edgeW*2, 'stroke-linejoin': 'miter', 'stroke-miterlimit': 10, 'paint-order': 'stroke fill' })) poly.setAttribute(k, v);
+svg.appendChild(poly);
+function setStar(angDeg, sx, sy) {
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const a = -Math.PI/2 + i * Math.PI / CFG.spikes + angDeg * Math.PI / 180, r = rc * (i % 2 ? CFG.inner : 1);
+    pts.push((Math.cos(a) * r * kx * sx).toFixed(1) + ',' + (Math.sin(a) * r * sy).toFixed(1));
+  }
+  poly.setAttribute('points', pts.join(' '));
+}
+grp.style.left = CFG.cx+'px'; grp.style.top = CFG.cy+'px';
+const NS = 'http://www.w3.org/2000/svg';
+function svgLayers(parent, text, layers, size, spacing) {
+  const svg = document.createElementNS(NS, 'svg');
+  for (const [col, sw] of layers) {
+    const tx = document.createElementNS(NS, 'text'); tx.textContent = text;
+    for (const [k, v] of Object.entries({ x: spacing/2, y: 0, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-family': "'Dela Gothic One',sans-serif",
+      'font-size': size, 'letter-spacing': spacing, fill: col, stroke: sw ? col : 'none', 'stroke-width': sw,
+      'stroke-linejoin': 'round', 'stroke-linecap': 'round', 'paint-order': 'stroke fill' })) tx.setAttribute(k, v);
+    svg.appendChild(tx);
+  }
+  parent.appendChild(svg); return svg;
+}
+// 描邊字用 SVG 文字＋圓角連接（HTML 文字的描邊轉折會長尖刺）
+svgLayers(document.getElementById('txt'), CFG.text, [[CFG.edge, (CFG.ringW+1.5)*2], [CFG.ring, CFG.ringW*2], [CFG.edge, 0]], CFG.fontSize, CFG.spacing);
+
+const txt = document.getElementById('txt');
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  let sx = 1, sy = 1, dx = 0, dy = 0, o = 1, ts = 1;
+  const k = f - CFG.popAt;
+  if (k < 0 || f >= CFG.exitEnd) o = 0;
+  else if (k < CFG.popX.length) { sx = CFG.popX[k]; sy = CFG.popY[k]; }
+  const tk = f - CFG.textFrom;
+  if (tk < 0) ts = 0; else if (tk < CFG.textPop.length) ts = CFG.textPop[tk];
+  if (CFG.exit[f]) { const [s, x, y] = CFG.exit[f]; dx = x; dy = y; grp.style.transform = 'translate(' + x + 'px,' + y + 'px) scale(' + s + ')'; }
+  else grp.style.transform = 'none';
+  grp.style.opacity = o;
+  const ang = CFG.spinPerLoop * f / CFG.loopFrames;
+  setStar(ang, sx, sy);
+  txt.style.transform = 'scale(' + ts + ')';
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function r(now){ render((now - t0) / 1000); requestAnimationFrame(r); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "Dela Gothic One"`, CFG.text).then(start);
+</script>
+</body>
+</html>

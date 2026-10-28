@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>TL14 Stripe Caution</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .band { position:absolute; left:0; width:100%; }
+  #box { position:absolute; left:0; top:0; width:0; height:0; }
+  #panel { position:absolute; display:flex; align-items:center; justify-content:center; }
+  #txt { white-space:nowrap; line-height:1; font-family:'Dela Gothic One',sans-serif; }
+</style>
+</head>
+<body>
+<div id="card"><div id="top" class="band"></div><div id="bot" class="band"></div><div id="box"><div id="panel"><div id="txt"></div></div></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '要注意',
+  W: 324, H: 106,
+  bg: '#fdc83c',           // 底色
+  band: '#fdd205',         // 條紋帶底色（比底色亮一點的黃）
+  stripe: '#11110a',       // 黑色斜紋
+  bands: { topY: 10, topH: 17, botY: 81, botH: 18 },   // 上、下兩條斜紋帶的位置
+  pitch: 34.5,             // 斜紋水平間距（px），黑黃各半；一輪剛好移動一個間距
+  panel: { w: 153, h: 49.5, cx: 162, cy: 53.5, color: '#101010', radius: 5 },   // 中央黑底板
+  ink: '#fad50a', fontSize: 36, flatten: .78,   // 字色、字級、縱向壓扁（原版字比較扁寬）
+  // 底板（連字）彈出：從第 4 幀起每幀的等比縮放，過衝後回穩
+  pop: [.45,.78,1.0,1.12,1.18,1.18,1.15,1.09,1.04,1.0], popAt: 4,
+  // 斜紋一直在動：上方往左、下方往右，每輪各移動一個間距（循環銜接無縫）
+  // 收尾：第 54–57 幀底板與字逐步變淡、變模糊，第 58 幀消失（斜紋不消失）
+  fade: [.84,.6,.36,.22], blur: [1,2,3.5,5], fadeFrom: 54,
+  loopFrames: 59,          // 一輪 59 幀（約 1.97 秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const topBand = document.getElementById('top'), botBand = document.getElementById('bot');
+const perp = CFG.pitch * Math.SQRT1_2;   // 45° 斜紋的垂直間距
+const stripes = `repeating-linear-gradient(135deg, ${CFG.stripe} 0 ${perp/2}px, ${CFG.band} ${perp/2}px ${perp}px)`;
+Object.assign(topBand.style, { top: CFG.bands.topY+'px', height: CFG.bands.topH+'px', background: stripes, backgroundSize: CFG.pitch+'px 100%' });
+Object.assign(botBand.style, { top: CFG.bands.botY+'px', height: CFG.bands.botH+'px', background: stripes, backgroundSize: CFG.pitch+'px 100%' });
+const box = document.getElementById('box'), panel = document.getElementById('panel'), txt = document.getElementById('txt');
+const P = CFG.panel;
+box.style.left = P.cx+'px'; box.style.top = P.cy+'px';
+Object.assign(panel.style, { left: -P.w/2+'px', top: -P.h/2+'px', width: P.w+'px', height: P.h+'px', background: P.color, borderRadius: P.radius+'px' });
+txt.textContent = CFG.text;
+Object.assign(txt.style, { color: CFG.ink, fontSize: CFG.fontSize+'px', transform: `scaleY(${CFG.flatten})` });
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  // 斜紋
+  const d = CFG.pitch * f / CFG.loopFrames;
+  topBand.style.backgroundPositionX = (-d)+'px'; botBand.style.backgroundPositionX = d+'px';
+  // 底板
+  const k = f - CFG.popAt;
+  let s = 1, o = 1, bl = 0;
+  if (k < 0 || f >= CFG.fadeFrom + CFG.fade.length) o = 0;
+  else if (k < CFG.pop.length) s = CFG.pop[k];
+  if (f >= CFG.fadeFrom && f < CFG.fadeFrom + CFG.fade.length) { const j = f - CFG.fadeFrom; o = CFG.fade[j]; bl = CFG.blur[j]; }
+  box.style.opacity = o; box.style.transform = `scale(${s})`; box.style.filter = bl ? `blur(${bl}px)` : 'none';
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function r(now){ render((now - t0) / 1000); requestAnimationFrame(r); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "Dela Gothic One"`, CFG.text).then(start);
+</script>
+</body>
+</html>

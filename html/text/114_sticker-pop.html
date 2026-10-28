@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>114 Sticker Pop</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #stage { position:absolute; inset:0; }
+  #sticker { position:absolute; box-sizing:border-box; }
+  #txt { position:absolute; left:50%; top:50%; line-height:1; white-space:nowrap; font-family:'Archivo Black',sans-serif; }
+  .ln { position:absolute; height:2px; border-radius:1px; transform-origin:0 50%; }
+</style>
+</head>
+<body>
+<div id="card"><div id="stage"><div id="sticker"></div><div id="txt"></div></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: 'WOW!',
+  W: 284, H: 158,
+  bg: '#fcfcf9',
+  paper: '#ffffff',           // 貼紙底色
+  ink: '#22232e',             // 貼紙框線與厚陰影
+  accent: '#6a967d',          // 字色
+  rays: '#9db3a6',            // 放射線顏色
+  fontSize: 36,                // 字寬要小於貼紙內框
+  sw: 145, sh: 88, radius: 13, border: 3,
+  cx: 144, cy: 80,            // 貼紙中心
+  angle: -6.7,                // 貼紙最終傾斜（度）
+  depth: [3, 5],              // 右下厚陰影位移
+};
+// =================================
+const FPS = 30, LOOP = 120;
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), stage = document.getElementById('stage');
+const st = document.getElementById('sticker'), txt = document.getElementById('txt');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+Object.assign(st.style, { width: CFG.sw+'px', height: CFG.sh+'px', left: CFG.cx - CFG.sw/2 + 'px', top: CFG.cy - CFG.sh/2 + 'px',
+  borderRadius: CFG.radius+'px', border: `${CFG.border}px solid ${CFG.ink}`, background: CFG.paper,
+  boxShadow: `${CFG.depth[0]}px ${CFG.depth[1]}px 0 ${CFG.ink}` });
+Object.assign(txt.style, { fontSize: CFG.fontSize+'px', color: CFG.accent });
+txt.textContent = CFG.text;
+// 貼紙四周的放射短線
+const rays = Array.from({ length: 12 }, (_, i) => {
+  const d = document.createElement('div'); d.className = 'ln'; d.style.background = CFG.rays;
+  stage.insertBefore(d, st); return { d, a: i / 12 * Math.PI * 2 + .26 };
+});
+
+const key = (tab, u) => { if (u <= tab[0][0]) return tab[0][1]; for (let i = 1; i < tab.length; i++) if (u <= tab[i][0]) { const [a, va] = tab[i-1], [b, vb] = tab[i]; return va + (vb - va) * (u - a) / (b - a); } return tab[tab.length-1][1]; };
+// 貼紙：從 0 彈到 1.15 倍再落定，同時轉正到最終角度
+const S_SCALE = [[0,0],[3,.75],[5,1.15],[7,1.08],[9,.97],[11,1.01],[13,1]];
+const S_ROT   = [[0,-22],[5,-3],[8,-8],[11,-6.2],[13,CFG.angle]];
+// 字：晚 3 幀蓋上去；倍率乘在貼紙倍率上且不超過 1，所以彈出過程中字也不會超出框
+const T_SCALE = [[0,0],[2,.7],[4,.95],[6,1]];
+
+function render(f) {
+  const s = key(S_SCALE, f), r = key(S_ROT, f);
+  st.style.transform = `rotate(${r}deg) scale(${s})`;
+  const ts = s * key(T_SCALE, f - 3);
+  txt.style.transform = `translate(-50%,-50%) translate(${CFG.cx - CFG.W/2}px,${CFG.cy - CFG.H/2}px) rotate(${r}deg) scale(${ts})`;
+  // 放射線：落定瞬間往外彈出，邊飛邊縮短淡出
+  const u = (f - 4) / 14;
+  rays.forEach(({ d, a }) => {
+    if (u < 0 || u > 1) { d.style.opacity = 0; return; }
+    const e = 1 - Math.pow(1 - u, 2), R = 1 + .22 * e;
+    const x = CFG.cx + Math.cos(a) * (CFG.sw / 2 + 10) * R, y = CFG.cy + Math.sin(a) * (CFG.sh / 2 + 10) * R;
+    d.style.opacity = 1 - u;
+    d.style.width = (12 * (1 - .5 * u)) + 'px';
+    d.style.left = x + 'px'; d.style.top = y + 'px';
+    d.style.transform = `rotate(${Math.atan2(Math.sin(a) * CFG.sh, Math.cos(a) * CFG.sw)}rad)`;
+  });
+  stage.style.opacity = f < 110 ? 1 : Math.max(0, 1 - (f - 110) / 8);
+}
+
+document.fonts.load(`${CFG.fontSize}px "Archivo Black"`, CFG.text).then(() => {
+  if (q.has('t')) render((+q.get('t') * FPS) % LOOP);
+  else { const t0 = performance.now(); (function g(now){ render(Math.floor((now - t0) / 1000 * FPS) % LOOP); requestAnimationFrame(g); })(t0); }
+});
+</script>
+</body>
+</html>

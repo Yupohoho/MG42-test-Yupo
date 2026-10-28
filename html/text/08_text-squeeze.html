@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>08 Text Squeeze</title>
+<link href="https://fonts.googleapis.com/css2?family=Reggae+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #w { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; line-height:1;
+       font-family:'Reggae One','Noto Sans JP',sans-serif; }
+</style>
+</head>
+<body>
+<div id="card"><div id="w"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#14161c',
+  fontSize: 58,
+  // 兩個詞輪流；squeeze = 該詞開始被擠扁的時間；inCurve = 下一個詞進場時的寬度倍率（每幀一個值）
+  words: [
+    { text: '弾力', color: '#f3eee4', squeeze: 0.633, inCurve: [1.2, 1.35, 1.25, 1.05, 1] },  // 換到反発：寬進來過衝再彈回
+    { text: '反発', color: '#ff4d4d', squeeze: 1.633, inCurve: [.35, .6, .85, 1] },           // 換回弾力：從窄展開
+  ],
+  outCurve: [1, .9, .75, .45, .3],   // 被擠扁時的寬度倍率（每幀一個值），之後空 1 幀
+  loop: 2.1,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+const el = document.getElementById('w');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+el.style.fontSize = CFG.fontSize + 'px';
+const F = 1/30;
+const frameVal = (arr, dt) => { const i = Math.floor(dt / F + 1e-6); return i < arr.length ? arr[i] : arr[arr.length-1]; };
+
+function render(t) {
+  const [A, B] = CFG.words;
+  // 找出目前是哪個詞、處在哪個階段
+  let cur, sx = 1, show = true;
+  const phase = (from, to, x) => {
+    const dOut = x - from.squeeze;
+    if (dOut >= 0 && dOut < CFG.outCurve.length * F) return [from, frameVal(CFG.outCurve, dOut), true];
+    if (dOut >= CFG.outCurve.length * F && dOut < (CFG.outCurve.length + 1) * F) return [to, 1, false];   // 空 1 幀
+    const dIn = dOut - (CFG.outCurve.length + 1) * F;
+    if (dIn >= 0 && dIn < from.inCurve.length * F) return [to, frameVal(from.inCurve, dIn), true];
+    return null;
+  };
+  const r = phase(A, B, t) || phase(B, A, t) || phase(B, A, t + CFG.loop);
+  if (r) [cur, sx, show] = r;
+  else cur = (t >= A.squeeze && t < B.squeeze) ? B : A;
+  el.textContent = cur.text;
+  el.style.color = cur.color;
+  el.style.opacity = show ? 1 : 0;
+  el.style.transform = `scaleX(${sx})`;
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(f); })(t0); }
+};
+// 日文字型是按字分批下載的，要先把兩個詞用到的字都載入，否則定格截圖會出現預設字型
+Promise.all(CFG.words.map(w => document.fonts.load(`${CFG.fontSize}px "Reggae One"`, w.text))).then(start);
+</script>
+</body>
+</html>

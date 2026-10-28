@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>TL39 Chapter Card</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@700;900&family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #card > div { position:absolute; white-space:nowrap; line-height:1; }
+  #num { font-family:'Roboto Mono',monospace; font-weight:700; }
+  #chap { font-family:'Noto Serif JP',serif; font-weight:700; }
+  #big { font-family:'Noto Serif JP',serif; font-weight:900; }
+</style>
+</head>
+<body>
+<div id="card"><div id="num"></div><div id="chap"></div><div id="rule"></div><div id="big"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  num: '01', chap: '第一章', big: '出会い',
+  W: 324, H: 106,
+  bg: '#f4f0e6',
+  numColor: '#5a4a1c', chapColor: '#111111', ruleColor: '#3f3b28', bigColor: '#111111',
+  // 排版（畫面 px）：由上而下 章號（小、等寬、金褐）→ 章名（小明朝）→ 細線 → 標題（大明朝）；各層之間留約 8px 的間距（原版幾乎貼在一起，這裡刻意拉開）
+  numSize: 14, numSpacing: 5, numCx: 161, numCy: 14.5,
+  chapSize: 17, chapSpacing: 5, chapCx: 161, chapCy: 36,
+  rule: { cx: 163, y: 52, w: 53, h: 1.6 },
+  bigSize: 39, bigSpacing: 8, bigCx: 158.5, bigCy: 79,
+  // 章號：第 4 幀起由淡到實（約 7 幀），同時由上往下落 3px
+  numFrom: 4, numOpacity: [.09,.24,.44,.6,.73,.84,.96,.97,.97,.98,.98,.99,1.0], numDrop: [-3,-3,-2.5,-2,-1.5,-1,-.5,0],
+  // 章名：第 7 幀起由淡到實（約 9 幀）
+  chapFrom: 7, chapOpacity: [.13,.31,.47,.6,.72,.83,.91,.96,1.0],
+  // 細線：第 11 幀起從中心往左右長出（寬度 px），約 12 幀長到 53px
+  ruleFrom: 11, ruleW: [4.8,12,20.7,26,32,36.6,41,44.5,47.7,51,51,52.5,53],
+  // 標題：第 16 幀起由淡到實（約 12 幀），同時由下往上升約 7px
+  bigFrom: 16, bigOpacity: [.13,.27,.42,.54,.67,.76,.82,.94,.94,.97,.99,1.0], bigRise: [7,3,3,1,1,0],
+  // 收尾：第 54–57 幀整組逐步變淡，第 58 幀起空白
+  fade: [.9,.59,.31,.16], fadeFrom: 54,
+  loopFrames: 59,          // 一輪 59 幀（約 1.97 秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const num = document.getElementById('num'), chap = document.getElementById('chap'), big = document.getElementById('big'), rule = document.getElementById('rule');
+num.textContent = CFG.num; chap.textContent = CFG.chap; big.textContent = CFG.big;
+Object.assign(num.style, { color: CFG.numColor, fontSize: CFG.numSize+'px', letterSpacing: CFG.numSpacing+'px' });
+Object.assign(chap.style, { color: CFG.chapColor, fontSize: CFG.chapSize+'px', letterSpacing: CFG.chapSpacing+'px' });
+Object.assign(big.style, { color: CFG.bigColor, fontSize: CFG.bigSize+'px', letterSpacing: CFG.bigSpacing+'px' });
+Object.assign(rule.style, { background: CFG.ruleColor, top: CFG.rule.y+'px', height: CFG.rule.h+'px' });
+function put(el, cx, cy, sp) { el.style.left = (cx - el.offsetWidth/2 + sp/2)+'px'; el.style.top = (cy - el.offsetHeight/2)+'px'; }
+function place() { put(num, CFG.numCx, CFG.numCy, CFG.numSpacing); put(chap, CFG.chapCx, CFG.chapCy, CFG.chapSpacing); put(big, CFG.bigCx, CFG.bigCy, CFG.bigSpacing); }
+const pick = (tbl, k) => k < 0 ? null : tbl[Math.min(k, tbl.length - 1)];
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  const g = f >= CFG.fadeFrom ? (f - CFG.fadeFrom < CFG.fade.length ? CFG.fade[f - CFG.fadeFrom] : 0) : 1;
+  const a = f - CFG.numFrom;
+  num.style.opacity = a < 0 ? 0 : pick(CFG.numOpacity, a) * g; num.style.transform = `translateY(${a < 0 ? CFG.numDrop[0] : a < CFG.numDrop.length ? CFG.numDrop[a] : 0}px)`;
+  const b = f - CFG.chapFrom;
+  chap.style.opacity = b < 0 ? 0 : pick(CFG.chapOpacity, b) * g;
+  const c = f - CFG.ruleFrom;
+  const rw = c < 0 ? 0 : pick(CFG.ruleW, c);
+  rule.style.width = rw+'px'; rule.style.left = (CFG.rule.cx - rw/2)+'px'; rule.style.opacity = rw > 0 ? g : 0;
+  const d = f - CFG.bigFrom;
+  big.style.opacity = d < 0 ? 0 : pick(CFG.bigOpacity, d) * g; big.style.transform = `translateY(${d < 0 ? CFG.bigRise[0] : d < CFG.bigRise.length ? CFG.bigRise[d] : 0}px)`;
+}
+
+const start = () => {
+  place();
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function r(now){ render((now - t0) / 1000); requestAnimationFrame(r); })(t0); }
+};
+Promise.all([document.fonts.load('900 39px "Noto Serif JP"', CFG.big), document.fonts.load('700 17px "Noto Serif JP"', CFG.chap), document.fonts.load('700 14px "Roboto Mono"', CFG.num)]).then(start);
+</script>
+</body>
+</html>

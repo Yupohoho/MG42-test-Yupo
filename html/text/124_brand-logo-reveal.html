@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>124 Brand Logo Reveal</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#f6f4f2; }
+  /* ?z=2 放大觀看；?t=0.5 定格；?m=1 量測用（卡片貼左上） */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  svg { position:absolute; inset:0; }
+</style>
+</head>
+<body>
+<div id="card">
+<svg id="sv" width="284" height="158" viewBox="0 0 284 158">
+  <circle id="ring" cx="142.5" cy="57.5" r="27.5" fill="none" stroke-width="3.5" stroke-linecap="round" transform="rotate(-90 142.5 57.5)"/>
+  <rect id="dia" x="-12" y="-12" width="24" height="24" rx="1"/>
+  <g id="txt"></g>
+  <rect id="ul" y="131" height="2" x="0" width="0"/>
+</svg>
+</div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 284, H: 158,
+  bg: '#fbfbf8',
+  ink: '#22242f',            // 菱形與字
+  accent: '#cc9f3f',         // 圓環（金色）
+  line: '#dcc68e',           // 字下方淺金線
+  text: 'STUDIO',            // Montserrat 700，字距寬
+  size: 21,
+  width: 111,                // 字最後的總寬
+  baseline: 117,
+};
+// =================================
+const LOOP = 120;   // 幀（30fps）：約 1.6 秒播完，停住到 4 秒再重播
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), $ = id => document.getElementById(id);
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+$('ring').style.stroke = CFG.accent; $('dia').style.fill = CFG.ink; $('ul').style.fill = CFG.line;
+const CX = 142.5, CIRC = 2 * Math.PI * 27.5;
+
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const lerp = (a, b, k) => a + (b - a) * k;
+function tab(arr, s, f) { const i = f - s, n = arr.length - 1; if (i <= 0) return arr[0]; if (i >= n) return arr[n]; const k = Math.floor(i); return lerp(arr[k], arr[k + 1], i - k); }
+
+// 量測值（我方幀 = 原片幀 + 3）
+const RING = [0,20,40,60,80,110,140,190,230,270,290,320,335,360];        // 第 0 幀起：圓環畫出角度（順時針、從正上方）
+const DIA = [0,1,4,5.5,7.5,9.5,11,12.5,13,14,14.5,15,15,15.5,15.8,16];  // 第 8 幀起：菱形半對角線 px（最後 16）
+const SPREAD = [.7,.75,.8,.84,.87,.9,.93,.95,.97,.985,.99,.995,1];      // 第 21 幀起：字距由 70% 散開到 100%
+const UL = [0,7.5,13.5,19,23,26,28.5,30.5,31.5,33.5,33.8,34,34.5,35,35.2,35.5];  // 第 31 幀起：底線半寬
+
+let letters = [];
+function build() {
+  const g = $('txt'), chars = [...CFG.text];
+  const tmp = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  tmp.style.font = `700 ${CFG.size}px Montserrat`; g.appendChild(tmp);
+  const adv = chars.map(c => { tmp.textContent = c; return tmp.getComputedTextLength(); });
+  g.removeChild(tmp);
+  const ls = (CFG.width - adv.reduce((a, b) => a + b, 0)) / (chars.length - 1);
+  let x = 140.5 - CFG.width / 2;
+  chars.forEach((c, i) => {
+    const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    t.textContent = c; t.setAttribute('y', CFG.baseline); t.setAttribute('text-anchor', 'middle');
+    t.style.font = `700 ${CFG.size}px Montserrat`; t.style.fill = CFG.ink;
+    g.appendChild(t); letters.push({ el: t, cx: x + adv[i] / 2 }); x += adv[i] + ls;
+  });
+}
+
+function render(t) {
+  const f = t * 30;
+  const a = tab(RING, 0, f);
+  $('ring').setAttribute('stroke-dasharray', `${CIRC * a / 360} ${CIRC}`);
+  $('ring').style.opacity = a > 0 ? 1 : 0;
+  const hd = tab(DIA, 8, f), k = hd / 16;
+  $('dia').setAttribute('transform', `translate(142.5,57.5) rotate(${45 * k}) scale(${k})`);
+  const sp = tab(SPREAD, 21, f);
+  letters.forEach((L, i) => {
+    L.el.setAttribute('x', 140.5 + (L.cx - 140.5) * sp);
+    L.el.style.opacity = clamp((f - 21 - 1.2 * i) / 4);     // 由左到右逐字淡入
+  });
+  const h = tab(UL, 31, f); $('ul').setAttribute('x', CX - h); $('ul').setAttribute('width', 2 * h);
+}
+
+document.fonts.load(`700 ${CFG.size}px Montserrat`, CFG.text).then(() => {
+  build();
+  if (q.has('t')) render((+q.get('t') * 30 % LOOP) / 30);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000 * 30 % LOOP) / 30); requestAnimationFrame(f); })(t0); }
+});
+</script>
+</body>
+</html>

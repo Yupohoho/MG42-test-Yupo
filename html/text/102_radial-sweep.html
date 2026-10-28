@@ -1,0 +1,78 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>T102 Radial Sweep</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Oswald:wght@700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#e9e7e3}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh}
+body.m{display:block;min-height:0}
+.card{position:relative;overflow:hidden}
+canvas{display:block}
+</style></head>
+<body><div class="card" id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== CFG：可換內容集中在這裡 =====
+const CFG={
+  text:'GO!',
+  font:'"Archivo Black"', weight:'400',
+  textBox:{x:107,y:65,w:73,h:27},        // 字停住時的墨跡框
+  cx:142, cy:79,                          // 放射中心
+  rays:12,                                // 色條數（另有同數量的淡色條，各 15°）
+  badge:{cx:142.5,cy:78.5,r:43,stroke:2}, // 中央白圓
+  bg:'#fcfcf9', ink:'#232631', ray:'#9575cd', ray2:'#eee8f2', badgeFill:'#ffffff'
+};
+const LOOP=120; // 幀（30fps），主動畫約 50 幀，色條全程持續旋轉
+
+// ===== 動態 =====
+const SPEED=9.3;                        // 掃開速度（度／幀），從 9 點鐘方向順時針
+const ROT=60;                           // 色條本身持續順時針轉：每個循環轉 60°（＝兩個色條間隔），循環無縫
+const BS=[.08,.28,.5,.7,.85,.97,1.06,1.12,1.15,1.17,1.18,1.16,1.14,1.1,1.07,1.05,1.02,1]; // 白圓彈出（n=29 起）
+const TS=[.33,.63,.85,1.04,1.15,1.22,1.26,1.26,1.22,1.19,1.11,1.07,1.04,1];             // 字彈出（n=36 起）
+let L;
+function init(){L=fitText(CFG.text,CFG.font,CFG.weight,CFG.textBox);}
+function render(n){
+  const {cx,cy}=CFG,a=Math.min(360,n*SPEED),R=220,D=Math.PI/180;
+  if(a>0){ctx.save();ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,R,180*D,(180+a)*D);ctx.closePath();ctx.clip();
+    ctx.fillStyle=CFG.ray2;ctx.fillRect(0,0,CW,CH);ctx.fillStyle=CFG.ray;
+    const off=ROT*n/LOOP;
+    for(let i=0;i<CFG.rays;i++){const s=i*360/CFG.rays+off;ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,R,s*D,(s+180/CFG.rays)*D);ctx.closePath();ctx.fill();}
+    ctx.restore();}
+  if(n>=29){const b=CFG.badge,k=tab(BS,n-29);ctx.beginPath();ctx.arc(b.cx,b.cy,b.r*k,0,Math.PI*2);
+    ctx.fillStyle=CFG.badgeFill;ctx.fill();ctx.lineWidth=b.stroke;ctx.strokeStyle=CFG.ink;ctx.stroke();}
+  if(n>=36)drawText(L,CFG.ink,tab(TS,n-36));
+}
+
+// ===== 共用 =====
+const Q=new URLSearchParams(location.search),Z=+(Q.get('z')||1);
+if(Q.get('m'))document.body.classList.add('m');
+const CW=284,CH=158,DPR=window.devicePixelRatio||1;
+const card=document.getElementById('card'),cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+card.style.cssText+=`width:${CW*Z}px;height:${CH*Z}px;border-radius:${12*Z}px;background:${CFG.bg}`;
+cv.width=CW*Z*DPR;cv.height=CH*Z*DPR;cv.style.width=CW*Z+'px';cv.style.height=CH*Z+'px';
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const tab=(A,i)=>A[clamp(Math.floor(i),0,A.length-1)];
+const lerp=(a,b,p)=>a+(b-a)*p;
+const hex=h=>[1,3,5].map(i=>parseInt(h.substr(i,2),16));
+const mix=(a,b,p)=>{const A=hex(a),B=hex(b);return `rgb(${A.map((v,i)=>Math.round(v+(B[i]-v)*p)).join(',')})`};
+// 文字依墨跡框定位：box={x,y,w,h}；w 省略時照字型原比例
+function fitText(str,fam,wt,box){
+  const c=document.createElement('canvas').getContext('2d');c.font=`${wt} 200px ${fam}`;
+  const m=c.measureText(str),k=box.h/(m.actualBoundingBoxAscent+m.actualBoundingBoxDescent);
+  const nw=(m.actualBoundingBoxLeft+m.actualBoundingBoxRight)*k,sx=box.w?box.w/nw:1;
+  return{str,font:`${wt} ${200*k}px ${fam}`,sx,ox:-(m.actualBoundingBoxRight-m.actualBoundingBoxLeft)/2*k,
+    nw,oy:(m.actualBoundingBoxAscent-m.actualBoundingBoxDescent)/2*k,cx:box.x+(box.w||0)/2,cy:box.y+box.h/2};
+}
+function drawText(L,color,s=1,alpha=1,dy=0){
+  ctx.save();ctx.globalAlpha=alpha;ctx.translate(L.cx,L.cy+dy);ctx.scale(s*L.sx,s);
+  ctx.font=L.font;ctx.fillStyle=color;ctx.fillText(L.str,L.ox,L.oy);ctx.restore();
+}
+function frame(t){
+  const n=Math.floor(t*30+1e-6)%LOOP;
+  ctx.setTransform(Z*DPR,0,0,Z*DPR,0,0);ctx.globalAlpha=1;ctx.filter='none';
+  ctx.fillStyle=CFG.bg;ctx.fillRect(0,0,CW,CH);render(n);
+}
+const T0=Q.get('t');
+document.fonts.load(`400 60px "Archivo Black"`,'A').then(()=>document.fonts.load(`700 60px "Oswald"`,'A')).catch(()=>{}).then(()=>{
+  init();
+  if(T0!==null)frame(+T0);else{const st=performance.now();const lp=()=>{frame((performance.now()-st)/1000);requestAnimationFrame(lp)};lp();}
+});
+</script></body></html>

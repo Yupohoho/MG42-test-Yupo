@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>11 Repeating Text</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .row { position:absolute; left:0; white-space:nowrap; line-height:1; font-family:'Noto Sans JP',sans-serif; font-weight:700; }
+  .row span { display:inline-block; }
+</style>
+</head>
+<body>
+<div id="card"></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#f2efe6',
+  word: '流行',
+  rows: 5, perRow: 9,         // 5 行，每行重複 9 次
+  size: 18, rowGap: 19, top: 8, left: 6,
+  base: [142, 138, 128],      // 平常的字色（灰）
+  hi:   [104, 84, 16],        // 波經過時的字色（深金）
+  speed: 16.7,                  // 波前進速度（字/秒）
+  lag: 2,                     // 每往下一行，波落後幾個字（形成斜向的波）
+  width: 2.5,                 // 波的寬度（字，高斯半徑）
+  period: 1.6,                // 每隔幾秒發出一道波
+  start: 0.27,                // 每道波在週期內第幾秒從第一個字左邊出發
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+
+const cells = [];
+for (let r = 0; r < CFG.rows; r++) {
+  const row = document.createElement('div'); row.className = 'row';
+  Object.assign(row.style, { top: (CFG.top + r * CFG.rowGap)+'px', left: CFG.left+'px', fontSize: CFG.size+'px' });
+  const line = [];
+  for (let i = 0; i < CFG.perRow; i++) for (const ch of CFG.word) {
+    const s = document.createElement('span'); s.textContent = ch; row.appendChild(s); line.push(s);
+  }
+  card.appendChild(row); cells.push(line);
+}
+
+function render(t) {
+  const tc = t % CFG.period;
+  cells.forEach((line, r) => {
+    line.forEach((s, c) => {
+      // 取目前這道波與上一道波中較強者（上一道波可能還在右下角沒走完）
+      let k = 0;
+      for (const back of [0, 1]) {
+        const center = CFG.speed * (tc + back * CFG.period - CFG.start) - CFG.lag * r;
+        const d = (c - center) / CFG.width;
+        k = Math.max(k, Math.exp(-d * d));
+      }
+      const col = CFG.base.map((b, j) => Math.round(b + (CFG.hi[j] - b) * k));
+      s.style.color = `rgb(${col})`;
+      s.style.webkitTextStroke = k > .05 ? `${(.6 * k).toFixed(2)}px rgb(${col})` : '';
+    });
+  });
+}
+
+document.fonts.load(`700 ${CFG.size}px "Noto Sans JP"`, CFG.word).then(() => {
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+});
+</script>
+</body>
+</html>

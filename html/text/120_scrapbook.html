@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>120 Scrapbook</title>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #stage { position:absolute; inset:0; }
+  .el { position:absolute; box-sizing:border-box; }
+  #paper { padding-top:6px; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  #paper span { display:block; line-height:.98; font-family:'Oswald',sans-serif; font-weight:700; letter-spacing:.5px; }
+</style>
+</head>
+<body>
+<div id="card"><div id="stage"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  lines: ['COMING', 'SOON'],
+  W: 284, H: 158,
+  bg: '#fcfcf9',
+  ink: '#22232e',
+  accent: '#6a967d',
+  lineColors: ['#22232e', '#6a967d'],
+  fontSize: 46,
+  // 紙卡 [中心x, 中心y, 寬, 高, 角度]
+  paper: [140, 81, 196, 116, -4],
+  // 拼貼零件 [中心x, 中心y, 寬, 高, 角度, 圓角]
+  tape:   [72, 14, 142, 32, 4, 0],      // 綠色膠帶（實心，不能蓋到字）
+  tape2:  [160, 9, 42, 16, -10, 0],     // 淡綠小膠帶
+  square: [216, 30, 50, 50, 12, 0],     // 半透明方片
+  strip:  [222, 140, 122, 29, -7, 0],   // 深色色條（實心，不能蓋到字）
+  dot:    [55.5, 134.5, 24, 24, 0, 12], // 綠色圓點
+};
+// =================================
+const FPS = 30, LOOP = 120;
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), stage = document.getElementById('stage');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const mk = ([cx, cy, w, h, , r], style) => {
+  const e = document.createElement('div'); e.className = 'el';
+  Object.assign(e.style, { left: cx - w/2 + 'px', top: cy - h/2 + 'px', width: w+'px', height: h+'px', borderRadius: (r || 0)+'px' }, style);
+  stage.appendChild(e); return e;
+};
+const paper = mk([...CFG.paper, 0], { background: '#fff', border: `1.5px solid ${CFG.ink}`, boxShadow: '4px 6px 0 rgba(34,35,46,.08)' });
+paper.id = 'paper';
+CFG.lines.forEach((t, i) => { const s = document.createElement('span'); s.textContent = t; Object.assign(s.style, { fontSize: CFG.fontSize+'px', color: CFG.lineColors[i % CFG.lineColors.length] }); paper.appendChild(s); });
+const tape2 = mk(CFG.tape2, { background: CFG.accent, opacity: .45 });
+const tape = mk(CFG.tape, { background: CFG.accent });
+const square = mk(CFG.square, { background: 'rgba(222,232,228,.65)', border: '1px solid #8faa9c' });
+const strip = mk(CFG.strip, { background: CFG.ink });
+const dot = mk(CFG.dot, { background: CFG.accent });
+
+const key = (tab, u) => { if (u <= tab[0][0]) return tab[0][1]; for (let i = 1; i < tab.length; i++) if (u <= tab[i][0]) { const [a, va] = tab[i-1], [b, vb] = tab[i]; return va + (vb - va) * (u - a) / (b - a); } return tab[tab.length-1][1]; };
+const out = (u) => 1 - Math.pow(1 - Math.max(0, Math.min(1, u)), 3);
+// 零件依序貼上：滑進來＋由淡變實（[開始幀, 長度, 起點位移x, y, 起始角度差]）
+const SEQ = [
+  [tape,   10, 7, -50, -10, -6],
+  [strip,  18, 5, -50, -15,  0],
+  [square, 24, 7,  20, -20, 18],
+  [tape2,  30, 5, -10,  -4,  0],
+];
+const BASE = new Map([[tape, CFG.tape], [strip, CFG.strip], [square, CFG.square], [tape2, CFG.tape2]]);
+
+function render(f) {
+  // 紙卡先彈出
+  const ps = key([[0,.6],[4,1.08],[8,1.04],[12,1]], f);
+  paper.style.opacity = key([[0,0],[3,1]], f);
+  paper.style.transform = `rotate(${CFG.paper[4]}deg) scale(${ps})`;
+  SEQ.forEach(([el, s0, len, dx, dy, dr]) => {
+    const u = (f - s0) / len, e = out(u), a = BASE.get(el)[4];
+    const op = el === tape2 ? .45 : 1;
+    el.style.opacity = u <= 0 ? 0 : op * Math.min(1, .25 + .75 * u);
+    el.style.transform = `translate(${dx * (1 - e)}px,${dy * (1 - e)}px) rotate(${a + dr * (1 - e)}deg)`;
+  });
+  // 圓點最後淡入、由大縮回
+  const u = (f - 36) / 8;
+  dot.style.opacity = u <= 0 ? 0 : Math.min(1, .2 + .8 * u);
+  dot.style.transform = `scale(${1 + .5 * (1 - out(u))})`;
+  stage.style.opacity = f < 110 ? 1 : Math.max(0, 1 - (f - 110) / 8);
+}
+
+document.fonts.load(`700 ${CFG.fontSize}px "Oswald"`, CFG.lines.join('')).then(() => {
+  if (q.has('t')) render((+q.get('t') * FPS) % LOOP);
+  else { const t0 = performance.now(); (function g(now){ render(Math.floor((now - t0) / 1000 * FPS) % LOOP); requestAnimationFrame(g); })(t0); }
+});
+</script>
+</body>
+</html>

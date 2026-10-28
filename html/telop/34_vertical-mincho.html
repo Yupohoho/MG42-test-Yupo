@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>TL34 Vertical Mincho</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@700;900&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #txt { position:absolute; white-space:nowrap; line-height:1; font-family:'Noto Serif JP',serif; font-weight:700;
+         writing-mode:vertical-rl; text-orientation:upright; }
+  #seal { position:absolute; display:flex; align-items:center; justify-content:center; font-family:'Noto Serif JP',serif; font-weight:900; line-height:1; }
+</style>
+</head>
+<body>
+<div id="card"><div id="txt"></div><div id="seal"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '静かな夜',
+  W: 324, H: 106,
+  bg: '#d8b16f',           // 底色（金黃）
+  color: '#141414',        // 字色（近黑）
+  fontSize: 24, cx: 184, top: 7,       // 直書字（由上往下）：字級、字的水平中心、字盒上緣
+  // 由上往下「刷出」：第 4 幀起每幀顯示到的位置（畫面 y，字從 y=8 起、到 102 結束）
+  revealFrom: 4, reveal: [16,25,28,41,49,51,61,67,72,77,78,85,88,91,94,98,98,102],
+  // 落款（朱印）：第 39 幀「啪」一下蓋上（直接出現），位置在字的左下方，微傾
+  seal: { text: '和', x: 148, y: 80, size: 27, color: '#c5332b', ink: '#fbf7f1', fontSize: 20, rot: 4, radius: 3, from: 39 },
+  // 收尾：第 54–56 幀字與落款一起逐步變淡，第 57 幀起空白
+  fade: [.85,.55,.3], fadeFrom: 54,
+  loopFrames: 59,          // 一輪 59 幀（約 1.97 秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), txt = document.getElementById('txt'), seal = document.getElementById('seal');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+txt.textContent = CFG.text; Object.assign(txt.style, { color: CFG.color, fontSize: CFG.fontSize+'px', left: (CFG.cx - CFG.fontSize/2)+'px', top: CFG.top+'px' });
+const S = CFG.seal;
+seal.textContent = S.text;
+Object.assign(seal.style, { left: (S.x - S.size/2)+'px', top: (S.y - S.size/2)+'px', width: S.size+'px', height: S.size+'px', background: S.color, color: S.ink,
+  fontSize: S.fontSize+'px', borderRadius: S.radius+'px', transform: `rotate(${S.rot}deg)` });
+const textH = () => txt.offsetHeight;
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  let g = 1;
+  if (f >= CFG.fadeFrom) g = f - CFG.fadeFrom < CFG.fade.length ? CFG.fade[f - CFG.fadeFrom] : 0;
+  const k = f - CFG.revealFrom;
+  const yReveal = k < 0 ? 0 : k < CFG.reveal.length ? CFG.reveal[k] : 1000;
+  const h = textH();
+  const visible = Math.max(0, Math.min(h, yReveal - CFG.top));
+  txt.style.clipPath = `inset(0 0 ${h - visible}px 0)`;
+  txt.style.opacity = g; seal.style.opacity = f >= S.from ? g : 0;
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function r(now){ render((now - t0) / 1000); requestAnimationFrame(r); })(t0); }
+};
+Promise.all([document.fonts.load('700 24px "Noto Serif JP"', CFG.text), document.fonts.load('900 20px "Noto Serif JP"', CFG.seal.text)]).then(start);
+</script>
+</body>
+</html>

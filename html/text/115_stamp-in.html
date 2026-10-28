@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>115 Stamp In</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #stage { position:absolute; inset:0; }
+  #stamp { position:absolute; box-sizing:border-box; display:flex; align-items:center; justify-content:center; }
+  #inner { position:absolute; box-sizing:border-box; }
+  #txt { line-height:1; white-space:nowrap; font-family:'Archivo Black',sans-serif; position:relative; }
+  #ring { position:absolute; border-radius:50%; box-sizing:border-box; }
+</style>
+</head>
+<body>
+<div id="card"><div id="stage"><div id="ring"></div><div id="stamp"><div id="inner"></div><div id="txt"></div></div></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: 'OPEN',
+  W: 284, H: 158,
+  bg: '#fcfcf9',
+  accent: '#6a967d',          // 印章色
+  ring: '#b8bcb8',            // 落下時擴散的圓環
+  fontSize: 46,
+  sw: 171, sh: 71,            // 印章外框
+  border: 4, radius: 4,
+  inset: 7, innerLine: 1.5,   // 內框線（距外框、線寬）
+  cx: 143.5, cy: 78.5,
+  angle: -7.6,
+  from: 2.2,                  // 從幾倍大蓋下來
+};
+// =================================
+const FPS = 30, LOOP = 120;
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), stage = document.getElementById('stage');
+const stamp = document.getElementById('stamp'), inner = document.getElementById('inner'), txt = document.getElementById('txt'), ring = document.getElementById('ring');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+Object.assign(stamp.style, { width: CFG.sw+'px', height: CFG.sh+'px', left: CFG.cx - CFG.sw/2 + 'px', top: CFG.cy - CFG.sh/2 + 'px',
+  border: `${CFG.border}px solid ${CFG.accent}`, borderRadius: CFG.radius+'px' });
+const ins = CFG.inset - CFG.border;
+Object.assign(inner.style, { left: ins+'px', top: ins+'px', right: ins+'px', bottom: ins+'px', border: `${CFG.innerLine}px solid ${CFG.accent}`, borderRadius: '2px', opacity: .75 });
+Object.assign(txt.style, { fontSize: CFG.fontSize+'px', color: CFG.accent, top: '1px' });
+txt.textContent = CFG.text;
+
+const key = (tab, u) => { if (u <= tab[0][0]) return tab[0][1]; for (let i = 1; i < tab.length; i++) if (u <= tab[i][0]) { const [a, va] = tab[i-1], [b, vb] = tab[i]; return va + (vb - va) * (u - a) / (b - a); } return tab[tab.length-1][1]; };
+const HIT = 6;   // 蓋到紙上的幀
+// 蓋下後的震動（逐幀位移）
+const SHAKE = [[-4,2],[4,-2],[-3,1],[2,-2],[-1,1],[1,0]];
+
+function render(f) {
+  let s = 1, op = 1, dx = 0, dy = 0;
+  if (f < HIT) { const u = f / HIT; s = CFG.from - (CFG.from - 1) * u * u; op = Math.min(1, f / 3); }
+  else if (f - HIT < SHAKE.length) [dx, dy] = SHAKE[f - HIT];
+  stamp.style.opacity = op;
+  stamp.style.transform = `translate(${dx}px,${dy}px) rotate(${CFG.angle}deg) scale(${s})`;
+  // 圓環：從印章大小往外擴散淡出
+  const u = (f - HIT) / 9;
+  if (u < 0 || u > 1) ring.style.opacity = 0;
+  else {
+    const e = 1 - Math.pow(1 - u, 2), rw = 200 + 110 * e, rh = 100 + 55 * e;
+    Object.assign(ring.style, { opacity: .9 * (1 - u), width: rw+'px', height: rh+'px', left: CFG.cx - rw/2 + 'px', top: CFG.cy - rh/2 + 'px',
+      border: `${2 - u}px solid ${CFG.ring}`, transform: `rotate(${CFG.angle}deg)` });
+  }
+  stage.style.opacity = f < 110 ? 1 : Math.max(0, 1 - (f - 110) / 8);
+}
+
+document.fonts.load(`${CFG.fontSize}px "Archivo Black"`, CFG.text).then(() => {
+  if (q.has('t')) render(Math.floor(+q.get('t') * FPS) % LOOP);
+  else { const t0 = performance.now(); (function g(now){ render(Math.floor((now - t0) / 1000 * FPS) % LOOP); requestAnimationFrame(g); })(t0); }
+});
+</script>
+</body>
+</html>

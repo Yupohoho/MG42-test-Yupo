@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>TL23 Two-Tone Caption</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@900&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #all { position:absolute; left:0; top:0; width:0; height:0; }
+  .w { position:absolute; left:0; top:0; width:0; height:0; }
+  .w svg { position:absolute; left:0; top:0; width:1px; height:1px; overflow:visible; }
+</style>
+</head>
+<body>
+<div id="card"><div id="all"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#f4f0e6',
+  // 三段字：文字、中心 x、字級、顏色（中間的重點字大一號、換色）
+  parts: [
+    { text: '今日は', cx: 83,    size: 29, color: '#141414', dy: 2 },
+    { text: '最高',   cx: 178.5, size: 45, color: '#00604f', key: true },
+    { text: 'の日',   cx: 254,   size: 29, color: '#141414', dy: 2 },   // dy：微調底線，讓不同字級的字墨跡底部對齊
+  ],
+  halo: '#ffffff', haloW: 2.5,        // 字外的白色光暈（描邊）
+  baseline: 72,                       // 三段字共用的底線（底部對齊：大字比小字高，但底部齊平）
+  keyAbove: 17,                       // 重點字的字心在底線上方多少 px（脈動時以字心為支點）
+  // 入場：第 4 幀起由淡到實，同時由下往上微升（逐幀值）
+  inFrom: 4, inOpacity: [.21,.36,.53,.65,.78,.83,.9,1.0], inRise: [7,5,4,3,2,1,1,0],
+  // 重點字脈動：第 15→20 幀放大到約 1.105 倍，停到第 24 幀，第 25→30 幀縮回（以字中心為準）
+  pulseFrom: 15, pulse: [1.0,1.023,1.045,1.07,1.09,1.105,1.105,1.105,1.105,1.105,1.1,1.09,1.07,1.047,1.02,1.0],
+  // 淡出：第 54–57 幀逐步變淡，第 58 幀消失
+  fade: [.89,.63,.34,.2], fadeFrom: 54,
+  loopFrames: 59,          // 一輪 59 幀（約 1.97 秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), all = document.getElementById('all');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+all.style.top = CFG.baseline+'px';
+const NS = 'http://www.w3.org/2000/svg';
+const groups = CFG.parts.map(p => {
+  const g = document.createElement('div'); g.className = 'w'; g.style.left = p.cx+'px'; g.style.top = (p.dy || 0)+'px';
+  const svg = document.createElementNS(NS, 'svg');
+  for (const [fill, sw] of [[CFG.halo, CFG.haloW*2], [p.color, 0]]) {
+    const tx = document.createElementNS(NS, 'text'); tx.textContent = p.text;
+    for (const [k, v] of Object.entries({ x: 0, y: 0, 'text-anchor': 'middle', 'dominant-baseline': 'alphabetic', 'font-family': "'Noto Sans JP',sans-serif", 'font-weight': 900,
+      'font-size': p.size, fill, stroke: sw ? fill : 'none', 'stroke-width': sw, 'stroke-linejoin': 'round', 'stroke-linecap': 'round', 'paint-order': 'stroke fill' })) tx.setAttribute(k, v);
+    svg.appendChild(tx);
+  }
+  g.appendChild(svg); all.appendChild(g); return { g, p };
+});
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  const k = f - CFG.inFrom;
+  let o = 0, dy = 0;
+  if (k >= 0) { const i = Math.min(k, CFG.inOpacity.length - 1); o = CFG.inOpacity[i]; dy = CFG.inRise[i]; }
+  if (f >= CFG.fadeFrom) o = f - CFG.fadeFrom < CFG.fade.length ? CFG.fade[f - CFG.fadeFrom] : 0;
+  all.style.opacity = o; all.style.transform = `translateY(${dy}px)`;
+  const pk = f - CFG.pulseFrom, s = (pk >= 0 && pk < CFG.pulse.length) ? CFG.pulse[pk] : 1;
+  for (const { g, p } of groups) g.style.transform = p.key ? `translateY(${-CFG.keyAbove}px) scale(${s}) translateY(${CFG.keyAbove}px)` : 'none';
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function r(now){ render((now - t0) / 1000); requestAnimationFrame(r); })(t0); }
+};
+document.fonts.load('900 45px "Noto Sans JP"', '今日は最高の日').then(start);
+</script>
+</body>
+</html>

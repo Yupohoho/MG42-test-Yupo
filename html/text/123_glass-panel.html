@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>123 Glass Panel</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#f6f4f2; }
+  /* ?z=2 放大觀看；?t=0.5 定格；?m=1 量測用（卡片貼左上） */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .blob { position:absolute; border-radius:50%; }
+  .glass { position:absolute; border-radius:10px; box-sizing:border-box;
+           background:rgba(255,255,255,.42); border:1px solid rgba(255,255,255,.85);
+           backdrop-filter:blur(9px); -webkit-backdrop-filter:blur(9px);
+           box-shadow:0 3px 10px rgba(40,40,60,.07); }
+  #title { position:absolute; left:0; width:100%; text-align:center; line-height:1; white-space:nowrap; }
+  #sub { position:absolute; left:0; width:100%; text-align:center; line-height:1; white-space:nowrap; }
+</style>
+</head>
+<body>
+<div id="card">
+  <div class="blob" id="bGold"></div>
+  <div class="blob" id="bDark"></div>
+  <div class="glass" id="pA"></div>
+  <div class="glass" id="pB"></div>
+  <div class="glass" id="pC"></div>
+  <div id="title"></div>
+  <div id="sub"></div>
+</div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 284, H: 158,
+  bg: '#f6f5f2',
+  ink: '#25252f',
+  accent: '#e8c97a',          // 後方金色光球
+  dark: '#2e313c',            // 後方深色光球
+  title: 'NEW',               // Montserrat 800
+  sub: 'GLASS OPENING',
+  size: 50.5,
+  // 三片玻璃最後的位置 [x, y, 寬, 高]
+  A: [16, 16, 136, 86], B: [142, 29, 128, 98], C: [46, 86, 198, 55],
+};
+// =================================
+const LOOP = 120;   // 幀（30fps）：玻璃與字約 1 秒到位，光球慢慢漂到約 2.8 秒，停住到 4 秒再重播
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), $ = id => document.getElementById(id);
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+Object.assign($('bGold').style, { width: '64px', height: '64px', background: CFG.accent, filter: 'blur(9px)' });
+Object.assign($('bDark').style, { width: '58px', height: '58px', background: CFG.dark, filter: 'blur(7px)' });
+['A', 'B', 'C'].forEach(k => { const [x, y, w, h] = CFG[k]; Object.assign($('p' + k).style, { left: x + 'px', top: y + 'px', width: w + 'px', height: h + 'px' }); });
+const title = $('title'), sub = $('sub');
+title.textContent = CFG.title; sub.textContent = CFG.sub;
+Object.assign(title.style, { font: `800 ${CFG.size}px Montserrat`, color: CFG.ink, top: '44px', left: '0px' });
+Object.assign(sub.style, { font: '500 7px "JetBrains Mono"', letterSpacing: '2px', color: '#55555c', top: '108px', paddingLeft: '2px' });
+
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const lerp = (a, b, k) => a + (b - a) * k;
+function tab(arr, s, f) { const i = f - s, n = arr.length - 1; if (i <= 0) return arr[0]; if (i >= n) return arr[n]; const k = Math.floor(i); return lerp(arr[k], arr[k + 1], i - k); }
+// 每 step 幀一個值的稀疏表（平滑內插）
+function key(arr, s, step, f) { const i = (f - s) / step, n = arr.length - 1; if (i <= 0) return arr[0]; if (i >= n) return arr[n]; const k = Math.floor(i), u = i - k, e = u * u * (3 - 2 * u); return lerp(arr[k], arr[k + 1], e); }
+
+// 量測值（我方幀 = 原片幀 + 4）
+const GOLD_X = [45,52,63,81,97,112,125,130,131], GOLD_Y = [66,63,60,57,55,53,51,49.5,49];   // 第 4 幀起每 10 幀
+const DARK_X = [205,200,196,200,202], DARK_Y = [138,124,101,82,78];                       // 第 4 幀起每 20 幀
+const A_DX = [-20,-15,-11,-8,-5,-3,-2,-1,0];          // 第 0 幀起每 2 幀
+const B_DX = [40,32,24,15,8,3,0];                     // 第 0 幀起每 2 幀
+const C_DY = [55,44,34,24,15,10,6,3,1,0];             // 第 0 幀起每 2 幀
+const T_OP = [0,.3,.38,.44,.5,.58,.65,.72,.8,.84,.88,.9,.93,.95,.97,.99,1];   // 第 8 幀起
+const T_DY = [11,9,7,5,4,3,2.5,2,1.5,1,.8,.6,.4,.3,.2,.1,0];                // 第 9 幀起
+
+function render(t) {
+  const f = t * 30;
+  const gx = key(GOLD_X, 4, 10, f), gy = key(GOLD_Y, 4, 10, f);
+  $('bGold').style.transform = `translate(${gx - 32}px,${gy - 32}px)`;
+  const dx = key(DARK_X, 4, 20, f), dy = key(DARK_Y, 4, 20, f);
+  $('bDark').style.transform = `translate(${dx - 29}px,${dy - 29}px)`;
+  const op = clamp(f / 4);
+  $('pA').style.transform = `translateX(${tab(A_DX, 0, f / 2)}px)`;
+  $('pB').style.transform = `translateX(${tab(B_DX, 0, f / 2)}px)`;
+  $('pC').style.transform = `translateY(${tab(C_DY, 0, f / 2)}px)`;
+  $('pA').style.opacity = $('pB').style.opacity = $('pC').style.opacity = op;
+  title.style.opacity = tab(T_OP, 8, f);
+  title.style.transform = `translateY(${tab(T_DY, 9, f)}px)`;
+  const s = clamp((f - 23) / 11); sub.style.opacity = s * s * (3 - 2 * s);
+}
+
+Promise.all([
+  document.fonts.load(`800 ${CFG.size}px Montserrat`, CFG.title),
+  document.fonts.load('500 7px "JetBrains Mono"', CFG.sub),
+]).then(() => {
+  if (q.has('t')) render((+q.get('t') * 30 % LOOP) / 30);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000 * 30 % LOOP) / 30); requestAnimationFrame(f); })(t0); }
+});
+</script>
+</body>
+</html>

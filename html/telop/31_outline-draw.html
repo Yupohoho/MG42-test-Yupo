@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>TL31 Outline Draw</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #sub { position:absolute; left:0; top:0; width:0; height:0; }
+  #sub svg { position:absolute; left:0; top:0; width:1px; height:1px; overflow:visible; }
+</style>
+</head>
+<body>
+<div id="card"><div id="sub"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '線画',
+  W: 324, H: 106,
+  bg: '#f4f0e6',
+  paper: '#fffbf1',        // 描線階段字裡面的底色（米白）
+  fill: '#bf9fff',         // 之後填入的顏色（紫）
+  line: '#141414', lineW: 2.1,   // 描線色與寬度（圓角連接）
+  fontSize: 51, cx: 163, cy: 52.5,
+  // 描線：第 6–22 幀沿著每個字的輪廓逐步畫出（每個筆畫輪廓各自從起點開始畫；數值是 dash 畫到的比例，已依「黑線像素量隨時間成長」的曲線校準，到 0.5 時所有輪廓都畫完）；
+  // dash 長度 L（px）要比最長的輪廓長；短的輪廓（點、小筆畫）會先畫完，長輪廓慢慢畫
+  dashL: 520, drawFrom: 6,
+  draw: [.0007,.0031,.0082,.0164,.028,.0396,.0572,.0787,.104,.1564,.188,.232,.2906,.3728,.429,.477,.5],
+  // 上色：第 36–42 幀紫色快速填入（不透明度）；黑色描線顏色不變、一直蓋在紫色上面不受上色影響，只是第 33–43 幀線寬從 2.1px 細到 0.6px
+  lineThin: { from: 33, to: 43, w: 0.6 },
+  fillFrom: 36, fillOpacity: [0,.2,.68,.85,.95,.97,.98,1.0],
+  // 收尾：第 54–56 幀整組逐步變淡，第 57 幀起空白
+  fade: [.95,.62,.3], fadeFrom: 54,
+  loopFrames: 59,          // 一輪 59 幀（約 1.97 秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), sub = document.getElementById('sub');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+sub.style.left = CFG.cx+'px'; sub.style.top = CFG.cy+'px';
+const NS = 'http://www.w3.org/2000/svg';
+const svg = document.createElementNS(NS, 'svg');
+const mk = (extra) => {
+  const tx = document.createElementNS(NS, 'text'); tx.textContent = CFG.text;
+  for (const [k, v] of Object.entries(Object.assign({ x: 0, y: 0, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-family': "'Dela Gothic One',sans-serif", 'font-size': CFG.fontSize }, extra))) tx.setAttribute(k, v);
+  svg.appendChild(tx); return tx;
+};
+const paper = mk({ fill: CFG.paper, stroke: 'none' });
+const purple = mk({ fill: CFG.fill, stroke: 'none' });
+const line = mk({ fill: 'none', stroke: CFG.line, 'stroke-width': CFG.lineW, 'stroke-linejoin': 'round', 'stroke-linecap': 'round', 'stroke-dasharray': `${CFG.dashL} ${CFG.dashL}` });
+sub.appendChild(svg);
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  let g = f >= CFG.fadeFrom ? (f - CFG.fadeFrom < CFG.fade.length ? CFG.fade[f - CFG.fadeFrom] : 0) : 1;
+  const d = f - CFG.drawFrom;
+  const p = d < 0 ? 0 : d < CFG.draw.length ? CFG.draw[d] : 1;
+  line.setAttribute('stroke-dashoffset', (CFG.dashL * (1 - p)).toFixed(1));
+  line.setAttribute('stroke-opacity', p > 0 ? 1 : 0);
+  const th = CFG.lineThin, u = Math.max(0, Math.min(1, (f - th.from) / (th.to - th.from)));
+  line.setAttribute('stroke-width', (CFG.lineW + (th.w - CFG.lineW) * u).toFixed(2));
+  paper.setAttribute('fill-opacity', p > 0 ? 1 : 0);
+  line.setAttribute('stroke-opacity', p > 0 ? 1 : 0);
+  const k = f - CFG.fillFrom;
+  purple.setAttribute('fill-opacity', k < 0 ? 0 : (k < CFG.fillOpacity.length ? CFG.fillOpacity[k] : 1));
+  sub.style.opacity = g;
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function r(now){ render((now - t0) / 1000); requestAnimationFrame(r); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "Dela Gothic One"`, CFG.text).then(start);
+</script>
+</body>
+</html>

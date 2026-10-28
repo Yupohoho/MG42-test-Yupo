@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>09 Huge Text Scroll</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Noto+Sans+JP:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .track { position:absolute; left:0; display:flex; white-space:nowrap; line-height:1; }
+  .unit { display:flex; align-items:center; flex:none; }
+</style>
+</head>
+<body>
+<div id="card"><div class="track" id="big"></div><div class="track" id="small"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#14161c',
+  big:   { text: '東京夜行', sep: '・', sepW: 45, font: 'Dela Gothic One', weight: 400, size: 75, color: '#f3eee4', y: .49, x0: 5 },
+  small: { text: '東京夜行', sep: '・', sepW: 22, font: 'Noto Sans JP', weight: 700, size: 11, color: '#f6c31c', y: .935, spacing: 2, speed: 120 },  // speed：正 = 往右（px/秒）
+  cycle: 2.0,   // 大字每個循環移動一組（文字＋分隔點）的寬度，ease-in-out
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+
+function buildTrack(el, c, copies) {
+  el.innerHTML = '';
+  for (let i = 0; i < copies; i++) {
+    const u = document.createElement('div'); u.className = 'unit';
+    u.innerHTML = `<span>${c.text}</span><span style="display:inline-block;width:${c.sepW}px;text-align:center">${c.sep}</span>`;
+    Object.assign(u.style, { fontFamily: `'${c.font}'`, fontWeight: c.weight, fontSize: c.size+'px', color: c.color, letterSpacing: (c.spacing || 0)+'px' });
+    el.appendChild(u);
+  }
+  el.style.top = (c.y * CFG.H - c.size / 2) + 'px';
+  return el.firstChild.offsetWidth;
+}
+
+let UB, US;
+const easeInOut = k => (1 - Math.cos(Math.PI * k)) / 2;
+function render(t) {
+  // 大字：每個循環從靜止加速再減速，剛好移動一組寬度，接回下一組（無縫）
+  const k = (t % CFG.cycle) / CFG.cycle;
+  big.style.transform = `translateX(${CFG.big.x0 - UB - UB * easeInOut(k)}px)`;
+  // 小字帶：等速往反方向流
+  const off = ((CFG.small.speed * t) % US + US) % US;
+  small.style.transform = `translateX(${off - US}px)`;
+}
+
+const big = document.getElementById('big'), small = document.getElementById('small');
+Promise.all([
+  document.fonts.load(`${CFG.big.weight} ${CFG.big.size}px "${CFG.big.font}"`, CFG.big.text + CFG.big.sep),
+  document.fonts.load(`${CFG.small.weight} ${CFG.small.size}px "${CFG.small.font}"`, CFG.small.text + CFG.small.sep),
+]).then(() => {
+  UB = buildTrack(big, CFG.big, 1);
+  UB = buildTrack(big, CFG.big, Math.ceil(CFG.W / UB) + 3);
+  US = buildTrack(small, CFG.small, 1);
+  US = buildTrack(small, CFG.small, Math.ceil(CFG.W / US) + 2);
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+});
+</script>
+</body>
+</html>

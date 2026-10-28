@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>12 Diagonal Text Bands</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Noto+Serif+JP:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #tilt { position:absolute; left:50%; top:50%; width:0; height:0; }
+  .band { position:absolute; overflow:hidden; display:flex; align-items:center; }
+  .track { display:flex; white-space:nowrap; line-height:1; flex:none; }
+  .unit { flex:none; display:flex; justify-content:flex-start; }
+</style>
+</head>
+<body>
+<div id="card"><div id="tilt"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#14161c',
+  angle: -12.2,          // 帶子傾斜角度（負 = 往右上）
+  bandLen: 520,          // 帶子長度（要比畫面對角線長）
+  // cy = 帶子中心距畫面中心的垂直距離（傾斜前）；h = 帶子厚度；unit = 一組字（含間隔）寬；speed = 沿帶子方向的速度（正 = 往右上）
+  bands: [
+    { text: '夜明け前', bg: '#f7c21f', color: '#151515', font: 'Dela Gothic One', weight: 400, size: 27, cy: -32, h: 38, unit: 145, speed:  62, x0: 68},
+    { text: '夜明け前', bg: '#f3efe6', color: '#151515', font: 'Noto Serif JP',   weight: 700, size: 29, cy:   6, h: 36, unit: 147, speed: -62, x0: 50 },
+    { text: '夜明け前', bg: '#f7c21f', color: '#151515', font: 'Dela Gothic One', weight: 400, size: 27, cy:  41, h: 33, unit: 145, speed:  62, x0: 68 },
+  ],
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+const tilt = document.getElementById('tilt');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+tilt.style.transform = `rotate(${CFG.angle}deg)`;
+
+const tracks = CFG.bands.map(b => {
+  const band = document.createElement('div'); band.className = 'band';
+  Object.assign(band.style, { left: -CFG.bandLen/2+'px', width: CFG.bandLen+'px', top: (b.cy - b.h/2)+'px', height: b.h+'px', background: b.bg });
+  const tr = document.createElement('div'); tr.className = 'track';
+  const copies = Math.ceil(CFG.bandLen / b.unit) + 2;
+  for (let i = 0; i < copies; i++) {
+    const u = document.createElement('div'); u.className = 'unit'; u.textContent = b.text;
+    Object.assign(u.style, { width: b.unit+'px', fontFamily: `'${b.font}'`, fontWeight: b.weight, fontSize: b.size+'px', color: b.color });
+    tr.appendChild(u);
+  }
+  band.appendChild(tr); tilt.appendChild(band); return tr;
+});
+
+function render(t) {
+  CFG.bands.forEach((b, i) => {
+    // 沿帶子等速流動，以一組寬度取模無縫循環；相鄰帶子方向相反
+    const off = (((b.x0 + b.speed * t) % b.unit) + b.unit) % b.unit;
+    tracks[i].style.transform = `translateX(${off - b.unit}px)`;
+  });
+}
+
+Promise.all(CFG.bands.map(b => document.fonts.load(`${b.weight} ${b.size}px "${b.font}"`, b.text))).then(() => {
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+});
+</script>
+</body>
+</html>

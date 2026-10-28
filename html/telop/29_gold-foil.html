@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>TL29 Gold Foil</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@900&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #txt { position:absolute; white-space:nowrap; line-height:1; font-family:'Noto Serif JP',serif; font-weight:900;
+         -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; color:transparent; }
+</style>
+</head>
+<body>
+<div id="card"><div id="txt"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '祝典',
+  W: 324, H: 106,
+  bg: '#14181e',
+  fontSize: 68, cx: 164, cy: 55,
+  // 金箔的亮度流動：字由左到右分成 8 段，每隔 2 幀量一次各段亮度（第 16–52 幀）。
+  // 一道亮帶由左往右掃過（約第 24→44 幀），掃過後左邊慢慢退回暗銅色、右邊留下淡金；
+  // 第 16 幀以前沿用第 16 幀的形狀，依入場曲線由暗到亮；第 52 幀起固定不動
+  segX0: 92, segW: 18,                 // 第 1 段的左緣 x、每段寬度（畫面 px）
+  lum: {
+    16: [158,147,144,133,124,116,113,105], 18: [167,154,148,136,129,120,117,110], 20: [176,161,152,140,132,123,120,113],
+    22: [185,173,162,146,137,128,126,118], 24: [197,185,172,153,140,132,131,122], 26: [197,195,190,167,150,138,137,130],
+    28: [187,192,204,180,158,143,144,135], 30: [175,179,203,198,178,157,152,143], 32: [161,165,191,196,197,172,160,150],
+    34: [153,155,178,183,205,186,176,163], 36: [143,146,165,173,203,195,193,176], 38: [136,140,158,162,192,189,201,189],
+    40: [130,133,149,151,179,183,204,200], 42: [126,129,146,151,170,176,200,201], 44: [120,123,141,147,160,169,195,199],
+    46: [116,120,138,144,158,164,190,198], 48: [114,118,135,140,155,160,185,196], 50: [113,117,134,139,154,160,185,195],
+    52: [113,116,133,138,152,160,183,193],
+  },
+  // 亮度 → 金色（暗銅 #917a49 對應亮度 113，淡金 #d5c8a8 對應亮度 194，往兩邊延伸）
+  ramp: { L0: 105, rgb0: [145,122,73], k: [.84,.96,1.17] },
+  // 入場：第 4–16 幀由暗到亮（相對第 16 幀的亮度比例）
+  inFrom: 4, inScale: [.16,.3,.4,.52,.61,.69,.73,.82,.83,.85,.86,.88,.89],
+  // 收尾：第 54–58 幀逐步變暗消失，第 59 幀（下一輪第 0 幀）起空白
+  fade: [.76,.54,.31,.19,.04], fadeFrom: 54,
+  loopFrames: 59,          // 一輪 59 幀（約 1.97 秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), txt = document.getElementById('txt');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+txt.textContent = CFG.text; txt.style.fontSize = CFG.fontSize+'px';
+let boxW = 0, boxL = 0;
+function place() { boxW = txt.offsetWidth; boxL = CFG.cx - boxW/2; txt.style.left = boxL+'px'; txt.style.top = (CFG.cy - txt.offsetHeight/2)+'px'; }
+const keys = Object.keys(CFG.lum).map(Number).sort((a, b) => a - b);
+function profile(f) {
+  if (f <= keys[0]) { const s = f < CFG.inFrom ? 0 : CFG.inScale[Math.min(CFG.inScale.length - 1, f - CFG.inFrom)] / CFG.inScale[CFG.inScale.length - 1]; return CFG.lum[keys[0]].map(v => v * s); }
+  if (f >= keys[keys.length - 1]) return CFG.lum[keys[keys.length - 1]];
+  let i = 1; while (keys[i] < f) i++;
+  const a = keys[i - 1], b = keys[i], u = (f - a) / (b - a);
+  return CFG.lum[a].map((v, j) => v + (CFG.lum[b][j] - v) * u);
+}
+const rgb = L => { const r = CFG.ramp, d = L - r.L0; return `rgb(${[0, 1, 2].map(i => Math.max(0, Math.min(255, Math.round(r.rgb0[i] + r.k[i] * d)))).join(',')})`; };
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  let o = f < CFG.inFrom ? 0 : 1;
+  if (f >= CFG.fadeFrom) o = f - CFG.fadeFrom < CFG.fade.length ? CFG.fade[f - CFG.fadeFrom] : 0;
+  const L = profile(f);
+  const stops = L.map((v, i) => `${rgb(v)} ${(CFG.segX0 + CFG.segW * (i + .5) - boxL).toFixed(1)}px`).join(',');
+  txt.style.backgroundImage = `linear-gradient(90deg, ${stops})`; txt.style.opacity = o;
+}
+
+const start = () => {
+  place();
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function r(now){ render((now - t0) / 1000); requestAnimationFrame(r); })(t0); }
+};
+document.fonts.load(`900 ${CFG.fontSize}px "Noto Serif JP"`, CFG.text).then(start);
+</script>
+</body>
+</html>

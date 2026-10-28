@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>13 Text Ribbon</title>
+<link href="https://fonts.googleapis.com/css2?family=Reggae+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  svg { position:absolute; inset:0; }
+</style>
+</head>
+<body>
+<div id="card"><svg id="svg"></svg></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#14161c',
+  text: '波に乗れ', sep: ' ・ ',
+  font: 'Reggae One', size: 24, color: '#ffffff',
+  // 路徑：量自原版的點（x, y），用平滑曲線串起來；路徑本身固定不動
+  points: [[-160,80],[-80,58],[0,37],[30,31],[60,29],[90,31],[120,38],[140,46],[160,60],[180,73],[200,81],[220,87],[250,91],[290,90],[324,86],[400,70],[480,52]],
+  ribbon: { width: 22, color: 'rgba(255,255,255,.22)', drop: 5 },   // drop = 緞帶相對文字路徑往下偏移
+  textLift: -5,       // 文字中心相對路徑的位移（負 = 往上），字騎在緞帶上緣
+  speed: 60,          // 文字沿路徑流動速度（px/秒，正 = 往右）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+const svg = document.getElementById('svg');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+svg.setAttribute('width', CFG.W); svg.setAttribute('height', CFG.H);
+
+const NS = 'http://www.w3.org/2000/svg';
+// Catmull-Rom 轉成三次貝茲曲線，讓曲線通過每個量測點
+const P = CFG.points;
+let d = `M${P[0][0]} ${P[0][1]}`;
+for (let i = 0; i < P.length - 1; i++) {
+  const p0 = P[Math.max(0, i-1)], p1 = P[i], p2 = P[i+1], p3 = P[Math.min(P.length-1, i+2)];
+  const c1 = [p1[0] + (p2[0]-p0[0])/6, p1[1] + (p2[1]-p0[1])/6], c2 = [p2[0] - (p3[0]-p1[0])/6, p2[1] - (p3[1]-p1[1])/6];
+  d += ` C${c1[0].toFixed(1)} ${c1[1].toFixed(1)} ${c2[0].toFixed(1)} ${c2[1].toFixed(1)} ${p2[0]} ${p2[1]}`;
+}
+svg.innerHTML = `
+  <path id="wave" d="${d}" fill="none" stroke="${CFG.ribbon.color}" stroke-width="${CFG.ribbon.width}" stroke-linecap="round" transform="translate(0 ${CFG.ribbon.drop})"/>
+  <text id="t" font-family="${CFG.font}" font-size="${CFG.size}" fill="${CFG.color}" dy="${CFG.textLift}" dominant-baseline="central"><textPath id="tp" href="#wave"></textPath></text>`;
+const tp = document.getElementById('tp');
+const path = document.getElementById('wave');
+let U = 0, lead = 0;
+
+function render(t) {
+  // 文字沿路徑等速前進；以一組字的長度取模，無縫循環
+  const off = ((CFG.speed * t) % U + U) % U;
+  tp.setAttribute('startOffset', (lead + off - U).toFixed(2));
+}
+
+document.fonts.load(`${CFG.size}px "${CFG.font}"`, CFG.text + CFG.sep).then(() => {
+  // 量一組字的長度，再鋪滿整條路徑
+  tp.textContent = CFG.text + CFG.sep;
+  U = document.getElementById('t').getComputedTextLength();
+  const n = Math.ceil(path.getTotalLength() / U) + 2;
+  tp.textContent = (CFG.text + CFG.sep).repeat(n);
+  lead = 0;
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>02 Letter Sequence</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格在第 0.5 秒 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #char { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+          font-family:'Dela Gothic One','Noto Sans JP',sans-serif; line-height:1; }
+</style>
+</head>
+<body>
+<div id="card"><div id="char"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  chars: ['止', 'ま', 'る', 'な'],
+  colors: ['#121212', '#f6efe4'],   // 字色依序交替
+  bg: '#ff4d4d',
+  W: 324, H: 106,
+  fontSize: 94,
+  perChar: 0.5,                     // 每字秒數
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+const ch = document.getElementById('char');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+ch.style.fontSize = CFG.fontSize + 'px';
+const LOOP = CFG.chars.length * CFG.perChar;
+
+// 每字開頭的幀序列（30fps）：空白 2 幀 → 1.35 倍、偏下、半透明 → 1.05 倍 → 1.0 定位
+const F = 1/30;
+function charState(lt) {
+  if (lt < 2*F) return { s: 1, y: 0, o: 0, b: 0 };
+  if (lt < 3*F) return { s: 1.35, y: .07, o: .72, b: 1 };
+  if (lt < 4*F) return { s: 1.05, y: 0, o: 1, b: 0 };
+  return { s: 1, y: 0, o: 1, b: 0 };
+}
+
+function render(t) {
+  const i = Math.floor(t / CFG.perChar) % CFG.chars.length;
+  const st = charState(t - i * CFG.perChar);
+  ch.textContent = CFG.chars[i];
+  ch.style.color = CFG.colors[i % CFG.colors.length];
+  ch.style.transform = `translateY(${st.y * CFG.H}px) scale(${st.s})`;
+  ch.style.opacity = st.o;
+  ch.style.filter = st.b ? `blur(${st.b}px)` : '';
+}
+
+if (q.has('t')) render(+q.get('t') % LOOP);
+else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % LOOP); requestAnimationFrame(f); })(t0); }
+</script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>04 Punch Zoom</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .w { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; line-height:1;
+       font-family:'Dela Gothic One','Noto Sans JP',sans-serif; }
+</style>
+</head>
+<body>
+<div id="card"></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '突破',
+  W: 324, H: 106,
+  bg: '#14161c',
+  color: '#f3eee4',
+  fontSize: 76,
+  zoomAt: 0.28,                // 開始衝入的時間
+  exitStart: 1.55, exitEnd: 1.75,
+  loop: 2.0,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+
+// 主字 + 2 層殘影（殘影 = 落後 1、2 幀的同一個字）
+const GHOSTS = [{ lag: 0, o: 1 }, { lag: 1, o: .35 }, { lag: 2, o: .15 }];
+const els = GHOSTS.map((g, i) => {
+  const d = document.createElement('div'); d.className = 'w'; d.textContent = CFG.text;
+  Object.assign(d.style, { fontSize: CFG.fontSize+'px', color: CFG.color, zIndex: 10 - i });
+  card.appendChild(d); return d;
+});
+
+// 衝入曲線（30fps）：每幀約放大一倍，由暗到亮
+const F = 1/30;
+const ZOOM = [[0, .1, .25], [1, .2, .35], [2, .4, .5], [3, .7, .75], [4, .95, 1], [5, .97, 1], [7, 1, 1]]
+  .map(([f, s, b]) => [f*F, s, b]);
+function zoomState(dt) {
+  if (dt < 0) return null;
+  for (let i = 1; i < ZOOM.length; i++) if (dt < ZOOM[i][0]) {
+    const [t0, s0, b0] = ZOOM[i-1], [t1, s1, b1] = ZOOM[i], k = (dt - t0) / (t1 - t0);
+    return { s: s0 + (s1 - s0) * k, b: b0 + (b1 - b0) * k };
+  }
+  return { s: 1, b: 1 };
+}
+
+function render(t) {
+  const exit = t < CFG.exitStart ? 1 : Math.max(0, 1 - (t - CFG.exitStart) / (CFG.exitEnd - CFG.exitStart));
+  GHOSTS.forEach((g, i) => {
+    const el = els[i], dt = t - CFG.zoomAt - g.lag * F;
+    const st = zoomState(dt);
+    // 殘影只在衝入期間出現，落定後消失
+    const show = st && (g.lag === 0 || (t - CFG.zoomAt) < 6*F);
+    if (!show) { el.style.opacity = 0; return; }
+    el.style.transform = `scale(${st.s})`;
+    el.style.opacity = g.o * exit;
+    el.style.filter = `brightness(${st.b * (.4 + .6*exit)})` + (st.s < .95 ? ' blur(.6px)' : '');
+  });
+}
+
+if (q.has('t')) render(+q.get('t') % CFG.loop);
+else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(f); })(t0); }
+</script>
+</body>
+</html>

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>TL33 Mincho Title</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@600&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .rule { position:absolute; height:2px; }
+  #txt { position:absolute; white-space:nowrap; line-height:1; font-family:'Noto Serif JP',serif; font-weight:600; }
+</style>
+</head>
+<body>
+<div id="card"><div id="r1" class="rule"></div><div id="r2" class="rule"></div><div id="txt"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '余白の美',
+  W: 324, H: 106,
+  bg: '#14181e',
+  color: '#ebebe6',        // 字色（米白）
+  rule: '#615850',         // 上下兩條細線（暗金色）
+  cx: 163, ruleY: [28, 79],// 兩條線的垂直位置（各約 2px 高）
+  fontSize: 36, cy: 55,
+  // 兩條細線從第 4 幀起由中心向左右展開（寬度 px），最後寬約 201px
+  ruleFrom: 4, ruleW: [41,76,104,127,146,161,173,182,188,192,195,197,199,200,201],
+  // 字：第 11 幀起由淡到實（約 27 幀慢慢到位），同時字距由寬收緊（總寬約 203 → 191px）
+  textFrom: 11,
+  opacity: [.30,.36,.43,.48,.55,.61,.65,.70,.73,.78,.80,.84,.87,.91,.92,.94,.96,.97,.98,.99,1.0],   // 每 1 幀，第 11–31 幀
+  spaceStart: 19.7, spaceEnd: 15.7, spaceFrames: 22,   // 字距（px）：第 11 幀 19.7，約第 33 幀收到 15.7
+  // 收尾：第 54–58 幀整組（字與線）逐步變淡，第 59 幀起空白
+  fade: [.84,.6,.34,.2,.04], fadeFrom: 54,
+  loopFrames: 59,          // 一輪 59 幀（約 1.97 秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), txt = document.getElementById('txt');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const rules = [document.getElementById('r1'), document.getElementById('r2')];
+rules.forEach((r, i) => Object.assign(r.style, { background: CFG.rule, top: CFG.ruleY[i]+'px' }));
+txt.textContent = CFG.text; Object.assign(txt.style, { color: CFG.color, fontSize: CFG.fontSize+'px' });
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  let g = 1;
+  if (f >= CFG.fadeFrom) g = f - CFG.fadeFrom < CFG.fade.length ? CFG.fade[f - CFG.fadeFrom] : 0;
+  // 線
+  const a = f - CFG.ruleFrom;
+  const w = a < 0 ? 0 : a < CFG.ruleW.length ? CFG.ruleW[a] : CFG.ruleW[CFG.ruleW.length - 1];
+  for (const r of rules) { r.style.width = w+'px'; r.style.left = (CFG.cx - w/2)+'px'; r.style.opacity = w > 0 ? g : 0; }
+  // 字
+  const k = f - CFG.textFrom;
+  const o = k < 0 ? 0 : k < CFG.opacity.length ? CFG.opacity[k] : 1;
+  const sp = k < 0 ? CFG.spaceStart : CFG.spaceStart + (CFG.spaceEnd - CFG.spaceStart) * Math.min(1, k / CFG.spaceFrames);
+  txt.style.letterSpacing = sp+'px';
+  txt.style.left = (CFG.cx - txt.offsetWidth/2 + sp/2)+'px'; txt.style.top = (CFG.cy - txt.offsetHeight/2)+'px';
+  txt.style.opacity = o * g;
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function r(now){ render((now - t0) / 1000); requestAnimationFrame(r); })(t0); }
+};
+document.fonts.load(`600 ${CFG.fontSize}px "Noto Serif JP"`, CFG.text).then(start);
+</script>
+</body>
+</html>

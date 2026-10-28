@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>TL25 Neon Glow</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@900&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #txt { position:absolute; white-space:nowrap; line-height:1; font-family:'Noto Sans JP',sans-serif; font-weight:900; }
+</style>
+</head>
+<body>
+<div id="card"><div id="txt"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '夜営業',
+  W: 324, H: 106,
+  bg: '#14181e',
+  color: '#fffcff',        // 字色（偏白）
+  // 霓虹光暈：由內而外三層（白、淡紫、紫）
+  glow: '0 0 4px #ffffff, 0 0 10px #d9ccff, 0 0 20px #a78bfa, 0 0 34px #7c5cff',
+  fontSize: 53, cx: 163.5, cy: 54.5,
+  // 亮度（0 = 全暗，1 = 全亮），逐幀；第 4 幀起：
+  //   第 4 幀 0.67（剛通電），第 5–9 幀全亮，第 10–11 幀閃暗（0.43、0.51），第 12–18 幀全亮，
+  //   第 19–20 幀再閃暗（0.58、0.63），第 21 幀起全亮直到第 52 幀
+  inFrom: 4, level: [.67,1,1,1,1,1,.43,.51,1,1,1,1,1,1,1,.58,.63],
+  // 熄滅：第 53–58 幀亮度逐步降到 0，第 59 幀（下一輪第 0 幀）起空白
+  fade: [.995,.8,.56,.33,.18,.06], fadeFrom: 53,
+  loopFrames: 59,          // 一輪 59 幀（約 1.97 秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), txt = document.getElementById('txt');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+txt.textContent = CFG.text;
+Object.assign(txt.style, { color: CFG.color, fontSize: CFG.fontSize+'px', textShadow: CFG.glow });
+function place() { txt.style.left = (CFG.cx - txt.offsetWidth/2)+'px'; txt.style.top = (CFG.cy - txt.offsetHeight/2)+'px'; }
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  const k = f - CFG.inFrom;
+  let o = 0;
+  if (k >= 0) o = k < CFG.level.length ? CFG.level[k] : 1;
+  if (f >= CFG.fadeFrom) o = f - CFG.fadeFrom < CFG.fade.length ? CFG.fade[f - CFG.fadeFrom] : 0;
+  txt.style.opacity = o;
+}
+
+const start = () => {
+  place();
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function r(now){ render((now - t0) / 1000); requestAnimationFrame(r); })(t0); }
+};
+document.fonts.load(`900 ${CFG.fontSize}px "Noto Sans JP"`, CFG.text).then(start);
+</script>
+</body>
+</html>

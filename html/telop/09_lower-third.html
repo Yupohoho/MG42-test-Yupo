@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>TL09 Lower Third</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@700;900&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #card > div { position:absolute; white-space:nowrap; line-height:1; font-family:'Noto Sans JP',sans-serif; }
+  #name { font-weight:900; }
+  #sub { font-weight:700; }
+</style>
+</head>
+<body>
+<div id="card"><div id="panel"></div><div id="bar"></div><div id="name"></div><div id="sub"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#14181e',
+  panel: { x: 21, y: 55, w: 200, h: 38, color: '#0e0f14' },   // 底板（終點位置）
+  bar:   { x: 21, w: 7, color: '#ffd345' },                   // 左側色條（高度同底板）
+  name:  { text: '山田 太郎',   x: 35.5, cy: 69.5, size: 20, color: '#fdffff' },   // 人名（左緣、垂直中心）
+  sub:   { text: 'ナレーター', x: 37.5, cy: 85.5, size: 10.7, color: '#ffd345' },   // 職稱
+  // 滑入：底板從畫面左邊先快後慢滑到定位。每幀的位置偏移（px，往左），從第 4 幀起；人名、職稱沿用同一條曲線但晚幾幀
+  slide: [-157,-108,-70,-46,-29,-15,-5,-2,0], slideFrom: 4,
+  nameDelay: 3,            // 人名比底板晚 3 幀
+  subDelay: 5,             // 職稱比底板晚 5 幀（等於比人名再晚 2 幀）
+  barFrom: 11, barSlide: [-13,-8,-4,-2,0],   // 色條第 11 幀才出現，只滑 13px
+  // 淡出：第 53–57 幀整組逐步變淡，第 58 幀消失
+  fade: [.93,.85,.55,.35,.15], fadeFrom: 53,
+  loopFrames: 59,          // 一輪 59 幀（約 1.97 秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const E = { panel: document.getElementById('panel'), bar: document.getElementById('bar'), name: document.getElementById('name'), sub: document.getElementById('sub') };
+const P = CFG.panel;
+Object.assign(E.panel.style, { left: P.x+'px', top: P.y+'px', width: P.w+'px', height: P.h+'px', background: P.color });
+Object.assign(E.bar.style, { left: CFG.bar.x+'px', top: P.y+'px', width: CFG.bar.w+'px', height: P.h+'px', background: CFG.bar.color });
+for (const k of ['name', 'sub']) {
+  const c = CFG[k]; E[k].textContent = c.text;
+  Object.assign(E[k].style, { left: c.x+'px', fontSize: c.size+'px', color: c.color });
+}
+const move = (f, from, list) => { const k = f - from; return k < 0 ? null : k >= list.length ? 0 : list[k]; };   // null = 還沒出現
+// 字的垂直置中要等字型載入後才量得到高度
+function place() { for (const k of ['name', 'sub']) E[k].style.top = (CFG[k].cy - E[k].offsetHeight/2) + 'px'; }
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  let o = 1;
+  if (f < CFG.slideFrom || f >= CFG.fadeFrom + CFG.fade.length) o = 0;
+  else if (f >= CFG.fadeFrom) o = CFG.fade[f - CFG.fadeFrom];
+  const set = (el, dx) => { el.style.opacity = dx === null ? 0 : o; el.style.transform = `translateX(${dx || 0}px)`; };
+  set(E.panel, move(f, CFG.slideFrom, CFG.slide));
+  set(E.name,  move(f, CFG.slideFrom + CFG.nameDelay, CFG.slide));
+  set(E.sub,   move(f, CFG.slideFrom + CFG.subDelay, CFG.slide));
+  set(E.bar,   move(f, CFG.barFrom, CFG.barSlide));
+}
+
+const start = () => {
+  place();
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function r(now){ render((now - t0) / 1000); requestAnimationFrame(r); })(t0); }
+};
+Promise.all([
+  document.fonts.load('900 20px "Noto Sans JP"', CFG.name.text),
+  document.fonts.load('700 11px "Noto Sans JP"', CFG.sub.text),
+]).then(start);
+</script>
+</body>
+</html>

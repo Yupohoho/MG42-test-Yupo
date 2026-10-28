@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>TL15 Speech Bubble</title>
+<link href="https://fonts.googleapis.com/css2?family=Yusei+Magic&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #grp { position:absolute; left:0; top:0; width:0; height:0; }
+  #grp svg { position:absolute; overflow:visible; }
+  #txt { position:absolute; white-space:nowrap; line-height:1; font-family:'Yusei Magic',sans-serif; }
+</style>
+</head>
+<body>
+<div id="card"><div id="grp"><svg id="bub"></svg><div id="txt"></div></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: 'そうなの？',
+  W: 324, H: 106,
+  bg: '#f4f0e6',
+  bubble: '#ffffff',       // 對話框色
+  shadow: '#c8c6c0',       // 下緣灰色立體陰影
+  ink: '#111111',          // 字色
+  body: { x: 64, y: 23, w: 198, h: 51, r: 23 },   // 對話框本體（終點位置）
+  tail: { x1: 97, x2: 112, tipX: 103, tipY: 82 }, // 左下小尾巴（底邊 x 範圍與尖端）
+  shadowDy: 4,           // 陰影往下偏移
+  fontSize: 30, spacing: 0, cx: 161, cy: 47.5,
+  // 彈出：以尾巴尖端為支點等比放大，從第 4 幀起每幀倍率；過衝後略縮再回穩
+  origin: [103, 85],
+  pop: [.5,.975,1.18,1.18,1.095,1.005,.97,.965,.98,.99,1.0], popAt: 4,
+  // 收尾：第 54–57 幀逐步變淡、變模糊，第 58 幀消失
+  fade: [.92,.5,.3,.15], blur: [1,3,5,6], fadeFrom: 54,
+  loopFrames: 59,          // 一輪 59 幀（約 1.97 秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), grp = document.getElementById('grp'), bub = document.getElementById('bub'), txt = document.getElementById('txt');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const [ox, oy] = CFG.origin;
+grp.style.left = ox+'px'; grp.style.top = oy+'px';
+const B = CFG.body, T = CFG.tail, r = B.r;
+// 以支點為原點的座標
+const bx = B.x - ox, by = B.y - oy;
+const rr = (dy) => `<path d="M${bx+r},${by+dy} H${bx+B.w-r} A${r},${r} 0 0 1 ${bx+B.w},${by+r+dy} V${by+B.h-r+dy} A${r},${r} 0 0 1 ${bx+B.w-r},${by+B.h+dy} H${bx+r} A${r},${r} 0 0 1 ${bx},${by+B.h-r+dy} V${by+r+dy} A${r},${r} 0 0 1 ${bx+r},${by+dy} Z"`;   // 圓角本體
+const tailPath = `<path d="M${T.x1-ox},${by+B.h-3} H${T.x2-ox} L${T.tipX-ox},${T.tipY-oy} Z"`;   // 尾巴（沒有陰影）
+bub.innerHTML = `${rr(CFG.shadowDy)} fill="${CFG.shadow}"/>${rr(0)} fill="${CFG.bubble}"/>${tailPath} fill="${CFG.bubble}"/>`;
+bub.setAttribute('width', 1); bub.setAttribute('height', 1);
+txt.textContent = CFG.text;
+Object.assign(txt.style, { color: CFG.ink, fontSize: CFG.fontSize+'px', letterSpacing: CFG.spacing+'px', webkitTextStroke: '1.3px '+CFG.ink });
+function place() { txt.style.left = (CFG.cx - ox - txt.offsetWidth/2)+'px'; txt.style.top = (CFG.cy - oy - txt.offsetHeight/2)+'px'; }
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  const k = f - CFG.popAt;
+  let s = 1, o = 1, bl = 0;
+  if (k < 0 || f >= CFG.fadeFrom + CFG.fade.length) o = 0;
+  else if (k < CFG.pop.length) s = CFG.pop[k];
+  if (f >= CFG.fadeFrom && f < CFG.fadeFrom + CFG.fade.length) { const j = f - CFG.fadeFrom; o = CFG.fade[j]; bl = CFG.blur[j]; }
+  grp.style.opacity = o; grp.style.transform = `scale(${s})`; grp.style.filter = bl ? `blur(${bl}px)` : 'none';
+}
+
+const start = () => {
+  place();
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function rr(now){ render((now - t0) / 1000); requestAnimationFrame(rr); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "Yusei Magic"`, CFG.text).then(start);
+</script>
+</body>
+</html>

@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>03 Text Stamp</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .stamp { position:absolute; left:0; top:0; white-space:nowrap; line-height:1;
+           font-family:'Dela Gothic One','Noto Sans JP',sans-serif; border-style:solid; border-radius:3px;
+           filter:url(#ink); }
+</style>
+</head>
+<body>
+<!-- 印泥斑駁質感：用雜訊挖掉零星小點 -->
+<svg width="0" height="0" style="position:absolute">
+  <filter id="ink" x="-10%" y="-10%" width="120%" height="120%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="3" result="n"/>
+    <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -5 4.1" result="holes"/>
+    <feComposite in="SourceGraphic" in2="holes" operator="in"/>
+  </filter>
+</svg>
+<div id="card"></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#f3efe6',
+  fontSize: 38,
+  // x,y = 章中心位置（畫面寬高的比例）；rot = 傾斜角度；at = 落定時間（秒）
+  stamps: [
+    { text: '確定', color: '#ef4444', x: .25, y: .26, rot: -10, at: 0.333 },
+    { text: '承認', color: '#151515', x: .75, y: .48, rot:   7, at: 0.733 },
+    { text: '完了', color: '#ef4444', x: .50, y: .61, rot:  -5, at: 1.167 },
+  ],
+  fadeStart: 1.8, fadeEnd: 1.95,
+  loop: 2.0,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+
+const fs = CFG.fontSize;
+const els = CFG.stamps.map(s => {
+  const d = document.createElement('div');
+  d.className = 'stamp';
+  d.textContent = s.text;
+  Object.assign(d.style, { color: s.color, borderColor: s.color, fontSize: fs+'px',
+    borderWidth: fs*.08+'px', padding: `${fs*.06}px ${fs*.12}px` });
+  card.appendChild(d);
+  return d;
+});
+
+// 落章 4 幀（30fps）：落定前 3 幀依序 2.2 倍/10% → 1.9 倍/30% → 1.45 倍/55% → 落定 1.0（最後一幀直接砸下）
+const F = 1/30;
+const DROP = [[-3*F, 2.2, .1], [-2*F, 1.9, .3], [-F, 1.45, .55], [-.001, 1.45, .55], [0, 1, 1]];
+function stampState(dt) {
+  if (dt < DROP[0][0]) return { s: 1, o: 0 };
+  for (let i = 1; i < DROP.length; i++) if (dt < DROP[i][0]) {
+    const [t0, s0, o0] = DROP[i-1], [t1, s1, o1] = DROP[i], k = (dt - t0) / (t1 - t0);
+    return { s: s0 + (s1 - s0) * k, o: o0 + (o1 - o0) * k };
+  }
+  return { s: 1, o: 1 };
+}
+
+function render(t) {
+  const fade = t < CFG.fadeStart ? 1 : Math.max(0, 1 - (t - CFG.fadeStart) / (CFG.fadeEnd - CFG.fadeStart));
+  CFG.stamps.forEach((s, i) => {
+    const el = els[i], st = stampState(t - s.at);
+    const w = el.offsetWidth, h = el.offsetHeight;
+    el.style.transform = `translate(${s.x*CFG.W - w/2}px,${s.y*CFG.H - h/2}px) rotate(${s.rot}deg) scale(${st.s})`;
+    el.style.opacity = st.o * fade;
+  });
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(f); })(t0); }
+};
+document.fonts.ready.then(start);
+</script>
+</body>
+</html>

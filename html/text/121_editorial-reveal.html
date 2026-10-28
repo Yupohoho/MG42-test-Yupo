@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>121 Editorial Reveal</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,900;1,700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#f6f4f2; }
+  /* ?z=2 放大觀看；?t=0.5 定格；?m=1 量測用（卡片貼左上） */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  svg { position:absolute; inset:0; }
+</style>
+</head>
+<body>
+<div id="card">
+<svg id="sv" width="284" height="158" viewBox="0 0 284 158">
+  <defs>
+    <clipPath id="cA"><rect x="0" y="0" width="284" height="80"/></clipPath>
+    <clipPath id="cB"><rect x="0" y="0" width="284" height="131"/></clipPath>
+  </defs>
+  <text id="cap" x="17" y="10"></text>
+  <rect id="ruleT" x="17" y="17" height="2" width="0"/>
+  <g clip-path="url(#cA)"><text id="t1" x="17.5" y="75"></text></g>
+  <g clip-path="url(#cB)"><text id="t2" x="17" y="123.5"></text></g>
+  <text id="vt" transform="translate(263.5,38) rotate(90)"></text>
+  <rect id="ruleB" x="17" y="138" height="2" width="0"/>
+  <rect id="gray" x="17" y="146" height="2" width="111"/>
+</svg>
+</div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 284, H: 158,
+  bg: '#fcfcf9',
+  ink: '#1e1e26',            // 上行標題、細線
+  accent: '#d1a03f',         // 下行大字（金色）
+  sub: '#9d9d9b',            // 小字
+  line2: '#e3e3df',          // 最下方淺灰短線
+  caption: '● VOL.01 — OPENING ISSUE',
+  line1: 'The New',          // 上行：Playfair Display 斜體 700
+  line2Text: 'OPENING',      // 下行：Playfair Display 900
+  side: '2026 / SPRING',     // 右側直排小字
+  size1: 43.5, size2: 46,
+};
+// =================================
+const LOOP = 120;   // 幀（30fps）：約 0.8 秒播完，停住到 4 秒再重播
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), $ = id => document.getElementById(id);
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const cap = $('cap'), t1 = $('t1'), t2 = $('t2'), vt = $('vt'), ruleT = $('ruleT'), ruleB = $('ruleB'), gray = $('gray');
+cap.textContent = CFG.caption; t1.textContent = CFG.line1; t2.textContent = CFG.line2Text; vt.textContent = CFG.side;
+Object.assign(cap.style, { font: '500 7px "JetBrains Mono"', letterSpacing: '1px', fill: CFG.sub });
+Object.assign(t1.style, { font: `italic 700 ${CFG.size1}px "Playfair Display"`, fill: CFG.ink });
+Object.assign(t2.style, { font: `900 ${CFG.size2}px "Playfair Display"`, fill: CFG.accent });
+Object.assign(vt.style, { font: '500 6.5px "JetBrains Mono"', letterSpacing: '2.4px', fill: '#8c8c88' });
+ruleT.style.fill = ruleB.style.fill = CFG.ink; gray.style.fill = CFG.line2;
+
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const lerp = (a, b, k) => a + (b - a) * k;
+// 逐幀數值表：arr[0] 對應第 s 幀，幀間線性內插
+function tab(arr, s, f) { const i = f - s, n = arr.length - 1; if (i <= 0) return arr[0]; if (i >= n) return arr[n]; const k = Math.floor(i); return lerp(arr[k], arr[k + 1], i - k); }
+
+// 量測值（px）：細線長度、標題由遮罩下緣往上升的位移
+const RULE_T = [0,6,18,34,57,95,152,190,213,228,236,242,245,247,248,248.5,249,249.5,250];             // 第 1 幀起
+const RISE_1 = [42,36,30,24,19,15,12,10,8,6,5,4,3,2,2,2,1,1,1,0.5,0];                                 // 第 1 幀起
+const RISE_2 = [41,34,27,21,16,13,10,8,6,4,3,2,2,1,0];                                                // 第 6 幀起
+const RULE_B = [0,1,4,8,15,26,44,74,124,174,204,222,233,240,244,246,248,249,250];                    // 第 3 幀起
+const SIDE_OP = [0,.39,.6,.74,.82,.88,.9,.96,.97,.99,1];                                              // 第 17 幀起
+
+function render(t) {
+  const f = t * 30;
+  const pre = clamp(f / 5);                      // 開頭小字與淺灰線淡入
+  cap.style.opacity = gray.style.opacity = pre;
+  ruleT.setAttribute('width', tab(RULE_T, 1, f));
+  t1.setAttribute('transform', `translate(0,${tab(RISE_1, 1, f)})`);
+  t2.setAttribute('transform', `translate(0,${tab(RISE_2, 6, f)})`);
+  ruleB.setAttribute('width', tab(RULE_B, 3, f));
+  vt.style.opacity = tab(SIDE_OP, 17, f);
+}
+
+Promise.all([
+  document.fonts.load(`italic 700 ${CFG.size1}px "Playfair Display"`, CFG.line1),
+  document.fonts.load(`900 ${CFG.size2}px "Playfair Display"`, CFG.line2Text),
+  document.fonts.load('500 7px "JetBrains Mono"', CFG.caption + CFG.side),
+]).then(() => {
+  if (q.has('t')) render((+q.get('t') * 30 % LOOP) / 30);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000 * 30 % LOOP) / 30); requestAnimationFrame(f); })(t0); }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,98 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>T104 Magnetic Shape</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Oswald:wght@700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#e9e7e3}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh}
+body.m{display:block;min-height:0}
+.card{position:relative;overflow:hidden}
+canvas{display:block}
+</style></head>
+<body><div class="card" id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== CFG：可換內容集中在這裡 =====
+const CFG={
+  text:'ON',
+  font:'"Archivo Black"', weight:'400',
+  textBox:{x:119,y:67,w:49,h:22},       // 字停住時的墨跡框
+  cx:143.5, cy:79,                       // 環的中心
+  core:{r:30},                           // 中央淡色圓
+  // 環上的小圖形：[x, y, 形狀(c圓/s方/t三角), 顏色(P/D), 大小, 角度]
+  shapes:[
+    [143,31,'c','D',14,0],[160,33,'s','P',15,20],[127,32,'c','P',12,0],[112,42,'t','D',20,0],[174,42,'t','D',19,0],
+    [98,47,'s','P',14,25],[186,47,'t','P',15,0],[195,58,'s','D',17,5],[91,59,'c','D',13,0],[201,73,'t','P',19,0],
+    [86,75,'t','P',18,0],[200,84,'c','D',13,0],[87,88,'s','D',13,0],[196,97,'s','P',16,0],[91,98,'s','P',11,0],
+    [188,112,'t','D',20,0],[100,112,'t','D',20,0],[114,118,'s','P',15,25],[175,117,'c','P',12,0],[160,123,'s','D',17,0],
+    [127,123,'c','D',14,0],[144,129,'t','P',19,0]
+  ],
+  bg:'#fcfcf9', ink:'#232631', P:'#9575cd', D:'#232631', core:'#eee8f2'
+};
+const LOOP=120; // 幀（30fps），動畫約 42 幀，其餘停住
+
+// ===== 動態 =====
+// 圖形從四周散落處一邊旋轉一邊被吸到環上（螺旋收攏），中央淡色圓模糊浮現，最後字彈出
+const DUR=16;
+const CORE=[.55,.9,1.08,1.1,1.08,1.04,1];      // 淡色圓（n=20 起）
+const BLUR=[6,4,2,1,0];
+const TS=[.27,.55,.77,.91,1.05,1.18,1.18,1.23,1.23,1.23,1.18,1.18,1.14,1.09,1.05,1]; // 字（n=25 起）
+const eo=p=>1-Math.pow(1-p,3);
+const back=p=>{const c=1.2;return 1+(c+1)*Math.pow(p-1,3)+c*Math.pow(p-1,2);};
+const rnd=i=>{const x=Math.sin(i*127.1+311.7)*43758.5453;return x-Math.floor(x);};
+let L;
+function init(){L=fitText(CFG.text,CFG.font,CFG.weight,CFG.textBox);}
+function shape(type,size,col){ctx.fillStyle=col;ctx.beginPath();
+  if(type==='c')ctx.arc(0,0,size/2,0,Math.PI*2);
+  else if(type==='s')ctx.rect(-size/2,-size/2,size,size);
+  else{const r=size/Math.sqrt(3);for(let k=0;k<3;k++){const a=-Math.PI/2+k*2*Math.PI/3;k?ctx.lineTo(r*Math.cos(a),r*Math.sin(a)):ctx.moveTo(r*Math.cos(a),r*Math.sin(a));}ctx.closePath();}
+  ctx.fill();}
+function render(n){
+  const {cx,cy}=CFG;
+  if(n>=19){const i=n-20,k=i<0?0:tab(CORE,i);if(k>0){ctx.filter=`blur(${tab(BLUR,i)}px)`;ctx.beginPath();ctx.arc(cx,cy,CFG.core.r*k,0,Math.PI*2);ctx.fillStyle=CFG.core;ctx.fill();ctx.filter='none';}}
+  CFG.shapes.forEach(([x,y,t,c,s,rot],i)=>{
+    const st=rnd(i)*8,p=clamp((n-st)/DUR,0,1),e=eo(p),b=back(p);
+    const a0=Math.atan2(y-cy,x-cx),r0=Math.hypot(x-cx,y-cy);
+    const a=a0+(1-e)*(1.6+rnd(i+50)*1.2),r=r0*(1+(1-b)*1.6+(rnd(i+90)-.5)*(1-e)*1.2);
+    const sc=lerp(1.7,1,e);
+    // 三角形尖端朝外
+    const ang=(t==='t'?a0+Math.PI/2:rot*Math.PI/180)+(1-e)*Math.PI*1.5;
+    ctx.save();ctx.translate(cx+r*Math.cos(a),cy+r*Math.sin(a));ctx.rotate(ang);ctx.scale(sc,sc);ctx.globalAlpha=clamp(p*4,0,1);
+    shape(t,s,CFG[c]);ctx.restore();
+  });
+  if(n>=25)drawText(L,CFG.ink,tab(TS,n-25));
+}
+
+// ===== 共用 =====
+const Q=new URLSearchParams(location.search),Z=+(Q.get('z')||1);
+if(Q.get('m'))document.body.classList.add('m');
+const CW=284,CH=158,DPR=window.devicePixelRatio||1;
+const card=document.getElementById('card'),cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+card.style.cssText+=`width:${CW*Z}px;height:${CH*Z}px;border-radius:${12*Z}px;background:${CFG.bg}`;
+cv.width=CW*Z*DPR;cv.height=CH*Z*DPR;cv.style.width=CW*Z+'px';cv.style.height=CH*Z+'px';
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const tab=(A,i)=>A[clamp(Math.floor(i),0,A.length-1)];
+const lerp=(a,b,p)=>a+(b-a)*p;
+const hex=h=>[1,3,5].map(i=>parseInt(h.substr(i,2),16));
+const mix=(a,b,p)=>{const A=hex(a),B=hex(b);return `rgb(${A.map((v,i)=>Math.round(v+(B[i]-v)*p)).join(',')})`};
+// 文字依墨跡框定位：box={x,y,w,h}；w 省略時照字型原比例
+function fitText(str,fam,wt,box){
+  const c=document.createElement('canvas').getContext('2d');c.font=`${wt} 200px ${fam}`;
+  const m=c.measureText(str),k=box.h/(m.actualBoundingBoxAscent+m.actualBoundingBoxDescent);
+  const nw=(m.actualBoundingBoxLeft+m.actualBoundingBoxRight)*k,sx=box.w?box.w/nw:1;
+  return{str,font:`${wt} ${200*k}px ${fam}`,sx,ox:-(m.actualBoundingBoxRight-m.actualBoundingBoxLeft)/2*k,
+    nw,oy:(m.actualBoundingBoxAscent-m.actualBoundingBoxDescent)/2*k,cx:box.x+(box.w||0)/2,cy:box.y+box.h/2};
+}
+function drawText(L,color,s=1,alpha=1,dy=0){
+  ctx.save();ctx.globalAlpha=alpha;ctx.translate(L.cx,L.cy+dy);ctx.scale(s*L.sx,s);
+  ctx.font=L.font;ctx.fillStyle=color;ctx.fillText(L.str,L.ox,L.oy);ctx.restore();
+}
+function frame(t){
+  const n=Math.floor(t*30+1e-6)%LOOP;
+  ctx.setTransform(Z*DPR,0,0,Z*DPR,0,0);ctx.globalAlpha=1;ctx.filter='none';
+  ctx.fillStyle=CFG.bg;ctx.fillRect(0,0,CW,CH);render(n);
+}
+const T0=Q.get('t');
+document.fonts.load(`400 60px "Archivo Black"`,'A').then(()=>document.fonts.load(`700 60px "Oswald"`,'A')).catch(()=>{}).then(()=>{
+  init();
+  if(T0!==null)frame(+T0);else{const st=performance.now();const lp=()=>{frame((performance.now()-st)/1000);requestAnimationFrame(lp)};lp();}
+});
+</script></body></html>

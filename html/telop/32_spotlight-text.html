@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>TL32 Spotlight Text</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@900&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #card > div { position:absolute; white-space:nowrap; line-height:1; font-family:'Noto Sans JP',sans-serif; font-weight:900; }
+</style>
+</head>
+<body>
+<div id="card"><div id="base"></div><div id="lit"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '主役はこの言葉',
+  W: 324, H: 106,
+  bg: '#14181e',
+  base: '#4b4c53',         // 還沒被照到的字（暗灰）
+  lit: '#c0a6ff',          // 被聚光燈照到的字（亮紫）
+  glow: '0 0 5px rgba(170,130,255,.6), 0 0 12px rgba(140,100,255,.3)',   // 照亮處的紫色光暈
+  fontSize: 40, spacing: -3, cx: 161, cy: 56.5,
+  // 聚光燈是圓形的柔邊光圈：圓心在視窗中央、半徑是視窗寬度的一半多一點，邊緣漸淡（不是矩形）
+  softCore: 62,            // 圓內不透明的範圍（半徑的 %），再往外漸淡到 0
+  // 視窗（畫面 x）：左緣 L、右緣 R，逐幀依下列節點線性內插
+  // 一輪開頭已亮著最左邊約 1 個多字（x 33–77）；第 6 幀起右緣往右長（視窗變寬到約 95px），
+  // 第 20 幀起左緣跟著動，視窗以固定寬度往右掃，第 54 幀掃到最右（x 204–291）；第 55 幀下一輪回到開頭
+  L: [[0,33],[20,33],[24,54],[28,82],[32,110],[36,134],[40,159],[44,183],[48,194],[52,202],[54,204],[55,204]],
+  R: [[0,77],[6,78],[14,97],[20,124],[26,161],[32,201],[38,241],[44,271],[49,289],[52,291],[55,291]],
+  loopFrames: 55,          // 一輪 55 幀（約 1.83 秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), base = document.getElementById('base'), lit = document.getElementById('lit');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+for (const [el, col] of [[base, CFG.base], [lit, CFG.lit]]) { el.textContent = CFG.text; Object.assign(el.style, { color: col, fontSize: CFG.fontSize+'px', letterSpacing: CFG.spacing+'px' }); }
+lit.style.textShadow = CFG.glow;
+let boxL = 0, boxW = 0;
+function place() { boxW = base.offsetWidth; boxL = CFG.cx - boxW/2; for (const el of [base, lit]) { el.style.left = boxL+'px'; el.style.top = (CFG.cy - el.offsetHeight/2)+'px'; } }
+const lerp = (tbl, f) => { if (f <= tbl[0][0]) return tbl[0][1]; for (let i = 1; i < tbl.length; i++) if (f <= tbl[i][0]) { const [a, x] = tbl[i-1], [b, y] = tbl[i]; return x + (y - x) * (f - a) / (b - a); } return tbl[tbl.length - 1][1]; };
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  const L = lerp(CFG.L, f) - boxL, R = lerp(CFG.R, f) - boxL;
+  const rad = Math.max(30, (R - L) / 2 * 1.12), cx = (L + R) / 2, cy = lit.offsetHeight / 2;
+  const m = 'radial-gradient(circle ' + rad.toFixed(1) + 'px at ' + cx.toFixed(1) + 'px ' + cy.toFixed(1) + 'px, #000 ' + CFG.softCore + '%, rgba(0,0,0,0) 100%)';
+  lit.style.webkitMaskImage = m; lit.style.maskImage = m;
+}
+
+const start = () => {
+  place();
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function r(now){ render((now - t0) / 1000); requestAnimationFrame(r); })(t0); }
+};
+document.fonts.load(`900 ${CFG.fontSize}px "Noto Sans JP"`, CFG.text).then(start);
+</script>
+</body>
+</html>

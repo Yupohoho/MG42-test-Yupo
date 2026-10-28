@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>TL30 3D Block</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #txt { position:absolute; white-space:nowrap; line-height:1; font-family:'Dela Gothic One',sans-serif; }
+</style>
+</head>
+<body>
+<div id="card"><div id="txt"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '立体字幕',
+  W: 324, H: 106,
+  bg: '#b794fe',           // 底色（紫）
+  color: '#f5f3ed',        // 字面色（米白）
+  depthColor: '#140f0e',   // 立體厚度色（近黑）
+  depthX: 6, depthY: 13,   // 厚度往右下延伸的量（px）：右 6、下 13
+  fontSize: 47.5, flatten: 1.03, cx: 165.5, cy: 54,   // 字級、橫向拉寬、字面中心
+  // 彈出：第 4 幀起每幀（不透明度、縮放，以字面中心為準）；縮放先過衝約 7% 再回穩
+  inFrom: 4,
+  inOpacity: [.2,.45,.75,.92,1],
+  inScale: [.7,.8,.89,.97,1.026,1.052,1.067,1.067,1.057,1.04,1.026,1.015,1.005],
+  // 收尾：第 54–58 幀整組逐步變淡，第 59 幀起空白（一直到下一輪第 4 幀）
+  fade: [.87,.57,.32,.17,.06], fadeFrom: 54,
+  loopFrames: 66,          // 一輪 66 幀（約 2.2 秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), txt = document.getElementById('txt');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+txt.textContent = CFG.text;
+// 立體厚度：一格一格往右下疊出來的黑色影子（每格 1px 高）
+const layers = []; for (let i = CFG.depthY; i >= 1; i--) layers.push(`${(i * CFG.depthX / CFG.depthY / CFG.flatten).toFixed(2)}px ${i}px 0 ${CFG.depthColor}`);
+Object.assign(txt.style, { color: CFG.color, fontSize: CFG.fontSize+'px', textShadow: layers.join(',') });
+function place() { txt.style.left = (CFG.cx - txt.offsetWidth/2)+'px'; txt.style.top = (CFG.cy - txt.offsetHeight/2)+'px'; }
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  const k = f - CFG.inFrom;
+  let o = 0, s = 1;
+  if (k >= 0) { o = k < CFG.inOpacity.length ? CFG.inOpacity[k] : 1; s = k < CFG.inScale.length ? CFG.inScale[k] : 1; }
+  if (f >= CFG.fadeFrom) o = f - CFG.fadeFrom < CFG.fade.length ? CFG.fade[f - CFG.fadeFrom] : 0;
+  txt.style.opacity = o; txt.style.transform = `scale(${CFG.flatten * s}, ${s})`;
+}
+
+const start = () => {
+  place();
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function r(now){ render((now - t0) / 1000); requestAnimationFrame(r); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "Dela Gothic One"`, CFG.text).then(start);
+</script>
+</body>
+</html>

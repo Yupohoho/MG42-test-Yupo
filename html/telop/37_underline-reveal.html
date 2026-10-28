@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>TL37 Underline Reveal</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@500&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #card > div { position:absolute; white-space:nowrap; line-height:1; }
+  #title { font-family:'Noto Serif JP',serif; font-weight:500; }
+  #sub { font-family:'Roboto Mono',monospace; font-weight:500; }
+</style>
+</head>
+<body>
+<div id="card"><div id="title"></div><div id="line"></div><div id="sub"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  title: 'はじまりの朝', sub: 'A NEW MORNING',
+  W: 324, H: 106,
+  bg: '#14181e',
+  color: '#e8e8e4',        // 標題字色
+  gold: '#e2c48e',         // 底線（金色）
+  subColor: '#8b8c82',     // 副標色（灰）
+  line: { x: 54, y: 77, h: 1.4 },       // 底線起點與位置
+  fontSize: 35, spacing: 4.8, cx: 162.5, cy: 50,     // 標題字級、字距、字中心（定位後）
+  subSize: 9, subSpacing: 4.75, subCx: 161, subCy: 89,  // 副標
+  // 底線：第 8 幀起由左往右畫出（右端 x，逐幀），第 18 幀畫到最右 275
+  lineFrom: 8, lineX: [57,81,105,145,195,225,249,249,272,273,275],
+  // 標題：第 13 幀起由淡到實、同時由下往上升約 5px
+  titleFrom: 13, titleOpacity: [.22,.36,.49,.61,.69,.75,.86,.9,.94,1.0], titleRise: [5,5,5,3,2,2,1,0,0,0],
+  // 副標：第 22 幀起由淡到實（約 14 幀）
+  subFrom: 22, subOpacity: [.38,.47,.55,.63,.71,.79,.84,.91,.98,1.0],
+  // 收尾：第 54–57 幀整組逐步變淡（底線更快，第 55 幀就消失），第 58 幀起空白
+  fade: [.9,.64,.39,.2], lineFade: [.35,0,0,0], fadeFrom: 54,
+  loopFrames: 59,          // 一輪 59 幀（約 1.97 秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), title = document.getElementById('title'), line = document.getElementById('line'), sub = document.getElementById('sub');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+title.textContent = CFG.title; Object.assign(title.style, { color: CFG.color, fontSize: CFG.fontSize+'px', letterSpacing: CFG.spacing+'px' });
+sub.textContent = CFG.sub; Object.assign(sub.style, { color: CFG.subColor, fontSize: CFG.subSize+'px', letterSpacing: CFG.subSpacing+'px' });
+Object.assign(line.style, { left: CFG.line.x+'px', top: CFG.line.y+'px', height: CFG.line.h+'px', background: CFG.gold });
+function place() {
+  title.style.left = (CFG.cx - title.offsetWidth/2 + CFG.spacing/2)+'px'; title.style.top = (CFG.cy - title.offsetHeight/2)+'px';
+  sub.style.left = (CFG.subCx - sub.offsetWidth/2 + CFG.subSpacing/2)+'px'; sub.style.top = (CFG.subCy - sub.offsetHeight/2)+'px';
+}
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  const j = f - CFG.fadeFrom, inFade = f >= CFG.fadeFrom;
+  const g = inFade ? (j < CFG.fade.length ? CFG.fade[j] : 0) : 1;
+  // 底線
+  const a = f - CFG.lineFrom;
+  const right = a < 0 ? CFG.line.x : a < CFG.lineX.length ? CFG.lineX[a] : CFG.lineX[CFG.lineX.length - 1];
+  line.style.width = Math.max(0, right - CFG.line.x + 1)+'px'; line.style.opacity = a < 0 ? 0 : (inFade ? (j < CFG.lineFade.length ? CFG.lineFade[j] : 0) : 1);
+  // 標題
+  const b = f - CFG.titleFrom;
+  const bi = Math.min(b, CFG.titleOpacity.length - 1);
+  title.style.opacity = b < 0 ? 0 : CFG.titleOpacity[bi] * g;
+  title.style.transform = `translateY(${b < 0 ? CFG.titleRise[0] : b < CFG.titleRise.length ? CFG.titleRise[b] : 0}px)`;
+  // 副標
+  const c = f - CFG.subFrom;
+  sub.style.opacity = c < 0 ? 0 : CFG.subOpacity[Math.min(c, CFG.subOpacity.length - 1)] * g;
+}
+
+const start = () => {
+  place();
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function r(now){ render((now - t0) / 1000); requestAnimationFrame(r); })(t0); }
+};
+Promise.all([document.fonts.load('500 35px "Noto Serif JP"', CFG.title), document.fonts.load('500 9px "Roboto Mono"', CFG.sub)]).then(start);
+</script>
+</body>
+</html>

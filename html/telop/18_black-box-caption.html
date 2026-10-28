@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>TL18 Black Box Caption</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #box { position:absolute; display:flex; align-items:center; justify-content:center; white-space:nowrap; line-height:1;
+         font-family:'Noto Sans JP',sans-serif; font-weight:700; }
+</style>
+</head>
+<body>
+<div id="card"><div id="box"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '背景ボックスで可読性アップ',
+  W: 324, H: 106,
+  bg: '#2fd9c0',           // 底色（原版為青綠色）
+  box: 'rgba(0,0,0,.74)',  // 黑帶（半透明黑）
+  color: '#ffffff',        // 字色
+  bw: 246, bh: 30, radius: 4, cx: 162.5, cy: 77.5,   // 黑帶大小與中心（畫面下方）
+  fontSize: 16.2,
+  // 入場：第 5 幀起，黑帶（連字）由中心橫向撐開、由淡到實、由模糊到清楚（約 5 幀）
+  inFrom: 5,
+  inScale:   [.66,.78,.89,.93,1.0],
+  inOpacity: [.28,.47,.65,.81,.89,.97,1.0],
+  inBlur:    [3,2,1,.5,0],
+  // 淡出：第 54–57 幀逐步變淡，第 58 幀消失
+  fade: [.83,.57,.36,.2], fadeFrom: 54,
+  loopFrames: 60,          // 一輪 60 幀（約 2.0 秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), box = document.getElementById('box');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+Object.assign(box.style, { left: (CFG.cx - CFG.bw/2)+'px', top: (CFG.cy - CFG.bh/2)+'px', width: CFG.bw+'px', height: CFG.bh+'px',
+  background: CFG.box, borderRadius: CFG.radius+'px', color: CFG.color, fontSize: CFG.fontSize+'px' });
+box.textContent = CFG.text;
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  const k = f - CFG.inFrom;
+  let o = 0, sx = 1, bl = 0;
+  if (k >= 0) { o = CFG.inOpacity[Math.min(k, CFG.inOpacity.length - 1)]; sx = k < CFG.inScale.length ? CFG.inScale[k] : 1; bl = k < CFG.inBlur.length ? CFG.inBlur[k] : 0; }
+  if (f >= CFG.fadeFrom) o = f - CFG.fadeFrom < CFG.fade.length ? CFG.fade[f - CFG.fadeFrom] : 0;
+  box.style.opacity = o; box.style.transform = `scaleX(${sx})`; box.style.filter = bl ? `blur(${bl}px)` : 'none';
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function r(now){ render((now - t0) / 1000); requestAnimationFrame(r); })(t0); }
+};
+document.fonts.load(`700 ${CFG.fontSize}px "Noto Sans JP"`, CFG.text).then(start);
+</script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>TL38 Corner Frame</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@900&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #frame { position:absolute; left:0; top:0; width:0; height:0; }
+  #frame div { position:absolute; box-sizing:border-box; }
+  #txt { position:absolute; white-space:nowrap; line-height:1; font-family:'Noto Sans JP',sans-serif; font-weight:900; }
+</style>
+</head>
+<body>
+<div id="card"><div id="frame"><div id="tl"></div><div id="tr"></div><div id="bl"></div><div id="br"></div></div><div id="txt"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '注目',
+  W: 324, H: 106,
+  bg: '#d8b16f',           // 底色（金黃）
+  color: '#161616',        // 字色（近黑）
+  bracket: '#8d6a2e',      // 四個角括號的顏色（咖啡）
+  fw: 158, fh: 74, armX: 20, armY: 18, thick: 3,   // 角括號整體大小、橫向／縱向邊長、線粗
+  fcx: 161.5, fcy: 55.5,   // 角括號中心
+  fontSize: 40, tcx: 161.5, tcy: 55,   // 字級、字中心
+  // 角括號：第 4 幀起從較大的位置往內收（倍率，以中心為準），同時由淡到實
+  frameFrom: 4,
+  frameScale: [1.23,1.2,1.12,1.08,1.05,1.04,1.03,1.03,1.01,1.0],
+  frameOpacity: [.29,.5,.63,.79,.83,.84,.97,1.0],
+  // 字：第 10 幀起由淡到實，同時由 0.88 倍放大到 1.0（約 9 幀）
+  textFrom: 10,
+  textOpacity: [.22,.36,.53,.64,.72,.8,.92,.95,1.0],
+  textScale: [.88,.9,.93,.95,.96,.97,.99,.99,1.0],
+  // 收尾：第 54–57 幀整組逐步變淡，第 58 幀起空白
+  fade: [.84,.6,.35,.2], fadeFrom: 54,
+  loopFrames: 59,          // 一輪 59 幀（約 1.97 秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), frame = document.getElementById('frame'), txt = document.getElementById('txt');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+frame.style.left = CFG.fcx+'px'; frame.style.top = CFG.fcy+'px';
+const hw = CFG.fw/2, hh = CFG.fh/2, b = `${CFG.thick}px solid ${CFG.bracket}`;
+const corners = { tl: [-hw, -hh, 'borderTop', 'borderLeft'], tr: [hw - CFG.armX, -hh, 'borderTop', 'borderRight'], bl: [-hw, hh - CFG.armY, 'borderBottom', 'borderLeft'], br: [hw - CFG.armX, hh - CFG.armY, 'borderBottom', 'borderRight'] };
+for (const [id, [x, y, b1, b2]] of Object.entries(corners)) {
+  const el = document.getElementById(id);
+  Object.assign(el.style, { left: x+'px', top: y+'px', width: CFG.armX+'px', height: CFG.armY+'px' }); el.style[b1] = b; el.style[b2] = b;
+}
+txt.textContent = CFG.text; Object.assign(txt.style, { color: CFG.color, fontSize: CFG.fontSize+'px' });
+function place() { txt.style.left = (CFG.tcx - txt.offsetWidth/2)+'px'; txt.style.top = (CFG.tcy - txt.offsetHeight/2)+'px'; }
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  const g = f >= CFG.fadeFrom ? (f - CFG.fadeFrom < CFG.fade.length ? CFG.fade[f - CFG.fadeFrom] : 0) : 1;
+  const a = f - CFG.frameFrom;
+  const fs = a < 0 ? CFG.frameScale[0] : a < CFG.frameScale.length ? CFG.frameScale[a] : 1;
+  const fo = a < 0 ? 0 : CFG.frameOpacity[Math.min(a, CFG.frameOpacity.length - 1)];
+  frame.style.transform = `scale(${fs})`; frame.style.opacity = fo * g;
+  const k = f - CFG.textFrom;
+  const to = k < 0 ? 0 : CFG.textOpacity[Math.min(k, CFG.textOpacity.length - 1)];
+  const ts = k < 0 ? CFG.textScale[0] : k < CFG.textScale.length ? CFG.textScale[k] : 1;
+  txt.style.opacity = to * g; txt.style.transform = `scale(${ts})`;
+}
+
+const start = () => {
+  place();
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function r(now){ render((now - t0) / 1000); requestAnimationFrame(r); })(t0); }
+};
+document.fonts.load(`900 ${CFG.fontSize}px "Noto Sans JP"`, CFG.text).then(start);
+</script>
+</body>
+</html>

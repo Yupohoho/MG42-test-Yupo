@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>05 Kinetic Stack</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .line { position:absolute; left:0; top:0; white-space:nowrap; line-height:1;
+          font-family:'Dela Gothic One','Noto Sans JP',sans-serif; }
+</style>
+</head>
+<body>
+<div id="card"></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#14161c',
+  // y = 行中心（畫面高比例）；from/to = 進場/退場方向（-1 左、1 右）；in/out = 開始時間（秒）
+  lines: [
+    { text: '夜を',       color: '#f3eee4', size: 26, y: .22, from: -1, in: 0.10, to:  1, out: 1.76, outDur: 0.10 },
+    { text: '走り抜けろ', color: '#ff4d4d', size: 29, y: .50, from:  1, in: 0.33, to: -1, out: 1.78, outDur: 0.17 },
+    { text: '今すぐ',     color: '#f3eee4', size: 26, y: .79, from: -1, in: 0.53, to:  1, out: 1.79, outDur: 0.30 },
+  ],
+  inDur: 0.24,      // 進場時間：滑入、越接近越慢
+                    // 退場（outDur）：越來越快滑出，每行速度不同
+  loop: 2.1,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+
+const els = CFG.lines.map(l => {
+  const d = document.createElement('div'); d.className = 'line'; d.textContent = l.text;
+  Object.assign(d.style, { color: l.color, fontSize: l.size+'px' });
+  card.appendChild(d); return d;
+});
+
+const easeOut = k => 1 - Math.pow(1 - k, 3);
+const easeIn  = k => k * k * k;
+
+function render(t) {
+  CFG.lines.forEach((l, i) => {
+    const el = els[i], w = el.offsetWidth, h = el.offsetHeight;
+    const cx = CFG.W / 2;
+    const off = CFG.W / 2 + w / 2 + 4;   // 移到畫面外所需距離
+    let dx = 0, motion = 0;
+    if (t < l.in)                         { el.style.opacity = 0; return; }
+    if (t < l.in + CFG.inDur)             { const k = (t - l.in) / CFG.inDur; dx = l.from * off * (1 - easeOut(k)); motion = 1 - k; }
+    else if (t >= l.out + l.outDur)       { el.style.opacity = 0; return; }
+    else if (t >= l.out)                  { const k = (t - l.out) / l.outDur; dx = l.to * off * easeIn(k); motion = k; }
+    el.style.transform = `translate(${cx - w/2 + dx}px,${l.y * CFG.H - h/2}px)`;
+    // 快速移動時偏暗、帶水平動態模糊
+    el.style.opacity = 1 - .45 * motion;
+    el.style.filter = motion > .05 ? `blur(${1.2 * motion}px)` : '';
+  });
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(f); })(t0); }
+};
+document.fonts.ready.then(start);
+</script>
+</body>
+</html>

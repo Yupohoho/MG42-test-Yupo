@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>16 Tape Cross</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .pivot { position:absolute; width:0; height:0; }
+  .tape { position:absolute; overflow:hidden; display:flex; align-items:center; }
+  .track { display:flex; white-space:nowrap; line-height:1; flex:none; }
+  .unit { flex:none; white-space:pre; font-family:'Dela Gothic One',sans-serif; }
+</style>
+</head>
+<body>
+<div id="card"></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#14161c',
+  tapeLen: 560,
+  // 兩條膠帶交叉成 X。陣列後面的在上層（米白在黃色上面）
+  // cx,cy = 膠帶中心線經過的點；angle = 傾斜角度（正 = 往右下）；speed = 沿膠帶方向速度（正 = 往字的閱讀方向前進、即往右）
+  tapes: [
+    { text: '立入禁止・', bg: '#f7c21f', color: '#151515', size: 20, h: 27, cx: 162, cy: 62, angle: -20, speed:  90 },
+    { text: '立入禁止・', bg: '#f1eee6', color: '#151515', size: 20, h: 29, cx: 162, cy: 47, angle:  20, speed: -90 },
+  ],
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+
+const tracks = [], units = [];
+function build() {
+  CFG.tapes.forEach(p => {
+    const pv = document.createElement('div'); pv.className = 'pivot';
+    Object.assign(pv.style, { left: p.cx+'px', top: p.cy+'px', transform: `rotate(${p.angle}deg)` });
+    const tape = document.createElement('div'); tape.className = 'tape';
+    Object.assign(tape.style, { left: -CFG.tapeLen/2+'px', width: CFG.tapeLen+'px', top: -p.h/2+'px', height: p.h+'px', background: p.bg,
+      boxShadow: '0 1px 3px rgba(0,0,0,.45)' });
+    const tr = document.createElement('div'); tr.className = 'track';
+    const mk = () => { const u = document.createElement('span'); u.className = 'unit'; u.textContent = p.text;
+      Object.assign(u.style, { fontSize: p.size+'px', color: p.color }); return u; };
+    tr.appendChild(mk()); tape.appendChild(tr); pv.appendChild(tape); card.appendChild(pv);
+    const U = tr.firstChild.offsetWidth;
+    for (let i = 1; i < Math.ceil(CFG.tapeLen / U) + 2; i++) tr.appendChild(mk());
+    tracks.push(tr); units.push(U);
+  });
+}
+
+function render(t) {
+  CFG.tapes.forEach((p, i) => {
+    // 沿膠帶等速流動，以一組字的寬度取模無縫循環
+    const U = units[i], off = ((p.speed * t) % U + U) % U;
+    tracks[i].style.transform = `translateX(${off - U}px)`;
+  });
+}
+
+document.fonts.load(`20px "Dela Gothic One"`, CFG.tapes.map(p => p.text).join('')).then(() => {
+  build();
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+});
+</script>
+</body>
+</html>

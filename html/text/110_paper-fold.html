@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>110 Paper Fold</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=block" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #scene { position:absolute; inset:0; }
+  .p3d { position:absolute; top:0; transform-style:preserve-3d; transform-origin:0 50%; }
+  .face { position:absolute; left:0; top:0; overflow:hidden; backface-visibility:hidden; }
+  .face svg { position:absolute; top:0; }
+  .face .shade { position:absolute; inset:0; background:#000; }
+  .face .fold { position:absolute; top:0; bottom:0; left:0; width:1px; }
+</style>
+</head>
+<body>
+<div id="card"><div id="scene"><div id="paper" class="p3d"></div></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 284, H: 158,
+  bg: '#FCFCF9',
+  ink: '#24242F',
+  text: 'OPEN',
+  box: [25, 50, 259, 105],               // 攤平後字的墨跡框
+  faces: 4,                              // 摺成幾面（四摺頁，從最左邊一片開始依序往右攤開）
+  paper: '#FFFFFF',                      // 紙的正面
+  paperBack: '#F1F0EB',                  // 紙的背面（摺起時看到的那面）
+  foldLine: '#E6E6E6',                   // 攤平後留下的摺線
+  shadeMax: 0.16,                        // 摺面立起／翻過來時最暗的黑色濃度
+  perspective: 700,
+  // 紙固定在最左邊（攤平後剛好滿版置中）；第 2 片（帶著後面還摺著的片）先翻開，再第 3、第 4 片，各自以左邊摺線為軸
+  unfold: [[4, 26], [22, 44], [40, 62]], // 第 2、3、4 片各自翻開的 [開始幀, 結束幀]
+  startAngle: -178,                      // 摺起時的角度（往前蓋在前一面上）
+};
+const LOOP = 120;                        // 一輪幀數（30fps）
+// =================================
+
+const q = new URLSearchParams(location.search);
+const $ = (id) => document.getElementById(id);
+const card = $('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+$('scene').style.perspective = CFG.perspective + 'px';
+$('scene').style.perspectiveOrigin = `${CFG.W/2}px ${CFG.H/2}px`;
+const NS = 'http://www.w3.org/2000/svg';
+const cv = document.createElement('canvas').getContext('2d');
+function fitText(t, str, font, box, mode) {
+  cv.font = `${font.w} 100px ${font.f}`; const m = cv.measureText(str);
+  const fs = (box[3]-box[1]) / (m.actualBoundingBoxAscent + m.actualBoundingBoxDescent) * 100, k = fs/100;
+  const inkW = (m.actualBoundingBoxLeft + m.actualBoundingBoxRight) * k, bw = box[2]-box[0];
+  t.textContent = str;
+  Object.entries({ 'font-family': font.f.replace(/"/g,''), 'font-weight': font.w, 'font-size': fs,
+    x: box[0] + m.actualBoundingBoxLeft*k, y: box[1] + m.actualBoundingBoxAscent*k }).forEach(([a,v]) => t.setAttribute(a, v));
+  if (mode === 'ls') t.setAttribute('letter-spacing', (bw-inkW) / Math.max(1, [...str].length-1));
+  else t.setAttribute('transform', `translate(${box[0]} 0) scale(${bw/inkW} 1) translate(${-box[0]} 0)`);
+}
+const PW = CFG.W / CFG.faces, hinges = [], shades = [], prints = [];
+
+// 一面紙：正面印著整張畫面的對應一段，背面是素色紙
+function face(i, back) {
+  const d = document.createElement('div'); d.className = 'face';
+  Object.assign(d.style, { width: (PW + (back ? 2 : 0.5)) + 'px', height: CFG.H + 'px', background: back ? CFG.paperBack : CFG.paper });
+  if (back) d.style.transform = 'rotateY(180deg)';
+  else {
+    const s = document.createElementNS(NS, 'svg'); s.setAttribute('width', CFG.W); s.setAttribute('height', CFG.H);
+    s.style.left = (-i * PW) + 'px';
+    const t = document.createElementNS(NS, 'text'); t.setAttribute('fill', CFG.ink); s.appendChild(t);
+    fitText(t, CFG.text, { f: '"Archivo Black"', w: 400 }, CFG.box, 'ls');
+    d.appendChild(s); prints[i] = s;
+    if (i > 0) { const fl = document.createElement('div'); fl.className = 'fold'; fl.style.background = CFG.foldLine; d.appendChild(fl); }
+  }
+  const sh = document.createElement('div'); sh.className = 'shade'; d.appendChild(sh); shades.push([i, sh]);
+  return d;
+}
+
+function build() {
+  // 第 1 面固定；第 2 面掛在第 1 面右邊摺線上，第 3 面掛在第 2 面右邊…（巢狀，翻開時會帶著後面的面一起動）
+  let parent = $('paper');
+  parent.appendChild(face(0, false));
+  for (let i = 1; i < CFG.faces; i++) {
+    const h = document.createElement('div'); h.className = 'p3d';
+    h.style.left = PW + 'px';
+    h.append(face(i, false), face(i, true));
+    parent.appendChild(h); hinges.push(h); parent = h;
+  }
+}
+
+const clamp = (p) => Math.min(1, Math.max(0, p));
+const easeInOut3 = (p) => { p = clamp(p); return p < .5 ? 4*p*p*p : 1 - Math.pow(-2*p + 2, 3) / 2; };
+
+function render(t) {
+  const f = ((t * 30) % LOOP + LOOP) % LOOP;
+  const ang = CFG.unfold.map(([a, b]) => CFG.startAngle * (1 - easeInOut3((f - a) / (b - a))));
+  hinges.forEach((h, i) => h.style.transform = `rotateY(${ang[i]}deg)`);
+  // 每一面相對畫面的實際角度＝前面所有摺的角度相加；越斜（或翻到背面）越暗
+  let acc = 0; const world = [0];
+  ang.forEach(a => { acc += a; world.push(acc); });
+  // 下一面幾乎完全蓋上來（超過 165°）時，這一面的字一定被蓋住：直接隱藏，避免摺線處透出字的邊
+  prints.forEach((s, i) => s.style.visibility = (i < ang.length && ang[i] < -165) ? 'hidden' : 'visible');
+  for (const [i, sh] of shades) sh.style.opacity = CFG.shadeMax * Math.abs(Math.sin(world[i] * Math.PI / 360));
+}
+
+document.fonts.load('400 50px "Archivo Black"', CFG.text).then(() => {
+  build();
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+});
+</script>
+</body>
+</html>

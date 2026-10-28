@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>18 Text Corridor</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #stage { position:absolute; left:0; top:0; transform-origin:0 0; }
+  .plane { position:absolute; }
+  .row { position:absolute; left:0; white-space:nowrap; line-height:1; font-family:'Dela Gothic One',sans-serif; }
+  .row span { position:absolute; left:0; top:0; }
+</style>
+</head>
+<body>
+<div id="card"><div id="stage"></div></div>
+<script type="module">
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  unit: '進め・',           // 重複的文字單位
+  W: 324, H: 106,
+  bg: '#22d3c5',
+  ink: '#0a0d0e',           // 右牆、地板的字色
+  dim: '#15857e',           // 左牆的字色（背光那一側較淡）
+  ceilInk: '#0e5f5a',       // 天花板的字色
+  vp: [.5, .42],            // 消失點位置（畫面比例）
+  perspective: 150,
+  halfW: 36,                // 走廊半寬（牆離中線多遠）
+  ceil: -24, floor: 26,     // 天花板、地板的高度（以消失點為 0，往下為正）
+  wallOver: 50,             // 左右牆往上下多伸出多少（不圍成封閉空間，四片板子像「井」字交錯）
+  flatOver: 120,            // 地板/天花板往左右多伸出多少
+  near: 130, far: -110,     // 走廊從哪裡開始到哪裡結束（CSS z，越小越遠）
+  fogFrom: -30,             // 從這個深度開始淡出到底色
+  wallSize: 14,             // 牆上字的大小
+  wallGap: 22,              // 牆上每行字的間距（上下）
+  floorSize: 7,             // 地板/天花板小字的大小
+  floorStretch: 2.6,        // 地板/天花板的字沿深度方向拉長幾倍（抵銷透視壓扁，鏡頭看起來才認得出字）
+  floorGap: 24,             // 地板/天花板每行字的間距（深度方向）
+  thick: 3, thickStep: .25, // 字的厚度：疊幾層、每層往遠處錯開多少
+  wallRows: 1,              // 每個循環，牆上的字往下流幾行
+  floorRows: 1,             // 每個循環，地板/天花板的字流過幾行
+  loop: 3.0,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), stage = document.getElementById('stage');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+Object.assign(stage.style, { perspectiveOrigin: `${CFG.vp[0]*100}% ${CFG.vp[1]*100}%` });
+
+await document.fonts.load(`40px "Dela Gothic One"`, CFG.unit);   // 先載好字型才量得準字寬
+// 3D 裡的字會先以原尺寸點陣化再被透視放大：整個舞台放大 U 倍做 3D，最後再縮回 1/U 倍，字才清楚
+const U = 4, C = {};
+["perspective","halfW","ceil","floor","wallOver","flatOver","near","far","fogFrom","wallSize","wallGap","floorSize","floorGap","thickStep"].forEach(k => C[k] = CFG[k] * U);
+Object.assign(stage.style, { width: CFG.W*U+'px', height: CFG.H*U+'px', perspective: C.perspective+'px', transform: `scale(${1/U})` });
+const LEN = C.near - C.far, ZC = (C.near + C.far) / 2;
+const fogStop = (C.near - C.fogFrom) / LEN * 100;
+
+// 一個平面：寬 w、高 h，中心放在消失點再往 3D 位置移動、旋轉；mask 讓遠處淡出
+function plane(w, h, tf, mask, back) {
+  const p = document.createElement('div'); p.className = 'plane';
+  Object.assign(p.style, { width: w+'px', height: h+'px', left: CFG.vp[0]*CFG.W*U - w/2+'px', top: CFG.vp[1]*CFG.H*U - h/2+'px', transform: tf });
+  p.style.webkitMaskImage = p.style.maskImage = mask;
+  // 不做 3D 前後排序（板子互相穿插時瀏覽器會排錯），固定地板/天花板在後、牆在前
+  if (back) stage.prepend(p); else stage.appendChild(p);
+  return p;
+}
+// 一行有厚度的字：同一行疊 thick 層，每層往遠處錯開一點（dx, dy = 平面上「遠處」的方向）
+function row(parent, text, size, color, x, dx, dy) {
+  const r = document.createElement('div'); r.className = 'row';
+  Object.assign(r.style, { left: x+'px', fontSize: size+'px', color });
+  for (let i = CFG.thick - 1; i >= 0; i--) {
+    const s = document.createElement('span'); s.textContent = text;
+    s.style.transform = `translate(${dx * i * C.thickStep}px,${dy * i * C.thickStep}px)`;
+    r.appendChild(s);
+  }
+  parent.appendChild(r); return r;
+}
+const textFor = (len, size) => CFG.unit.repeat(Math.ceil(len / (size * CFG.unit.length)) + 2);
+
+// 左右牆：寬度方向 = 深度方向，從天花板到地板排滿一行行字，整面往下流
+const wallH = C.floor - C.ceil + 2 * C.wallOver, wallYC = (C.floor + C.ceil) / 2;
+const walls = [
+  { tf: `translate3d(${C.halfW}px,${wallYC}px,${ZC}px) rotateY(-90deg)`, mask: `linear-gradient(90deg, transparent 0%, #000 ${100 - fogStop}%)`, color: CFG.ink, far: [-1, 0] },  // 右牆：左端是遠處
+  { tf: `translate3d(${-C.halfW}px,${wallYC}px,${ZC}px) rotateY(90deg)`, mask: `linear-gradient(90deg, #000 ${fogStop}%, transparent 100%)`, color: CFG.dim, far: [1, 0] },   // 左牆：右端是遠處
+];
+const nWall = Math.ceil(wallH / C.wallGap) + 1;
+const wallRows = [];
+walls.forEach(w => {
+  const p = plane(LEN, wallH, w.tf, w.mask);
+  for (let i = 0; i < nWall; i++) wallRows.push({ el: row(p, textFor(LEN, C.wallSize), C.wallSize, w.color, -C.wallSize, ...w.far), i });
+});
+
+// 地板/天花板：一行行橫排小字沿深度方向排開
+// 兩個平面的 y 往下都對應「字的流向」：地板往下 = 往鏡頭，天花板往下 = 往遠處
+const floorW = (C.halfW + C.flatOver) * 2;
+// 地板/天花板的字不加厚度（往深度方向疊會把被透視壓扁的字糊成一團）
+const flats = [
+  { tf: `translate3d(0,${C.floor}px,${ZC}px) rotateX(90deg)`,  mask: `linear-gradient(180deg, transparent 0%, #000 ${100 - fogStop}%)`, color: CFG.ink, far: [0, 0] },
+  { tf: `translate3d(0,${C.ceil}px,${ZC}px) rotateX(-90deg)`, mask: `linear-gradient(0deg, transparent 0%, #000 ${100 - fogStop}%)`,   color: CFG.ceilInk, far: [0, 0] },
+];
+const nFlat = Math.ceil(LEN / C.floorGap) + 1;
+const flatRows = [];
+flats.forEach(f => {
+  const p = plane(floorW, LEN, f.tf, f.mask, true);
+  for (let i = 0; i < nFlat; i++) {
+    const el = row(p, textFor(floorW, C.floorSize), C.floorSize, f.color, -C.floorSize, ...f.far);
+    Object.assign(el.style, { transformOrigin: '0 0', transform: `scaleY(${CFG.floorStretch})` });
+    flatRows.push({ el, i });
+  }
+});
+
+// 每一行往下推，超出平面就從另一端補回來（每循環剛好推整數行，接縫不跳）
+const wrap = (v, m) => ((v % m) + m) % m;
+function render(t) {
+  const k = t / CFG.loop;
+  const wd = k * CFG.wallRows * C.wallGap;
+  wallRows.forEach(({ el, i }) => place(el, wrap(i * C.wallGap + wd, nWall * C.wallGap) - C.wallGap, C.wallSize, wallH));
+  const fd = k * CFG.floorRows * C.floorGap;
+  flatRows.forEach(({ el, i }) => place(el, wrap(i * C.floorGap + fd, nFlat * C.floorGap) - C.floorGap, C.floorSize * CFG.floorStretch, LEN));
+}
+// 不用 overflow 裁切（會讓 3D 裡的字變糊），改成字快超出平面邊緣時淡出、從另一端淡入
+function place(el, y, size, h) {
+  el.style.top = y + 'px';
+  el.style.opacity = Math.max(0, Math.min(1, 1 + y / (size * .5), 1 + (h - y - size) / (size * .5)));
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(f); })(t0); }
+};
+start();
+</script>
+</body>
+</html>

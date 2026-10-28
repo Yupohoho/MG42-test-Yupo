@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>TL26 Glitch Telop</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; isolation:isolate; }
+  .band { position:absolute; left:0; width:100%; overflow:hidden; }
+  .band.g { mix-blend-mode:lighten; }
+  #plain { position:absolute; white-space:nowrap; line-height:1; font-family:'Dela Gothic One',sans-serif; color:#ffffff; }
+  .band > div { position:absolute; white-space:nowrap; line-height:1; font-family:'Dela Gothic One',sans-serif; transform-origin:50% 50%; }
+</style>
+</head>
+<body>
+<div id="card"></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '異常検知',
+  W: 324, H: 106,
+  bg: '#b794fe',           // 底色（紫）
+  // 做法：平常是一般的純白字；故障時改成「紅通道」「綠通道」兩份（切成 10 條橫帶各自位移）：
+  // 紅通道（粉紅）用一般疊色，綠通道（淡青）用 lighten 疊在上面，兩份重疊的地方會回到白色，往左右錯開的邊緣就出現粉紅與淡青的色差
+  rChannel: '#ff96f0', gChannel: '#c8fff8',
+  fontSize: 50.5, flatten: 1.0, cx: 162.5, cy: 53.5,    // 字級、橫向拉寬倍率、字中心
+  bandY0: 26, bandH: 6, bands: 10,
+  // 每輪 39 幀：第 0–5 幀一組故障（每 2 幀換一組位移），第 15–18 幀另一組故障，其餘時間是乾淨的白字
+  // 位移單位 px（正 = 往右），陣列依橫帶（上→下）順序
+  glitch: {
+    0:  { R: [0,-12,-12,-12,-12,-12,-12,-12,0,15],            G: [13,12,0,0,0,0,0,0,0,-13] },
+    2:  { R: [-16,0,9,9,9,9,9,9,9,4],                          G: [0,0,0,0,0,0,0,0,-9,-16] },
+    4:  { R: [0,-4,0,-3,-3,-3,-3,-3,0,0],                      G: [0,0,0,0,0,0,0,0,0,-1] },
+    15: { R: [0,-9,-9,-9,-9,-9,-9,-9,-9,-1],                   G: [0,10,0,0,0,0,0,0,0,-14] },
+    17: { R: [-14,0,6,7,6,6,7,6,7,-13],                        G: [2,0,0,0,0,0,0,0,0,0] },
+  },
+  holdEach: 2,             // 每組位移維持 2 幀（相當於 15fps 的卡頓感）
+  groupLen: [[0,6],[15,19]],   // 故障發生的幀範圍：[起, 迄)
+  loopFrames: 39,          // 一輪 39 幀（1.3 秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const mk = (color, k, cls) => {
+  const band = document.createElement('div'); band.className = 'band ' + cls;
+  const y = CFG.bandY0 + k * CFG.bandH;
+  Object.assign(band.style, { top: y+'px', height: CFG.bandH+'px' });
+  const t = document.createElement('div'); t.textContent = CFG.text;
+  Object.assign(t.style, { color, fontSize: CFG.fontSize+'px' });
+  band.appendChild(t); card.appendChild(band); return { band, t, y };
+};
+const R = [], G = [];
+for (let k = 0; k < CFG.bands; k++) R.push(mk(CFG.rChannel, k, 'r'));
+for (let k = 0; k < CFG.bands; k++) G.push(mk(CFG.gChannel, k, 'g'));
+const plain = document.createElement('div'); plain.id = 'plain'; plain.textContent = CFG.text; plain.style.fontSize = CFG.fontSize+'px'; card.appendChild(plain);
+function place(e, dx) { e.t.style.left = (CFG.cx - e.t.offsetWidth/2 + dx)+'px'; e.t.style.top = (CFG.cy - e.t.offsetHeight/2 - e.y)+'px'; e.t.style.transform = `scaleX(${CFG.flatten})`; }
+
+function placePlain() { plain.style.left = (CFG.cx - plain.offsetWidth/2)+'px'; plain.style.top = (CFG.cy - plain.offsetHeight/2)+'px'; plain.style.transform = 'scaleX(' + CFG.flatten + ')'; }
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  let key = null;
+  for (const [a, b] of CFG.groupLen) if (f >= a && f < b) { const ks = Object.keys(CFG.glitch).map(Number).filter(n => n >= a && n < b); key = ks.filter(n => f >= n).pop(); }
+  const g = key === null ? null : CFG.glitch[key];
+  for (let k = 0; k < CFG.bands; k++) { place(R[k], g ? g.R[k] : 0); place(G[k], g ? g.G[k] : 0); }
+  plain.style.visibility = g ? 'hidden' : 'visible';
+  for (const e of [...R, ...G]) e.band.style.visibility = g ? 'visible' : 'hidden';
+}
+
+const start = () => {
+  placePlain();
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function r(now){ render((now - t0) / 1000); requestAnimationFrame(r); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "Dela Gothic One"`, CFG.text).then(start);
+</script>
+</body>
+</html>

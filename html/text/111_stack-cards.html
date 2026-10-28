@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>111 Stack Cards</title>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@700&display=block" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .c { position:absolute; left:0; top:0; box-sizing:border-box; box-shadow:0 4px 10px rgba(0,0,0,.14); }
+  .c svg { position:absolute; left:0; top:0; overflow:visible; }
+</style>
+</head>
+<body>
+<div id="card"></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 284, H: 158,
+  bg: '#FCFCF9',
+  ink: '#24242F',
+  accent: '#EE7493',
+  size: [87, 117], radius: 8,
+  center: [142, 78.5],                  // 疊在一起的位置（＝中間那張的位置）
+  numH: 31, wordH: 21,                  // 數字、單字的字高
+  // 由下到上；dx, dy, rot = 攤開後相對中心的位置與角度；start = 開始攤開的幀
+  cards: [
+    { label: '01',    bg: '#F9E9EA', fg: 'ink',  line: true,  dx: -99, dy: 16,  rot: -15, start: 10 },
+    { label: '02',    bg: '#FFFFFF', fg: 'ink',  line: true,  dx: -49, dy: 8.5, rot: -8,  start: 9 },
+    { label: '03',    bg: 'accent',  fg: '#FFFFFF', line: false, dx: 0, dy: 0,  rot: 0,   start: 0 },
+    { label: '04',    bg: 'ink',     fg: '#FFFFFF', line: false, dx: 51, dy: 8.5, rot: 8, start: 4 },
+    { label: 'CHECK', bg: '#FFFFFF', fg: 'ink',  line: true,  dx: 101, dy: 16,  rot: 15,  start: 0 },
+  ],
+  spreadFrames: 20,                     // 每張攤開的幀數（減速）
+};
+const LOOP = 120;                       // 一輪幀數（30fps）
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const NS = 'http://www.w3.org/2000/svg';
+const col = (c) => CFG[c] || c;
+const cv = document.createElement('canvas').getContext('2d');
+// 文字置中、字高 h
+function centerText(t, str, font, cx, cy, h) {
+  cv.font = `${font.w} 100px ${font.f}`; const m = cv.measureText(str);
+  const k = h / (m.actualBoundingBoxAscent + m.actualBoundingBoxDescent);
+  t.textContent = str;
+  Object.entries({ 'font-family': font.f.replace(/"/g,''), 'font-weight': font.w, 'font-size': 100*k,
+    x: cx - (m.actualBoundingBoxRight - m.actualBoundingBoxLeft) * k / 2, y: cy - h/2 + m.actualBoundingBoxAscent*k }).forEach(([a,v]) => t.setAttribute(a, v));
+}
+const [cw, ch] = CFG.size, els = [];
+
+function build() {
+  for (const c of CFG.cards) {
+    const d = document.createElement('div'); d.className = 'c';
+    Object.assign(d.style, { width: cw+'px', height: ch+'px', borderRadius: CFG.radius+'px', background: col(c.bg),
+      border: c.line ? `1.5px solid ${CFG.ink}` : 'none' });
+    const s = document.createElementNS(NS, 'svg'); s.setAttribute('width', cw); s.setAttribute('height', ch);
+    if (c.line) s.style.left = s.style.top = '-1.5px';
+    const t = document.createElementNS(NS, 'text'); t.setAttribute('fill', col(c.fg)); s.appendChild(t);
+    centerText(t, c.label, { f: '"Oswald"', w: 700 }, cw/2, ch/2, c.label.length > 2 ? CFG.wordH : CFG.numH);
+    d.appendChild(s); card.appendChild(d); els.push([d, c]);
+  }
+}
+
+function render(t) {
+  const f = ((t * 30) % LOOP + LOOP) % LOOP;
+  for (const [d, c] of els) {
+    const u = Math.min(1, Math.max(0, (f - c.start) / CFG.spreadFrames));
+    const p = 1 - Math.pow(1 - u, 3);
+    const x = CFG.center[0] + c.dx * p - cw/2, y = CFG.center[1] + c.dy * p - ch/2;
+    d.style.transform = `translate(${x}px,${y}px) rotate(${c.rot * p}deg)`;
+  }
+}
+
+document.fonts.load('700 50px "Oswald"', '01234CHECK').then(() => {
+  build();
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+});
+</script>
+</body>
+</html>

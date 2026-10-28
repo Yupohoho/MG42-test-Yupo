@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>06 Stretch Text</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #row { position:absolute; left:0; right:0; display:flex; justify-content:center; align-items:flex-end; }
+  .c { display:inline-block; line-height:1; transform-origin:50% 100%;
+       font-family:'Dela Gothic One','Noto Sans JP',sans-serif; }
+</style>
+</head>
+<body>
+<div id="card"><div id="row"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#ff4d4d',
+  chars: ['伸', 'び', 'る'],
+  colors: ['#121212', '#f6efe4'],   // 依序交替
+  fontSize: 52,
+  baseline: .80,                    // 字底位置（畫面高比例），字從這裡往上拉
+  gap: 10/30,                       // 每字接力間隔（秒）：前一字縮回的同時下一字開始拉長
+  startAt: 0,                       // 第一個字開始伸縮的時間
+  loop: 1.4,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+const row = document.getElementById('row');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+row.style.top = 0; row.style.height = CFG.baseline * CFG.H + 'px';
+const els = CFG.chars.map((c, i) => {
+  const s = document.createElement('span'); s.className = 'c'; s.textContent = c;
+  Object.assign(s.style, { fontSize: CFG.fontSize+'px', color: CFG.colors[i % CFG.colors.length], marginRight: -CFG.fontSize*.04+'px' });
+  row.appendChild(s); return s;
+});
+
+// 單字伸縮曲線（30fps 幀數 → 倍率）：縱向拉長到 1.6 撐住 → 一幀縮成 0.8 → 0.7 → 彈回 1.0
+const F = 1/30;
+const STRETCH = [[0,1],[1,1.15],[2,1.4],[3,1.55],[4,1.6],[5,1.6],[6,1.55],[7,1.5],[8,1.45],[9,1.3],[9.5,1.3],[10,.8],[11,.7],[12,.7],[13,.75],[14,.85],[15,1]]
+  .map(([f,v]) => [f*F, v]);
+function sy(dt) {
+  if (dt <= 0 || dt >= STRETCH[STRETCH.length-1][0]) return 1;
+  for (let i = 1; i < STRETCH.length; i++) if (dt < STRETCH[i][0]) {
+    const [t0,v0] = STRETCH[i-1], [t1,v1] = STRETCH[i];
+    return v0 + (v1 - v0) * (dt - t0) / (t1 - t0);
+  }
+  return 1;
+}
+
+function render(t) {
+  els.forEach((el, i) => {
+    const y = sy(t - CFG.startAt - i * CFG.gap);
+    // 拉長只拉高度；縮回階段高度縮比較多、寬度縮一半的量
+    el.style.transform = y >= 1 ? `scaleY(${y})` : `scale(${1 - (1 - y) * .5}, ${y})`;
+  });
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t') % CFG.loop);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % CFG.loop); requestAnimationFrame(f); })(t0); }
+};
+document.fonts.ready.then(start);
+</script>
+</body>
+</html>

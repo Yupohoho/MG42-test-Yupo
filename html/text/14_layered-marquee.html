@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>14 Layered Marquee</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Noto+Sans+JP:wght@400;900&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .track { position:absolute; left:0; display:flex; white-space:nowrap; line-height:1; }
+  .unit { flex:none; white-space:pre; }
+</style>
+</head>
+<body>
+<div id="card"></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#f7c22b',
+  // y = 行中心；speed = 正往右、負往左（px/秒）。重點：每行字型、粗細、大小、速度、方向都不同
+  rows: [
+    { text: '本日限定・',      font: 'Dela Gothic One', weight: 400, size: 17, color: '#2a2206', y: 15, speed: -60 },
+    { text: '先行公開 ・ ',    font: 'Noto Sans JP',    weight: 900, size: 13, color: '#1a1a1a', y: 34, speed:  60 },
+    { text: '新発売 ▸ ',      font: 'Noto Sans JP',    weight: 900, size: 22, color: '#151515', y: 55, speed: -45 },
+    { text: '予約受付中 ・ ',  font: 'Noto Sans JP',    weight: 400, size: 13, color: '#8a6410', y: 78, speed: 120 },
+    { text: '最終日・',        font: 'Dela Gothic One', weight: 400, size: 17, color: '#151515', y: 96, speed: -60 },
+  ],
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+
+const tracks = [], units = [];
+function build() {
+  CFG.rows.forEach(r => {
+    const tr = document.createElement('div'); tr.className = 'track';
+    tr.style.top = (r.y - r.size / 2) + 'px';
+    const mk = () => { const u = document.createElement('span'); u.className = 'unit'; u.textContent = r.text;
+      Object.assign(u.style, { fontFamily: `'${r.font}'`, fontWeight: r.weight, fontSize: r.size+'px', color: r.color }); return u; };
+    tr.appendChild(mk()); card.appendChild(tr);
+    const U = tr.firstChild.getBoundingClientRect().width / (+(q.get('z') || 1));
+    for (let i = 1; i < Math.ceil(CFG.W / U) + 2; i++) tr.appendChild(mk());
+    tracks.push(tr); units.push(U);
+  });
+}
+
+function render(t) {
+  CFG.rows.forEach((r, i) => {
+    // 每行各自等速流動，以一組寬度取模無縫循環
+    const U = units[i], off = ((r.speed * t) % U + U) % U;
+    tracks[i].style.transform = `translateX(${off - U}px)`;
+  });
+}
+
+Promise.all(CFG.rows.map(r => document.fonts.load(`${r.weight} ${r.size}px "${r.font}"`, r.text))).then(() => {
+  build();
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+});
+</script>
+</body>
+</html>

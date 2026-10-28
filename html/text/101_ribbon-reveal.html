@@ -1,0 +1,84 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>T101 Ribbon Reveal</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Oswald:wght@700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#e9e7e3}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh}
+body.m{display:block;min-height:0}
+.card{position:relative;overflow:hidden}
+canvas{display:block}
+</style></head>
+<body><div class="card" id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== CFG：可換內容集中在這裡 =====
+const CFG={
+  text:'SALE',
+  font:'"Archivo Black"', weight:'400',
+  textBox:{x:42,y:53,w:203,h:51},         // 字停住時的墨跡框
+  line:{x:73,y:125,w:140,h:3.5},          // 底線
+  angle:-12,                              // 緞帶傾斜角度
+  // 三條緞帶（由上到下）：左緣 x=10 處的上緣 y、厚度、長度範圍 u（停住時兩端在卡片外）、
+  // 離場方向 dir（順著緞帶：-1 往左下、+1 往右上）、離場開始幀
+  // 第 0 幀起緞帶就把字完全蓋住，依序順著自己的方向、左右交錯加速滑出，尾端最後快速掃過畫面
+  ribbons:[
+    {key:'dark', y:20,    t:56.7, u0:-80, u1:360, dir:-1, start:14},
+    {key:'mid',  y:78,    t:58.2, u0:-80, u1:360, dir:1,  start:17},
+    {key:'pale', y:137.5, t:53.3, u0:-80, u1:360, dir:-1, start:20},
+  ],
+  bg:'#fcfcf9', ink:'#232631', dark:'#232631', mid:'#9575cd', pale:'#eee8f2', paleLine:'#9575cd'
+};
+const LOOP=120; // 幀（30fps），動畫約 39 幀，其餘停住
+
+// ===== 動態 =====
+const DISP=[0,14,46,100,180,285,410,560];                     // 離場：順著緞帶方向加速滑走
+const UW=[0,40,65,85,100,113,122,128,133,136,138,139,140];   // 底線由左往右長出（n=26 起）
+let L;
+function init(){L=fitText(CFG.text,CFG.font,CFG.weight,CFG.textBox);}
+function render(n){
+  // 字一開始就在緞帶底下
+  drawText(L,CFG.ink);
+  for(const r of [CFG.ribbons[2],CFG.ribbons[1],CFG.ribbons[0]]){
+    const dsp=n<r.start?0:tab(DISP,n-r.start)*r.dir;
+    ctx.save();ctx.translate(10,r.y);ctx.rotate(CFG.angle*Math.PI/180);ctx.translate(dsp,0);
+    ctx.fillStyle=CFG[r.key];ctx.fillRect(r.u0,0,r.u1-r.u0,r.t);
+    if(r.key==='pale'){ctx.fillStyle=CFG.paleLine;ctx.fillRect(r.u0,r.t-1.2,r.u1-r.u0,1.2);}
+    ctx.restore();
+  }
+  if(n>=26){const {x,y,h}=CFG.line;ctx.fillStyle=CFG.mid;ctx.fillRect(x,y,tab(UW,n-26)*CFG.line.w/140,h);}
+}
+
+// ===== 共用 =====
+const Q=new URLSearchParams(location.search),Z=+(Q.get('z')||1);
+if(Q.get('m'))document.body.classList.add('m');
+const CW=284,CH=158,DPR=window.devicePixelRatio||1;
+const card=document.getElementById('card'),cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+card.style.cssText+=`width:${CW*Z}px;height:${CH*Z}px;border-radius:${12*Z}px;background:${CFG.bg}`;
+cv.width=CW*Z*DPR;cv.height=CH*Z*DPR;cv.style.width=CW*Z+'px';cv.style.height=CH*Z+'px';
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const tab=(A,i)=>A[clamp(Math.floor(i),0,A.length-1)];
+const lerp=(a,b,p)=>a+(b-a)*p;
+const hex=h=>[1,3,5].map(i=>parseInt(h.substr(i,2),16));
+const mix=(a,b,p)=>{const A=hex(a),B=hex(b);return `rgb(${A.map((v,i)=>Math.round(v+(B[i]-v)*p)).join(',')})`};
+// 文字依墨跡框定位：box={x,y,w,h}；w 省略時照字型原比例
+function fitText(str,fam,wt,box){
+  const c=document.createElement('canvas').getContext('2d');c.font=`${wt} 200px ${fam}`;
+  const m=c.measureText(str),k=box.h/(m.actualBoundingBoxAscent+m.actualBoundingBoxDescent);
+  const nw=(m.actualBoundingBoxLeft+m.actualBoundingBoxRight)*k,sx=box.w?box.w/nw:1;
+  return{str,font:`${wt} ${200*k}px ${fam}`,sx,ox:-(m.actualBoundingBoxRight-m.actualBoundingBoxLeft)/2*k,
+    nw,oy:(m.actualBoundingBoxAscent-m.actualBoundingBoxDescent)/2*k,cx:box.x+(box.w||0)/2,cy:box.y+box.h/2};
+}
+function drawText(L,color,s=1,alpha=1,dy=0){
+  ctx.save();ctx.globalAlpha=alpha;ctx.translate(L.cx,L.cy+dy);ctx.scale(s*L.sx,s);
+  ctx.font=L.font;ctx.fillStyle=color;ctx.fillText(L.str,L.ox,L.oy);ctx.restore();
+}
+function frame(t){
+  const n=Math.floor(t*30+1e-6)%LOOP;
+  ctx.setTransform(Z*DPR,0,0,Z*DPR,0,0);ctx.globalAlpha=1;ctx.filter='none';
+  ctx.fillStyle=CFG.bg;ctx.fillRect(0,0,CW,CH);render(n);
+}
+const T0=Q.get('t');
+document.fonts.load(`400 60px "Archivo Black"`,'A').then(()=>document.fonts.load(`700 60px "Oswald"`,'A')).catch(()=>{}).then(()=>{
+  init();
+  if(T0!==null)frame(+T0);else{const st=performance.now();const lp=()=>{frame((performance.now()-st)/1000);requestAnimationFrame(lp)};lp();}
+});
+</script></body></html>

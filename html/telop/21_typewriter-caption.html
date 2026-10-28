@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>TL21 Typewriter Caption</title>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #txt { position:absolute; white-space:pre; line-height:1; font-family:'DotGothic16',monospace; }
+  #cur { position:absolute; }
+</style>
+</head>
+<body>
+<div id="card"><div id="txt"></div><div id="cur"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: 'ゆっくり1文字ずつ',
+  W: 324, H: 106,
+  bg: '#14181e',
+  color: '#f1f2f5',        // 字色（細的點陣字）
+  cursor: '#2bd6bd',       // 游標色
+  fontSize: 30.7,          // 等寬字；每個字前進 = 字級
+  x0: 24, cy: 55,          // 游標起點（第 0 個字的左邊）、字與游標的垂直中心
+  curW: 3, curH: 35,       // 游標寬高
+  // 打字：每個字出現的幀（硬切），游標跟著往右一格
+  typeFrames: [8,12,17,21,26,30,35,39,44],
+  // 游標：全程在字的後面；第 51–53 幀游標消失（字還在），第 0 幀整句清空（游標也不在），第 1–7 幀只剩游標在開頭
+  curHideFrom: 51, clearFrame: 0,
+  loopFrames: 54,          // 一輪 54 幀（約 1.8 秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), txt = document.getElementById('txt'), cur = document.getElementById('cur');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+Object.assign(txt.style, { color: CFG.color, fontSize: CFG.fontSize+'px', left: (CFG.x0 + 1.5)+'px' });
+Object.assign(cur.style, { width: CFG.curW+'px', height: CFG.curH+'px', background: CFG.cursor, top: (CFG.cy - CFG.curH/2)+'px' });
+function place() { txt.style.top = (CFG.cy - CFG.fontSize/2)+'px'; }   // line-height:1，字盒高度 = 字級
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  let k = CFG.typeFrames.filter(n => f >= n).length;
+  if (f === CFG.clearFrame) k = 0;
+  txt.textContent = CFG.text.slice(0, k);
+  cur.style.left = (CFG.x0 + CFG.fontSize * k)+'px';
+  cur.style.opacity = (f === CFG.clearFrame || f >= CFG.curHideFrom) ? 0 : 1;
+  txt.style.opacity = f === CFG.clearFrame ? 0 : 1;
+}
+
+const start = () => {
+  place();
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function r(now){ render((now - t0) / 1000); requestAnimationFrame(r); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "DotGothic16"`, CFG.text).then(start);
+</script>
+</body>
+</html>

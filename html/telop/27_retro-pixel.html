@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>TL27 Retro Pixel</title>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #txt { position:absolute; white-space:pre; line-height:1; font-family:'DotGothic16',monospace; }
+  #cur { position:absolute; }
+</style>
+</head>
+<body>
+<div id="card"><div id="txt"></div><div id="cur"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: 'ゲームスタート',
+  W: 324, H: 106,
+  // 底色：米白 + 每 8px 一組的掃描線（亮、暗、中、中、暗、亮、淺灰、淺灰），模擬舊電視螢幕
+  scan: ['#fdf9ef','#d5d1c7','#f1ede3','#f2eee4','#d5d1c7','#fefaf0','#e1ddd3','#e1ddd3'], scanPhase: 2,
+  color: '#141414',        // 字色（點陣字）
+  cursor: '#b495ff',       // 游標色（紫）
+  fontSize: 32, x0: 51.5, cy: 53.5,      // 字級、字起點 x、字的垂直中心
+  curX: 290, curY: 38, curW: 14, curH: 32,   // 游標固定在畫面右側（不跟著字移動）
+  // 打字：每個字出現的幀（硬切）
+  typeFrames: [6,8,10,12,15,17,19],
+  // 游標閃爍：亮 7 幀、暗 7 幀；一輪內亮的幀範圍 [起, 迄]
+  curOn: [[1,8],[16,22],[30,35],[43,49]],
+  // 整句在第 56 幀（下一輪第 0 幀）一次清空，第 1–5 幀只剩游標閃
+  loopFrames: 56,          // 一輪 56 幀（約 1.87 秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), txt = document.getElementById('txt'), cur = document.getElementById('cur');
+const rows = CFG.scan.map((c, i) => `${c} ${i}px ${i + 1}px`).join(',');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', transform: `scale(${+(q.get('z') || 1)})`,
+  background: `repeating-linear-gradient(to bottom, ${rows})`, backgroundPositionY: CFG.scanPhase+'px' });
+Object.assign(txt.style, { color: CFG.color, fontSize: CFG.fontSize+'px', left: CFG.x0+'px', top: (CFG.cy - CFG.fontSize/2)+'px' });
+Object.assign(cur.style, { left: CFG.curX+'px', top: CFG.curY+'px', width: CFG.curW+'px', height: CFG.curH+'px', background: CFG.cursor });
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  const k = CFG.typeFrames.filter(n => f >= n).length;
+  txt.textContent = CFG.text.slice(0, k);
+  cur.style.opacity = CFG.curOn.some(([a, b]) => f >= a && f <= b) ? 1 : 0;
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function r(now){ render((now - t0) / 1000); requestAnimationFrame(r); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "DotGothic16"`, CFG.text).then(start);
+</script>
+</body>
+</html>

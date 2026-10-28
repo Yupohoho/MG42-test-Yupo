@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>109 Orbit Camera</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=block" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  .L { position:absolute; left:0; top:0; }
+  svg { position:absolute; left:0; top:0; overflow:visible; }
+  #rig { transform-style:preserve-3d; }
+</style>
+</head>
+<body>
+<div id="card">
+  <svg id="floor"><ellipse id="ring"></ellipse></svg>
+  <div id="scene" class="L"><div id="rig" class="L">
+    <div id="backL" class="L"><svg id="sb"><text id="tb"></text></svg></div>
+    <div id="frontL" class="L"><svg id="sf"><text id="tf"></text></svg></div>
+  </div></div>
+</div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 284, H: 158,
+  bg: '#FCFCF9',
+  ink: '#24242F',
+  accent: '#EE7493',
+  text: 'NEW DROP',
+  box: [20, 63, 254, 92],               // 正面時字的墨跡框
+  depth: 16,                            // 粉紅後層在字後方的距離（px）＝字的厚度感
+  perspective: 600,                     // 透視距離（放在父層 #scene）
+  angle: 32,                            // 轉到左右兩側時的角度（度）
+  ring: { cx: 142.5, cy: 129, rx: 113, ry: 27.5, opacity: 0.55 },   // 地上的環繞軌道（不動）
+  // 左右來回一次＝一輪，連續不停：角度 = angle × sin(φ)，φ = 2π·f/LOOP − slow·sin(4π·f/LOOP)
+  // slow＝0.25 時經過正面的角速度約為一般正弦的一半（變緩但不停），左右兩側自然折返
+  slow: 0.25,
+};
+const LOOP = 120;                       // 一輪幀數（30fps）
+// =================================
+
+const q = new URLSearchParams(location.search);
+const $ = (id) => document.getElementById(id);
+const card = $('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+['floor', 'sb', 'sf'].forEach(id => { $(id).setAttribute('width', CFG.W); $(id).setAttribute('height', CFG.H); });
+['scene', 'rig', 'backL', 'frontL'].forEach(id => Object.assign($(id).style, { width: CFG.W+'px', height: CFG.H+'px' }));
+const cx = (CFG.box[0] + CFG.box[2]) / 2, cy = (CFG.box[1] + CFG.box[3]) / 2;
+// 透視在父層、原點與旋轉軸都在字的中心
+Object.assign($('scene').style, { perspective: CFG.perspective + 'px', perspectiveOrigin: `${cx}px ${cy}px` });
+$('rig').style.transformOrigin = `${cx}px ${cy}px`;
+$('backL').style.transform = `translateZ(${-CFG.depth}px)`;
+const R = CFG.ring;
+Object.entries({ cx: R.cx, cy: R.cy, rx: R.rx, ry: R.ry, fill: 'none', stroke: CFG.accent, 'stroke-width': 1, opacity: R.opacity })
+  .forEach(([a,v]) => $('ring').setAttribute(a, v));
+const cv = document.createElement('canvas').getContext('2d');
+function fitText(t, str, font, box, mode) {
+  cv.font = `${font.w} 100px ${font.f}`; const m = cv.measureText(str);
+  const fs = (box[3]-box[1]) / (m.actualBoundingBoxAscent + m.actualBoundingBoxDescent) * 100, k = fs/100;
+  const inkW = (m.actualBoundingBoxLeft + m.actualBoundingBoxRight) * k, bw = box[2]-box[0];
+  t.textContent = str;
+  Object.entries({ 'font-family': font.f.replace(/"/g,''), 'font-weight': font.w, 'font-size': fs,
+    x: box[0] + m.actualBoundingBoxLeft*k, y: box[1] + m.actualBoundingBoxAscent*k }).forEach(([a,v]) => t.setAttribute(a, v));
+  if (mode === 'ls') t.setAttribute('letter-spacing', (bw-inkW) / Math.max(1, [...str].length-1));
+  else t.setAttribute('transform', `translate(${box[0]} 0) scale(${bw/inkW} 1) translate(${-box[0]} 0)`);
+}
+
+function render(t) {
+  const f = ((t * 30) % LOOP + LOOP) % LOOP;
+  const ph = 2 * Math.PI * f / LOOP - CFG.slow * Math.sin(4 * Math.PI * f / LOOP);
+  const k = Math.sin(ph);   // 1 = 左側、0 = 正面、-1 = 右側
+  $('rig').style.transform = `rotateY(${CFG.angle * k}deg)`;
+}
+
+document.fonts.load('400 50px "Archivo Black"', CFG.text).then(() => {
+  $('tb').setAttribute('fill', CFG.accent); fitText($('tb'), CFG.text, { f: '"Archivo Black"', w: 400 }, CFG.box, 'ls');
+  $('tf').setAttribute('fill', CFG.ink);    fitText($('tf'), CFG.text, { f: '"Archivo Black"', w: 400 }, CFG.box, 'ls');
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+});
+</script>
+</body>
+</html>

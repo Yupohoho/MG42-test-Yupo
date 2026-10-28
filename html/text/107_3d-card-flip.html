@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>107 3D Card Flip</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Mono:wght@700&display=block" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #scene { position:absolute; inset:0; }
+  #panel { position:absolute; box-sizing:border-box; background:#fff; backface-visibility:hidden; }
+  #panel svg { position:absolute; left:0; top:0; overflow:visible; }
+</style>
+</head>
+<body>
+<div id="card"><div id="scene"><div id="panel"><svg id="sv"><text id="lab"></text><text id="tx"></text><rect id="bar"></rect></svg></div></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 284, H: 158,
+  bg: '#FCFCF9',
+  ink: '#24242F',
+  accent: '#EE7493',
+  label: 'OPENING 27',  labelColor: '#8C8C8C',
+  text: 'WOW!',
+  panel: [58, 26, 170, 108],           // 卡片 x, y, 寬, 高
+  radius: 10,
+  // 以下座標都相對卡片左上角
+  labelPos: [10, 15, 6],               // 小字 x, 基線 y, 字級
+  box: [10, 37, 160, 70],              // 主字墨跡框
+  bar: [13, 89, 52, 4],                // 底線 x, y, 寬, 高
+  // 翻入：從側面翻正
+  flipFrames: 24,
+  from: { ry: -90, rx: 14, rz: -6 },   // 出發角度（度）
+  perspective: 520,
+  // 翻正後輕輕浮起再落下
+  bobStart: 47, bobFrames: 39, bobLift: 5,
+};
+const LOOP = 120;                      // 一輪幀數（30fps）
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), scene = document.getElementById('scene'), panel = document.getElementById('panel');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const [px, py, pw, ph] = CFG.panel;
+Object.assign(scene.style, { perspective: CFG.perspective + 'px', perspectiveOrigin: `${px + pw/2}px ${py + ph/2}px` });
+Object.assign(panel.style, { left: px+'px', top: py+'px', width: pw+'px', height: ph+'px', borderRadius: CFG.radius+'px',
+  border: `1.5px solid ${CFG.ink}`, boxShadow: '0 9px 14px -4px rgba(0,0,0,.16)' });
+const sv = document.getElementById('sv'); sv.setAttribute('width', pw); sv.setAttribute('height', ph);
+sv.style.left = sv.style.top = '-1.5px';
+const cv = document.createElement('canvas').getContext('2d');
+function fitText(t, str, font, box, mode) {
+  cv.font = `${font.w} 100px ${font.f}`; const m = cv.measureText(str);
+  const fs = (box[3]-box[1]) / (m.actualBoundingBoxAscent + m.actualBoundingBoxDescent) * 100, k = fs/100;
+  const inkW = (m.actualBoundingBoxLeft + m.actualBoundingBoxRight) * k, bw = box[2]-box[0];
+  t.textContent = str;
+  Object.entries({ 'font-family': font.f.replace(/"/g,''), 'font-weight': font.w, 'font-size': fs,
+    x: box[0] + m.actualBoundingBoxLeft*k, y: box[1] + m.actualBoundingBoxAscent*k }).forEach(([a,v]) => t.setAttribute(a, v));
+  if (mode === 'ls') t.setAttribute('letter-spacing', (bw-inkW) / Math.max(1, [...str].length-1));
+  else t.setAttribute('transform', `translate(${box[0]} 0) scale(${bw/inkW} 1) translate(${-box[0]} 0)`);
+}
+const easeOut3 = (p) => 1 - Math.pow(1 - Math.min(1, Math.max(0, p)), 3);
+
+function build() {
+  const lab = document.getElementById('lab'), [lx, ly, ls] = CFG.labelPos;
+  Object.entries({ x: lx, y: ly, 'font-family': 'Space Mono', 'font-weight': 700, 'font-size': ls, 'letter-spacing': 0.6, fill: CFG.labelColor })
+    .forEach(([a,v]) => lab.setAttribute(a, v));
+  lab.textContent = CFG.label;
+  const tx = document.getElementById('tx'); tx.setAttribute('fill', CFG.accent);
+  fitText(tx, CFG.text, { f: '"Archivo Black"', w: 400 }, CFG.box, 'ls');
+  const [bx, by, bw, bh] = CFG.bar;
+  Object.entries({ x: bx, y: by, width: bw, height: bh, rx: bh/2, fill: CFG.accent }).forEach(([a,v]) => document.getElementById('bar').setAttribute(a, v));
+}
+
+function render(t) {
+  const f = ((t * 30) % LOOP + LOOP) % LOOP;
+  const k = 1 - easeOut3(f / CFG.flipFrames);                 // 剩下的角度比例
+  const u = (f - CFG.bobStart) / CFG.bobFrames;
+  const lift = (u > 0 && u < 1) ? CFG.bobLift * (1 - Math.cos(u * Math.PI * 2)) / 2 : 0;
+  panel.style.transform = `translateY(${-lift}px) rotateY(${CFG.from.ry*k}deg) rotateX(${CFG.from.rx*k}deg) rotateZ(${CFG.from.rz*k}deg)`;
+}
+
+Promise.all([document.fonts.load('400 50px "Archivo Black"', CFG.text), document.fonts.load('700 10px "Space Mono"', CFG.label)]).then(() => {
+  build();
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+});
+</script>
+</body>
+</html>

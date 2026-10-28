@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>126 Minimal Grid</title>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#f6f4f2; }
+  /* ?z=2 放大觀看；?t=0.5 定格；?m=1 量測用（卡片貼左上） */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  svg { position:absolute; inset:0; }
+</style>
+</head>
+<body>
+<div id="card">
+<svg id="sv" width="284" height="158" viewBox="0 0 284 158">
+  <rect id="frame" x="18" y="15" width="250" height="127" fill="none" stroke-width="1.6"/>
+  <line id="v1" x1="100.5" y1="16" x2="100.5" y2="16" stroke-width="1"/>
+  <line id="v2" x1="184.5" y1="16" x2="184.5" y2="16" stroke-width="1"/>
+  <line id="h1" x1="19" y1="78.5" x2="19" y2="78.5" stroke-width="1"/>
+  <text id="num" x="59.5" y="68" text-anchor="middle"></text>
+  <text id="gs1" x="28" y="93.5"></text>
+  <text id="gs2" x="28" y="103.5"></text>
+  <circle id="cir" cx="142.5" cy="46.5" r="0"/>
+  <rect id="sq" x="-16" y="-16" width="32" height="32"/>
+  <polygon id="tri" points="0,-15.5 17,15.5 -17,15.5"/>
+  <g id="lines"></g>
+</svg>
+</div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 284, H: 158,
+  bg: '#fcfcf9',
+  frame: '#3a3a3a',          // 外框
+  grid: '#636363',           // 內格線
+  ink: '#22252e',            // 01、方塊
+  accent: '#d3a32c',         // 圓、三角（金色）
+  light: '#e0e0dd',          // 淺灰假文字條
+  darkLine: '#3c3c44',       // 深灰假文字條
+  num: '01',                 // Oswald 600
+  label: ['GRID', 'SYSTEM'],
+  numSize: 47,
+};
+// =================================
+const LOOP = 120;   // 幀（30fps）：約 1.7 秒拼完，停住到 4 秒再重播
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), $ = id => document.getElementById(id);
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+$('frame').style.stroke = CFG.frame; ['v1', 'v2', 'h1'].forEach(id => $(id).style.stroke = CFG.grid);
+$('num').textContent = CFG.num; Object.assign($('num').style, { font: `600 ${CFG.numSize}px Oswald`, fill: CFG.ink });
+$('gs1').textContent = CFG.label[0]; $('gs2').textContent = CFG.label[1];
+['gs1', 'gs2'].forEach(id => Object.assign($(id).style, { font: '500 5.6px "JetBrains Mono"', letterSpacing: '1px', fill: '#9a9a98' }));
+$('cir').style.fill = $('tri').style.fill = CFG.accent; $('sq').style.fill = CFG.ink;
+
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const lerp = (a, b, k) => a + (b - a) * k;
+function tab(arr, s, f) { const i = f - s, n = arr.length - 1; if (i <= 0) return arr[0]; if (i >= n) return arr[n]; const k = Math.floor(i); return lerp(arr[k], arr[k + 1], i - k); }
+
+// 量測值（我方幀 = 原片幀 + 3）
+const PERI = 2 * (250 + 127);
+const FRAME = [0,50,105,165,234,324,430,519,588,680,754];                     // 第 0 幀起：外框由左上順時針畫出的長度
+const V1 = [0,3,7,13,22,34,51,70,87,99,108,114,118,120,122,123];             // 第 5 幀起：左直線往下長
+const V2 = [0,1,4,7,14,23,35,51,71,87,100,109,115,120,122,123];              // 第 8 幀起：右直線往下長
+const NUM_OP = [0,.14,.31,.44,.57,.68,.77,.84,.91,.93,.97,.99,1];            // 第 13 幀起
+const CIR_R = [0,5,9.5,12.5,15.5,17.5,19.5,20,21.5,21.5,21.5,21,20.5,20,19.5,19,18.5,17.5];   // 第 22 幀起：圓彈出（過衝再縮回）
+const SQ_S = [0,.12,.45,.7,.88,.95,1,1.03,1.05,1.06,1.06,1.05,1.04,1.03,1.02,1.01,1];         // 第 26 幀起：方塊縮放
+const SQ_R = [45,45,35,25,15,8,2,-5,-10,-13,-14,-14,-13,-11,-8,-6,-3,-1,0];                    // 第 26 幀起：方塊旋轉（轉過頭再回正）
+const TRI_S = [0,.27,.45,.64,.82,.94,1.06,1.12,1.14,1.15,1.14,1.12,1.1,1.07,1.04,1.02,1];     // 第 31 幀起：三角彈出
+const GROW = [0,.12,.35,.52,.65,.75,.83,.89,.94,.97,.99,1];                                    // 假文字條長出曲線
+// 假文字條：[x, y, 寬, 色, 開始幀]
+const LINES = [
+  [112, 96.5, 52, 'light', 32], [112, 105.8, 41, 'light', 33.5], [112, 115.8, 28, 'light', 36],
+  [196, 96.8, 58, 'darkLine', 38], [196, 105.8, 46, 'darkLine', 41], [196, 115.3, 36, 'darkLine', 43],
+];
+const lineEls = LINES.map(([x, y, w, c]) => {
+  const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  r.setAttribute('x', x); r.setAttribute('y', y); r.setAttribute('height', 2.6); r.style.fill = CFG[c];
+  $('lines').appendChild(r); return r;
+});
+
+function render(t) {
+  const f = t * 30;
+  const p = tab(FRAME, 0, f);
+  $('frame').setAttribute('stroke-dasharray', `${p} ${PERI}`);
+  $('frame').style.opacity = p > 0 ? 1 : 0;
+  $('v1').setAttribute('y2', 16 + tab(V1, 5, f));
+  $('v2').setAttribute('y2', 16 + tab(V2, 8, f));
+  const h = clamp((f - 11) / 15); $('h1').setAttribute('x2', 19 + 248 * h * h * (3 - 2 * h));
+  $('num').style.opacity = tab(NUM_OP, 13, f);
+  const g = clamp((f - 19) / 10); $('gs1').style.opacity = $('gs2').style.opacity = g;
+  $('cir').setAttribute('r', tab(CIR_R, 22, f));
+  $('sq').setAttribute('transform', `translate(226,46.5) rotate(${tab(SQ_R, 26, f)}) scale(${tab(SQ_S, 26, f)})`);
+  $('tri').setAttribute('transform', `translate(60,113.5) scale(${tab(TRI_S, 31, f)})`);
+  LINES.forEach(([x, y, w, c, s], i) => lineEls[i].setAttribute('width', w * tab(GROW, s, f)));
+}
+
+Promise.all([
+  document.fonts.load(`600 ${CFG.numSize}px Oswald`, CFG.num),
+  document.fonts.load('500 6px "JetBrains Mono"', CFG.label.join('')),
+]).then(() => {
+  if (q.has('t')) render((+q.get('t') * 30 % LOOP) / 30);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000 * 30 % LOOP) / 30); requestAnimationFrame(f); })(t0); }
+});
+</script>
+</body>
+</html>

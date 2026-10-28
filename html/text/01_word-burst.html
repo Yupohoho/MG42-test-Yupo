@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>01 Word Burst</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#14161c; --red:#ff4d4d; }
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格在第 0.5 秒（對照用） */
+  #card { position:relative; width:324px; height:106px; background:var(--bg); border-radius:12px; overflow:hidden; transform-origin:0 0; }
+  #word { position:absolute; left:0; top:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center;
+          font-family:'Dela Gothic One','Noto Sans JP',sans-serif; font-size:64px; color:var(--red); letter-spacing:-1px; }
+  .shard { position:absolute; left:50%; top:50%; }
+</style>
+</head>
+<body>
+<div id="card"><div id="word">衝撃</div></div>
+<script>
+const LOOP = 2.1;
+const q = new URLSearchParams(location.search);
+const Z = +(q.get('z') || 1);
+const card = document.getElementById('card');
+const word = document.getElementById('word');
+card.style.transform = `scale(${Z})`;
+
+// 彈入曲線：30fps 逐幀量出的字寬倍率（0 → 過衝 1.23 → 回彈 1.0）
+const POP = [[0,0],[1,.38],[2,.70],[3,.92],[4,1.07],[5,1.17],[6,1.23],[7,1.23],[8,1.21],[9,1.17],[10,1.11],[11,1.09],[12,1.0]]
+  .map(([f,s]) => [f/30, s]);
+const lerpTable = (tbl, t) => {
+  if (t <= tbl[0][0]) return tbl[0][1];
+  for (let i = 1; i < tbl.length; i++) if (t <= tbl[i][0]) {
+    const [t0,v0] = tbl[i-1], [t1,v1] = tbl[i];
+    return v0 + (v1 - v0) * (t - t0) / (t1 - t0);
+  }
+  return tbl[tbl.length-1][1];
+};
+const smooth = x => x*x*(3-2*x);
+
+// 事件時間軸（秒）：0 彈入 → 0.93 炸開(舊字放大變暗消失) → 1.067 第二次彈入 → 1.93 退場 → 2.1 循環
+const T_POP1 = 0, T_EXIT1 = 0.93, T_POP2 = 1.067, T_EXIT2 = 1.93, T_EXIT_LEN = 0.137;
+
+function wordState(t) {
+  const pop = (t0) => lerpTable(POP, t - t0);
+  if (t < T_EXIT1)                  return { s: t < T_POP1 + .4 ? pop(T_POP1) : 1, o: t < 1/30 ? 0 : 1, b: 0 };
+  if (t < T_EXIT1 + T_EXIT_LEN)     { const k = (t - T_EXIT1) / T_EXIT_LEN; return { s: 1 + .3*k, o: 1 - smooth(k), b: 3*k }; }
+  if (t < T_POP2)                   return { s: 1, o: 0, b: 0 };
+  if (t < T_EXIT2)                  return { s: t < T_POP2 + .4 ? pop(T_POP2) : 1, o: t < T_POP2 + 1/30 ? 0 : 1, b: 0 };
+  if (t < T_EXIT2 + T_EXIT_LEN)     { const k = (t - T_EXIT2) / T_EXIT_LEN; return { s: 1 + .3*k, o: 1 - smooth(k), b: 3*k }; }
+  return { s: 1, o: 0, b: 0 };
+}
+
+// 碎片：12 片，白/暗紅小長方形，從中心向外飛、旋轉、後段淡出
+let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+const shards = Array.from({length: 18}, (_, i) => {
+  const side = i % 2 ? 1 : -1;                          // 左右兩側為主，少量上下
+  const a = (i % 6 === 0 ? (rnd() < .5 ? -1 : 1) * Math.PI/2 : (side > 0 ? 0 : Math.PI)) + (rnd() - .5) * 1.4;
+  return { a, v: 95 + rnd() * 75, w: 7 + rnd() * 4, h: 12 + rnd() * 7, rot: (rnd() - .5) * 420, r0: rnd() * 360,
+           c: i % 3 === 0 ? '#b83b3b' : '#e6e6e6', el: null };
+});
+shards.forEach(s => { const d = document.createElement('div'); d.className = 'shard'; d.style.width = s.w+'px'; d.style.height = s.h+'px'; d.style.background = s.c; card.appendChild(d); s.el = d; });
+const SH_START = 0.83, SH_END = 1.56;
+function drawShards(t) {
+  const k = (t - SH_START) / (SH_END - SH_START);
+  shards.forEach(s => {
+    if (k < 0 || k > 1) { s.el.style.opacity = 0; return; }
+    const e = 1 - Math.pow(1 - k, 5);                 // 強 ease-out：0.15 秒內衝到邊緣，之後慢慢漂
+    const x = Math.cos(s.a) * s.v * e * 1.2, y = Math.sin(s.a) * s.v * e * .5;
+    s.el.style.opacity = k < .1 ? k * 10 : k > .7 ? (1 - k) / .3 : 1;
+    s.el.style.transform = `translate(${x}px,${y}px) rotate(${s.r0 + s.rot * k}deg)`;
+  });
+}
+
+function render(t) {
+  const w = wordState(t);
+  word.style.transform = `scale(${w.s})`;
+  word.style.opacity = w.o;
+  word.style.filter = w.b ? `blur(${w.b}px) brightness(${1 - .4*(w.b/3)})` : '';
+  drawShards(t);
+}
+
+if (q.has('t')) render(+q.get('t') % LOOP);
+else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000) % LOOP); requestAnimationFrame(f); })(t0); }
+</script>
+</body>
+</html>

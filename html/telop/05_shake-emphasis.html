@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>TL05 Shake Emphasis</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #word { position:absolute; left:0; top:0; width:0; height:0; }
+  #word svg { position:absolute; left:0; top:0; width:1px; height:1px; overflow:visible; }
+</style>
+</head>
+<body>
+<div id="card"><div id="word"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '超危険!!',
+  W: 324, H: 106,
+  bg: '#14161c',
+  color: '#ff5a5f',        // 字色
+  outline: '#f4efe4',      // 外框色
+  outlineW: 3.5,           // 外框寬度（px，往外長）
+  fontSize: 40, spacing: 8,
+  cx: 163, cy: 54.5,       // 字中心（px）
+  // 彈出：從第 4 幀起，橫向／縱向縮放，過衝後回穩（硬切不用緩動）
+  popX: [.56,.94,1.14,1.24,1.24,1.19,1.10,1.02,1.0,1.0,1.0,1.0],
+  popY: [.57,.95,1.19,1.24,1.24,1.19,1.10,1.02,1.0,1.0,1.0,1.0],
+  // 抖動：第 16–34 幀，每幀硬切一個位置偏移 [dx, dy]（px）
+  shakeFrom: 16,
+  shake: [[-3.5,-2],[1,-1],[0,1],[-1,0],[2.5,-2],[-4,0],[3,1],[-1,-1],[0,-1],[1,0],[-3,.5],[4,-2],[-3,0],[1,1],[0,0],[-1,-2],[4,0],[4,0],[0,0]],
+  // 淡出：第 54–56 幀逐步變淡，第 57 幀消失
+  fade: [.87,.61,.34], fadeFrom: 54,
+  popAt: 4,
+  loopFrames: 59,          // 一輪 59 幀（約 1.97 秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), word = document.getElementById('word');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const NS = 'http://www.w3.org/2000/svg';
+function svgLayers(parent, text, layers, size, spacing) {
+  const svg = document.createElementNS(NS, 'svg');
+  for (const [col, sw] of layers) {
+    const tx = document.createElementNS(NS, 'text'); tx.textContent = text;
+    for (const [k, v] of Object.entries({ x: spacing/2, y: 0, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-family': "'Dela Gothic One',sans-serif",
+      'font-size': size, 'letter-spacing': spacing, fill: col, stroke: sw ? col : 'none', 'stroke-width': sw,
+      'stroke-linejoin': 'round', 'stroke-linecap': 'round', 'paint-order': 'stroke fill' })) tx.setAttribute(k, v);
+    svg.appendChild(tx);
+  }
+  parent.appendChild(svg); return svg;
+}
+// 描邊字用 SVG 文字＋圓角連接（HTML 文字的描邊轉折會長尖刺）
+svgLayers(word, CFG.text, [[CFG.outline, CFG.outlineW*2], [CFG.color, 0]], CFG.fontSize, CFG.spacing);
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  let sx = 1, sy = 1, o = 1, dx = 0, dy = 0;
+  const k = f - CFG.popAt;
+  if (k < 0) o = 0;
+  else if (k < CFG.popX.length) { sx = CFG.popX[k]; sy = CFG.popY[k]; }
+  const j = f - CFG.shakeFrom;
+  if (j >= 0 && j < CFG.shake.length) [dx, dy] = CFG.shake[j];
+  if (f >= CFG.fadeFrom) { const m = f - CFG.fadeFrom; o = m < CFG.fade.length ? CFG.fade[m] : 0; }
+  word.style.opacity = o;
+  word.style.left = (CFG.cx + dx)+'px'; word.style.top = (CFG.cy + dy)+'px';
+  word.style.transform = `scale(${sx},${sy})`;
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function r(now){ render((now - t0) / 1000); requestAnimationFrame(r); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "Dela Gothic One"`, CFG.text).then(start);
+</script>
+</body>
+</html>

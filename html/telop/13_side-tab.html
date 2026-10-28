@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>TL13 Side Tab</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@700;900&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #card > div { position:absolute; }
+  #panel { transform-origin:0 50%; }
+  #tab { transform-origin:50% 100%; display:flex; align-items:center; justify-content:center; overflow:hidden;
+         font-family:'Noto Sans JP',sans-serif; font-weight:900; writing-mode:vertical-rl; text-orientation:sideways; line-height:1; }
+  #txt { white-space:nowrap; line-height:1; font-family:'Noto Sans JP',sans-serif; font-weight:700; }
+</style>
+</head>
+<body>
+<div id="card"><div id="panel"></div><div id="txt"></div><div id="tab"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#14181e',
+  panel: { x: 17, y: 20, w: 290, h: 65, color: '#0e0f14' },        // 底板（終點位置；左端藏在色條後面）
+  tab:   { x: 17, y: 24, w: 36, h: 59, color: '#ffcc55', text: 'NEWS', ink: '#14151c', size: 15, spacing: 2 },   // 左側色條與直排字
+  text:  { text: '新製品を発表', x: 69, cy: 53.5, size: 24, color: '#ffffff' },   // 內文（左緣、垂直中心）
+  // 色條：第 4 幀起以底邊為準往上長高（縱向倍率）
+  tabFrom: 4, tabScale: [.37,.63,.80,.90,.97,.98,1.0],
+  // 底板：第 9 幀起從色條右邊往右刷出（走完全程的比例，先快後慢）
+  panelFrom: 9, panelProg: [.06,.29,.52,.69,.80,.88,.94,.97,.99,.99,1.0],
+  // 內文：第 17 幀起由淡到實（約 10 幀），同時由模糊變清楚 [模糊px]
+  textFrom: 17, textIn: 10, blur: [4,3,2,1,.5],
+  // 淡出：第 53–57 幀整組逐步變淡，第 58 幀消失
+  fade: [.93,.8,.55,.32,.12], fadeFrom: 53,
+  loopFrames: 59,          // 一輪 59 幀（約 1.97 秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+const panel = document.getElementById('panel'), tab = document.getElementById('tab'), txt = document.getElementById('txt');
+const P = CFG.panel, T = CFG.tab, X = CFG.text;
+Object.assign(panel.style, { left: P.x+'px', top: P.y+'px', width: P.w+'px', height: P.h+'px', background: P.color });
+Object.assign(tab.style, { left: T.x+'px', top: T.y+'px', width: T.w+'px', height: T.h+'px', background: T.color, color: T.ink, fontSize: T.size+'px', letterSpacing: T.spacing+'px', paddingTop: T.spacing+'px' });
+tab.textContent = T.text;
+txt.textContent = X.text; Object.assign(txt.style, { left: X.x+'px', fontSize: X.size+'px', color: X.color });
+function place() { txt.style.top = (X.cy - txt.offsetHeight/2)+'px'; }
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  let g = 1;
+  if (f >= CFG.fadeFrom) g = f - CFG.fadeFrom < CFG.fade.length ? CFG.fade[f - CFG.fadeFrom] : 0;
+  // 色條
+  const a = f - CFG.tabFrom;
+  tab.style.opacity = a < 0 ? 0 : g; tab.style.transform = `scaleY(${a < 0 ? .01 : a >= CFG.tabScale.length ? 1 : CFG.tabScale[a]})`;
+  // 底板
+  const b = f - CFG.panelFrom;
+  panel.style.opacity = b < 0 ? 0 : g; panel.style.transform = `scaleX(${b < 0 ? .001 : b >= CFG.panelProg.length ? 1 : CFG.panelProg[b]})`;
+  // 內文
+  const c = f - CFG.textFrom;
+  txt.style.opacity = c < 0 ? 0 : Math.min(1, (c + 1) / CFG.textIn) * g;
+  const bl = c < 0 ? CFG.blur[0] : c >= CFG.blur.length ? 0 : CFG.blur[c];
+  txt.style.filter = bl ? `blur(${bl}px)` : 'none';
+}
+
+const start = () => {
+  place();
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function r(now){ render((now - t0) / 1000); requestAnimationFrame(r); })(t0); }
+};
+Promise.all([
+  document.fonts.load('900 15px "Noto Sans JP"', CFG.tab.text),
+  document.fonts.load('700 24px "Noto Sans JP"', CFG.text.text),
+]).then(start);
+</script>
+</body>
+</html>

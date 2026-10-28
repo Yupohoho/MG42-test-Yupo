@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>125 Product Spotlight</title>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@600&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#f6f4f2; }
+  /* ?z=2 放大觀看；?t=0.5 定格；?m=1 量測用（卡片貼左上） */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  svg { position:absolute; inset:0; }
+</style>
+</head>
+<body>
+<div id="card">
+<svg id="sv" width="284" height="158" viewBox="0 0 284 158">
+  <defs>
+    <!-- 光柱亮度：上緣最亮，往下線性淡到 y≈135 消失 -->
+    <linearGradient id="beamG" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="135">
+      <stop offset="0" stop-color="#fff" stop-opacity=".33"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <!-- 光裡的瓶子：瓶蓋附近較暗，往下到肩部全亮 -->
+    <linearGradient id="litG" gradientUnits="userSpaceOnUse" x1="0" y1="15" x2="0" y2="62">
+      <stop offset="0" stop-color="#fff" stop-opacity=".45"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="1"/>
+    </linearGradient>
+    <!-- 照亮範圍邊緣柔化：瓶子被光照到的地方由暗到亮漸變，不是硬切 -->
+    <filter id="soft" filterUnits="userSpaceOnUse" x="-50" y="-50" width="384" height="258"><feGaussianBlur stdDeviation="9"/></filter>
+    <mask id="beamM" maskUnits="userSpaceOnUse" x="0" y="0" width="284" height="158">
+      <polygon id="beamMask" fill="url(#litG)" filter="url(#soft)" points="0,0 0,0 0,0"/>
+    </mask>
+    <g id="bottle">
+      <rect x="129" y="21" width="28" height="18" rx="3"/>
+      <rect x="133" y="38" width="19.5" height="17"/>
+      <rect x="116" y="54" width="54" height="74" rx="10"/>
+    </g>
+  </defs>
+  <!-- 暗的瓶子（剪影） -->
+  <g id="darkB">
+    <use href="#bottle"/>
+    <rect id="dLab" x="128" y="84" width="29" height="24" rx="2"/>
+  </g>
+  <!-- 光柱經過時：亮瓶只露在光柱範圍內 -->
+  <g id="litBeam" mask="url(#beamM)">
+    <use href="#litShape"/>
+  </g>
+  <!-- 光柱離開後：整支亮起 -->
+  <g id="litFull">
+    <use href="#litShape"/>
+  </g>
+  <polygon id="beam" fill="url(#beamG)" points="0,0 0,0 0,0"/>
+  <text id="tag" x="141.5" y="151" text-anchor="middle"></text>
+</svg>
+</div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 284, H: 158,
+  bg: '#232631',
+  bottleDark: ['#2a323e', '#384050', '#384050'],   // 暗瓶：填色、外框、標籤
+  bottleLit: ['#f6f4f2', '#ccb06e', '#d7a940'],    // 亮瓶：填色、金外框、金標籤
+  tag: 'NEW', tagColor: '#ececee',
+};
+// =================================
+const LOOP = 120;   // 幀（30fps）：光柱由左等速掃到右，掃過後瓶子整支亮起（約 3 秒），停住到 4 秒再重播
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), $ = id => document.getElementById(id);
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+// 亮瓶的圖形（光柱內與整支亮起共用）
+const NS = 'http://www.w3.org/2000/svg';
+const lit = document.createElementNS(NS, 'g'); lit.id = 'litShape';
+lit.innerHTML = `<use href="#bottle" style="fill:${CFG.bottleLit[0]};stroke:${CFG.bottleLit[1]};stroke-width:1.3"/>
+  <rect x="128" y="84" width="29" height="24" rx="2" fill="${CFG.bottleLit[2]}"/>`;
+document.querySelector('defs').appendChild(lit);
+$('darkB').querySelector('use').style.cssText = `fill:${CFG.bottleDark[0]};stroke:${CFG.bottleDark[1]};stroke-width:1.2`;
+$('dLab').style.fill = CFG.bottleDark[2];
+const tag = $('tag'); tag.textContent = CFG.tag;
+Object.assign(tag.style, { font: '600 11.5px Oswald', letterSpacing: '3px', fill: CFG.tagColor });
+
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+// 光柱：光源在畫面上方外，畫面裡只看到從上緣進來、上窄下寬的光柱（上緣寬 27px，往下每 1px 加寬 0.6px）。
+// 光柱上緣等速由左往右（每幀 5.15px），方向始終微微斜向瓶子：
+// 中心線每往下 1px，往瓶子方向偏「0.00215 × 與瓶子的水平距離」，所以在瓶子左邊時下端偏右、右邊時下端偏左
+const BX = 144, SPEED = 5.15, X0 = -90, K = 0.00215, W0 = 13.5, SPREAD = 0.3;
+function beamPts(xt) {
+  const s = K * (BX - xt), p = [];
+  for (const y of [-5, 165]) { const c = xt + s * y, w = W0 + SPREAD * y; p.push([c - w, y], [c + w, y]); }
+  return `${p[0]} ${p[1]} ${p[3]} ${p[2]}`;
+}
+
+function render(t) {
+  const f = t * 30;
+  const pts = beamPts(X0 + SPEED * f);           // 第 0 幀光柱在左外側，約第 75 幀上緣離開右側
+  $('beam').setAttribute('points', pts);
+  $('beamMask').setAttribute('points', pts);
+  $('litFull').style.opacity = clamp((f - 85) / 5);   // 光柱離開後約 10 幀，第 85–90 幀整支亮起並保持
+  tag.style.opacity = clamp((f - 48) / 15);            // NEW：光柱經過瓶子時淡入（第 48–63 幀）
+}
+
+document.fonts.load('600 11.5px Oswald', CFG.tag).then(() => {
+  if (q.has('t')) render((+q.get('t') * 30 % LOOP) / 30);
+  else { const t0 = performance.now(); (function f(now){ render(((now - t0) / 1000 * 30 % LOOP) / 30); requestAnimationFrame(f); })(t0); }
+});
+</script>
+</body>
+</html>
