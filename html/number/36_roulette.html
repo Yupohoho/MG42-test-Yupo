@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><title>N36 ルーレット (Roulette)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@800&family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;height:100%;background:#090d13}
+body{display:flex;align-items:center;justify-content:center;overflow:hidden}
+body.m{display:block}
+#wrap{transform-origin:center}
+body.m #wrap{transform-origin:0 0}
+#c{position:relative;width:324px;height:124px;border-radius:12px;overflow:hidden;font-family:Montserrat,sans-serif;color:#fff;
+ background:radial-gradient(circle at 100% 0,rgba(140,80,170,.13),transparent 60%),radial-gradient(rgba(255,255,255,.055) 1px,transparent 1.5px) 5px 5px/11px 11px,#131921;
+ box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
+#c>*{position:absolute}
+.cen{transform:translate(-50%,-50%);white-space:nowrap}
+.big{font-family:Montserrat,sans-serif;font-weight:800}
+.mn{font-family:Manrope,Montserrat,sans-serif}
+
+#rl{left:243px;top:31px;font:700 8px Montserrat;letter-spacing:.2em;color:#8d96ad}
+#res{left:0;top:0;font-size:70px;color:#444c60}
+
+</style></head><body><div id="wrap"><div id="c">
+<svg id="wh" width="180" height="124" viewBox="0 0 180 124" style="left:0;top:0"></svg>
+<div class="cen" id="rl">RESULT</div><div class="cen big" id="res">?</div>
+</div></div>
+<script>
+/* CFG：示範用的數值、字、色都集中在這裡 */
+const LOOP=120;
+const FONTS=['800 20px Manrope','700 12px Montserrat'];
+const CX=90,CY=67,RR=51,TARGET=7,START_DEG=100,A=1340,T=64;
+// 結果數字衝入縮放（實測自參考：f80 起 1.08→1.2 過衝→.93 回縮→1）
+const RES_SC=[[80,1.08],[81,1.2],[82,1.2],[83,1.15],[84,1.07],[85,.98],[86,.94],[87,.93],[88,.95],[89,.98],[90,1]];
+
+const FPS=30;
+const clamp=(v,a=0,b=1)=>Math.min(b,Math.max(a,v));
+const lerp=(a,b,t)=>a+(b-a)*t;
+const eo=t=>1-Math.pow(1-clamp(t),3), ei=t=>Math.pow(clamp(t),3), eio=t=>{t=clamp(t);return t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2};
+function kf(keys,f,smooth){
+  if(f<=keys[0][0])return keys[0].slice(1);
+  for(let i=1;i<keys.length;i++){if(f<=keys[i][0]){const a=keys[i-1],b=keys[i];let t=(f-a[0])/(b[0]-a[0]);if(smooth)t=t*t*(3-2*t);return a.slice(1).map((v,j)=>lerp(v,b[j+1],t))}}
+  return keys[keys.length-1].slice(1)}
+function rnd(seed){let s=seed*9301+49297;return()=>{s=(s*9301+49297)%233280;return s/233280}}
+const fmt=n=>Math.round(n).toLocaleString('en-US');
+const $=id=>document.getElementById(id);
+function mix(c1,c2,t){t=clamp(t);return 'rgb('+c1.map((v,i)=>Math.round(lerp(v,c2[i],t))).join(',')+')'}
+function place(el,x,y,s,a){el.style.transform='translate(-50%,-50%) translate('+x+'px,'+y+'px) scale('+s+')';el.style.opacity=a}
+const q=new URLSearchParams(location.search);
+$('wrap').style.transform='scale('+(+q.get('z')||1)+')';
+if(q.get('m')==='1')document.body.classList.add('m');
+function start(){
+  if(typeof setup==='function')setup();
+  if(q.has('t')){render(+q.get('t')*FPS);}
+  else{const st=performance.now();(function tick(){render(((performance.now()-st)/1000*FPS)%LOOP);requestAnimationFrame(tick)})()}
+}
+Promise.race([Promise.all(FONTS.map(f=>document.fonts.load(f,'0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ?,.'))),new Promise(r=>setTimeout(r,2500))]).then(start);
+
+
+const NS='http://www.w3.org/2000/svg';
+function arc(r,a0,a1){const p=a=>[Math.sin(a*Math.PI/180)*r,-Math.cos(a*Math.PI/180)*r];const [x0,y0]=p(a0),[x1,y1]=p(a1);return [x0,y0,x1,y1]}
+let G,PTR;
+function setup(){
+  const sv=$('wh');
+  G=document.createElementNS(NS,'g');sv.appendChild(G);
+  const bg=document.createElementNS(NS,'circle');bg.setAttribute('r',RR+1);bg.setAttribute('fill','#10151f');G.appendChild(bg);
+  for(let n=1;n<=8;n++){
+    const c=START_DEG+45*(n-TARGET);
+    const [ax,ay,bx,by]=arc(RR,c-22.5,c+22.5),[cx2,cy2,dx,dy]=arc(9,c-22.5,c+22.5);
+    const p=document.createElementNS(NS,'path');
+    p.setAttribute('d','M'+cx2+' '+cy2+'L'+ax+' '+ay+'A'+RR+' '+RR+' 0 0 1 '+bx+' '+by+'L'+dx+' '+dy+'A9 9 0 0 0 '+cx2+' '+cy2+'Z');
+    p.setAttribute('fill',n===TARGET?'#8a3a63':'#1d2640');p.setAttribute('stroke','#10151f');p.setAttribute('stroke-width','1.5');G.appendChild(p);
+    const t=document.createElementNS(NS,'text');t.setAttribute('transform','rotate('+c+') translate(0,-36)');t.setAttribute('text-anchor','middle');t.setAttribute('dominant-baseline','central');
+    t.setAttribute('font-family','Montserrat');t.setAttribute('font-weight','700');t.setAttribute('font-size','12');t.setAttribute('fill','#fff');t.textContent=n;G.appendChild(t)}
+  const ring=document.createElementNS(NS,'circle');ring.setAttribute('r',RR);ring.setAttribute('fill','none');ring.setAttribute('stroke','#2c3556');ring.setAttribute('stroke-width','2');G.appendChild(ring);
+  const hub=document.createElementNS(NS,'circle');hub.setAttribute('r',9);hub.setAttribute('fill','#0e1220');hub.setAttribute('stroke','#2a3350');hub.setAttribute('stroke-width','1.5');G.appendChild(hub);
+  PTR=document.createElementNS(NS,'polygon');PTR.setAttribute('points','-6,-6 6,-6 0,8');PTR.setAttribute('fill','#4dffa0');sv.appendChild(PTR);
+}
+function render(f){
+  const reset=f>=118;
+  const u=clamp(f/T);const rot=reset?0:A*(1-Math.pow(1-u,3));
+  const speed=reset?0:A*3*Math.pow(1-u,2)/T;
+  G.setAttribute('transform','translate('+CX+','+CY+') rotate('+rot+')');
+  const ph=(((rot-(START_DEG-45*0))%45)+45)%45/45;
+  const tilt=speed<22?-24*Math.max(0,1-ph*2.4):0;
+  PTR.setAttribute('transform','translate('+CX+','+(CY-RR+1)+') rotate('+tilt+')');
+  const res=$('res');
+  if(f<80||reset){res.textContent='?';res.style.color='#444c60';res.style.textShadow='none';place(res,243,70,1,1)}
+  else{res.textContent=TARGET;
+    const g=1-clamp((f-85)/22);
+    res.style.color=mix([255,255,255],[102,255,170],g);
+    res.style.textShadow='0 0 '+(16*g)+'px rgba(91,255,160,'+(.75*g)+')';
+    place(res,243,70,kf(RES_SC,f)[0],1)}
+}
+</script></body></html>

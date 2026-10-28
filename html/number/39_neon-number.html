@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><title>N39 ネオン数字 (Neon Number)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@800&family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;height:100%;background:#090d13}
+body{display:flex;align-items:center;justify-content:center;overflow:hidden}
+body.m{display:block}
+#wrap{transform-origin:center}
+body.m #wrap{transform-origin:0 0}
+#c{position:relative;width:324px;height:124px;border-radius:12px;overflow:hidden;font-family:Montserrat,sans-serif;color:#fff;
+ background:radial-gradient(circle at 100% 0,rgba(140,80,170,.13),transparent 60%),radial-gradient(rgba(255,255,255,.055) 1px,transparent 1.5px) 5px 5px/11px 11px,#131921;
+ box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
+#c>*{position:absolute}
+.cen{transform:translate(-50%,-50%);white-space:nowrap}
+.big{font-family:Montserrat,sans-serif;font-weight:800}
+.mn{font-family:Manrope,Montserrat,sans-serif}
+
+#svg{left:0;top:0}
+#svg text{font-family:Manrope,Montserrat,sans-serif;font-weight:800;font-size:81px;stroke-linejoin:round;paint-order:stroke fill}
+
+</style></head><body><div id="wrap"><div id="c">
+<svg id="svg" width="324" height="124" viewBox="0 0 324 124"><defs id="df"></defs><g id="grp"></g></svg>
+</div></div>
+<script>
+/* CFG：示範用的數值、字、色都集中在這裡 */
+const LOOP=120;
+const FONTS=['800 20px Manrope'];
+const TEXT='2025';
+const TARGET_W=214,CX=162,BASE=91;
+// 各數字逐幀點亮度（0=暗、1=全亮，實測自參考，會閃爍）
+const LIT=[[0,0,0,0,0,0,0,0.97,0.97,0.06,0.97,0.97,0.06,0.97,0.97,0.06,0.97,0.97,0.06,0.06,1,0.14,0.06,1,1,0.07,0.97,1,0.07,0.97,1,0.16,0.97,1,0.17,0.97,1,0.16,0.97,1,0.16,0.09,1,0.16,0.09,1,1,0.96,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0.79,0.71,0,0.01,0.48,0.39,0,0,0.19,0.11,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0.01,0.01,0,0.01,0.01,0,0.01,0.01,0,0.01,0.01,0,0,1,1,0.09,1,1,0.15,0.13,1,0.15,0.14,1,1,0.14,1,1,0.14,1,1,0.16,1,1,0.18,1,1,0.18,1,1,0.2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0.01,0.05,0.78,0.73,0,0.59,0.54,0,0,0.31,0.25,0.02,0.02,0.03,0.01,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.03,0.03,0,0.03,0.03,0.99,0.09,1,0.99,0.16,1,1,0.16,1,1,0.16,0.16,1,0.17,0.16,1,1,0.15,1,1,0.16,1,1,0.21,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0.04,0.02,0.87,0.8,0.02,0,0.59,0.51,0,0,0.29,0.21,0,0.07,0.02,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.02,0,0.03,0.03,1,0.16,1,1,0.15,1,1,0.13,1,1,0.13,1,1,0.13,0.15,1,0.13,0.16,1,1,0.16,1,1,0.16,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0.97,0.95,0.02,0,0.69,0.63,0,0,0.37,0.32,0.01,0.01,0.09,0.03,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]];
+const DIM=[140,62,112],ON=[255,114,184];
+// 白色描邊（實測自參考：亮時約1.5px淡粉白，暗時為深酒紅細邊；SVG text + round join + paint-order）
+const STK=[255,206,250],STK_DIM=[96,40,74],SW=3;
+
+const FPS=30;
+const clamp=(v,a=0,b=1)=>Math.min(b,Math.max(a,v));
+const lerp=(a,b,t)=>a+(b-a)*t;
+const eo=t=>1-Math.pow(1-clamp(t),3), ei=t=>Math.pow(clamp(t),3), eio=t=>{t=clamp(t);return t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2};
+function kf(keys,f,smooth){
+  if(f<=keys[0][0])return keys[0].slice(1);
+  for(let i=1;i<keys.length;i++){if(f<=keys[i][0]){const a=keys[i-1],b=keys[i];let t=(f-a[0])/(b[0]-a[0]);if(smooth)t=t*t*(3-2*t);return a.slice(1).map((v,j)=>lerp(v,b[j+1],t))}}
+  return keys[keys.length-1].slice(1)}
+function rnd(seed){let s=seed*9301+49297;return()=>{s=(s*9301+49297)%233280;return s/233280}}
+const fmt=n=>Math.round(n).toLocaleString('en-US');
+const $=id=>document.getElementById(id);
+function mix(c1,c2,t){t=clamp(t);return 'rgb('+c1.map((v,i)=>Math.round(lerp(v,c2[i],t))).join(',')+')'}
+function place(el,x,y,s,a){el.style.transform='translate(-50%,-50%) translate('+x+'px,'+y+'px) scale('+s+')';el.style.opacity=a}
+const q=new URLSearchParams(location.search);
+$('wrap').style.transform='scale('+(+q.get('z')||1)+')';
+if(q.get('m')==='1')document.body.classList.add('m');
+function start(){
+  if(typeof setup==='function')setup();
+  if(q.has('t')){render(+q.get('t')*FPS);}
+  else{const st=performance.now();(function tick(){render(((performance.now()-st)/1000*FPS)%LOOP);requestAnimationFrame(tick)})()}
+}
+Promise.race([Promise.all(FONTS.map(f=>document.fonts.load(f,'0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ?,.'))),new Promise(r=>setTimeout(r,2500))]).then(start);
+
+
+const NS='http://www.w3.org/2000/svg';
+let TX=[],FL=[];
+function setup(){
+  const grp=$('grp'),df=$('df');const ws=[];
+  TEXT.split('').forEach((ch,i)=>{
+    const f=document.createElementNS(NS,'filter');f.setAttribute('id','f'+i);f.setAttribute('filterUnits','userSpaceOnUse');f.setAttribute('x','-200');f.setAttribute('y','-100');f.setAttribute('width','400');f.setAttribute('height','300');
+    f.innerHTML='<feGaussianBlur in="SourceAlpha" stdDeviation="0.1" result="b1"/><feFlood flood-color="rgb(255,60,150)" flood-opacity="0" result="c1"/><feComposite in="c1" in2="b1" operator="in" result="g1"/><feGaussianBlur in="SourceAlpha" stdDeviation="0.1" result="b2"/><feFlood flood-color="rgb(255,150,205)" flood-opacity="0" result="c2"/><feComposite in="c2" in2="b2" operator="in" result="g2"/><feMerge><feMergeNode in="g1"/><feMergeNode in="g2"/><feMergeNode in="SourceGraphic"/></feMerge>';
+    df.appendChild(f);FL.push(f);
+    const g=document.createElementNS(NS,'g');g.setAttribute('filter','url(#f'+i+')');
+    const t=document.createElementNS(NS,'text');t.textContent=ch;t.setAttribute('y',BASE);t.setAttribute('stroke-width',SW);g.appendChild(t);grp.appendChild(g);TX.push(t);
+    ws.push(t.getComputedTextLength());
+  });
+  const W=ws.reduce((p,q)=>p+q,0);let x=-W/2;
+  TX.forEach((t,i)=>{t.setAttribute('x',x);x+=ws[i]});
+  grp.setAttribute('transform','translate('+CX+',0) scale('+(TARGET_W/W)+',1)');
+}
+function render(f){
+  const fi=Math.floor(f)%120;
+  for(let i=0;i<TX.length;i++){
+    const a=LIT[i][fi];
+    TX[i].setAttribute('fill',mix(DIM,ON,a));
+    TX[i].setAttribute('stroke',mix(STK_DIM,STK,a));
+    const n=FL[i].children;
+    n[0].setAttribute('stdDeviation',Math.max(.1,8*a));n[1].setAttribute('flood-opacity',.85*a);
+    n[3].setAttribute('stdDeviation',Math.max(.1,2.5*a));n[4].setAttribute('flood-opacity',a);
+  }
+}
+</script></body></html>

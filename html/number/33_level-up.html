@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><title>N33 レベルアップ (Level Up)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@800&family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;height:100%;background:#090d13}
+body{display:flex;align-items:center;justify-content:center;overflow:hidden}
+body.m{display:block}
+#wrap{transform-origin:center}
+body.m #wrap{transform-origin:0 0}
+#c{position:relative;width:324px;height:124px;border-radius:12px;overflow:hidden;font-family:Montserrat,sans-serif;color:#fff;
+ background:radial-gradient(circle at 100% 0,rgba(140,80,170,.13),transparent 60%),radial-gradient(rgba(255,255,255,.055) 1px,transparent 1.5px) 5px 5px/11px 11px,#131921;
+ box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
+#c>*{position:absolute}
+.cen{transform:translate(-50%,-50%);white-space:nowrap}
+.big{font-family:Montserrat,sans-serif;font-weight:800}
+.mn{font-family:Manrope,Montserrat,sans-serif}
+
+#badge{left:30px;top:30px;width:64px;height:64px;border-radius:50%;background:radial-gradient(circle at 50% 30%,#2a3560,#19213d);box-shadow:inset 0 0 0 1px #34416a}
+#lvl{position:absolute;top:8px;left:0;width:100%;text-align:center;font:700 9px Montserrat;color:#9aa3bd;letter-spacing:.1em}
+#win{position:absolute;left:17px;top:14.5px;width:30px;height:36px;overflow:hidden}
+.d{height:36px;line-height:36px;text-align:center;font:800 32px Manrope,Montserrat}
+.d.g{color:#ffd24d;text-shadow:0 0 10px rgba(255,200,60,.55)}
+#ring{border-radius:50%;border:2px solid #ffd24d;opacity:0;box-sizing:border-box}
+#xp{left:112px;width:167px;top:42px;text-align:center;font:600 12px Montserrat;color:#aeb6cc}
+#trk{left:112px;top:66px;width:167px;height:10px;border-radius:5px;background:#1e2638}
+#fill{height:10px;border-radius:5px;background:linear-gradient(90deg,#a98bff,#ff69b4)}
+#lu{left:0;top:0;font:800 22px Montserrat;color:#ffd24d;letter-spacing:.02em;text-shadow:0 0 12px rgba(255,200,60,.6);opacity:0}
+.cf{border-radius:1px}
+
+</style></head><body><div id="wrap"><div id="c">
+<div id="badge"><div id="lvl">LV</div><div id="win"><div id="strip"><div class="d">7</div><div class="d g">8</div></div></div></div>
+<div id="ring"></div><div id="conf" style="left:0;top:0"></div>
+<div id="xp">251 / 1,000 XP</div><div id="trk"><div id="fill"></div></div><div class="cen" id="lu">LEVEL UP!</div>
+</div></div>
+<script>
+/* CFG：示範用的數值、字、色都集中在這裡 */
+const LOOP=120;
+const FONTS=['800 20px Manrope','700 12px Montserrat','800 20px Montserrat'];
+const BAR=[42,42,43,43,45,46,48,50,53,56,60,65,70,76,83,91,99,109,117,125,132,138,143,148,152,155,158,161,163,164,164,165,166,167,167,167,167,167,170,170,39,39,39,39,39,38,38,39,39,39,39,39,39,39,39,38,38,38,38,37,37,37,37,37,37,37,37,37,37,37,37,37,37,37,37,37,37,37,37,37,37,37,37,37,37,37,37,37,37,37,167,167,165,159,148,131,104,78,60,49,44,42,42,42,42,42,42,42,42,42,42,42,42,42,42,42,42,42,42,42,42,42];
+const CONF_COLORS=['#ffffff','#7fe9ff','#ff8ac8','#ffd24d','#9cff9c'];
+
+const FPS=30;
+const clamp=(v,a=0,b=1)=>Math.min(b,Math.max(a,v));
+const lerp=(a,b,t)=>a+(b-a)*t;
+const eo=t=>1-Math.pow(1-clamp(t),3), ei=t=>Math.pow(clamp(t),3), eio=t=>{t=clamp(t);return t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2};
+function kf(keys,f,smooth){
+  if(f<=keys[0][0])return keys[0].slice(1);
+  for(let i=1;i<keys.length;i++){if(f<=keys[i][0]){const a=keys[i-1],b=keys[i];let t=(f-a[0])/(b[0]-a[0]);if(smooth)t=t*t*(3-2*t);return a.slice(1).map((v,j)=>lerp(v,b[j+1],t))}}
+  return keys[keys.length-1].slice(1)}
+function rnd(seed){let s=seed*9301+49297;return()=>{s=(s*9301+49297)%233280;return s/233280}}
+const fmt=n=>Math.round(n).toLocaleString('en-US');
+const $=id=>document.getElementById(id);
+function mix(c1,c2,t){t=clamp(t);return 'rgb('+c1.map((v,i)=>Math.round(lerp(v,c2[i],t))).join(',')+')'}
+function place(el,x,y,s,a){el.style.transform='translate(-50%,-50%) translate('+x+'px,'+y+'px) scale('+s+')';el.style.opacity=a}
+const q=new URLSearchParams(location.search);
+$('wrap').style.transform='scale('+(+q.get('z')||1)+')';
+if(q.get('m')==='1')document.body.classList.add('m');
+function start(){
+  if(typeof setup==='function')setup();
+  if(q.has('t')){render(+q.get('t')*FPS);}
+  else{const st=performance.now();(function tick(){render(((performance.now()-st)/1000*FPS)%LOOP);requestAnimationFrame(tick)})()}
+}
+Promise.race([Promise.all(FONTS.map(f=>document.fonts.load(f,'0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ?,.'))),new Promise(r=>setTimeout(r,2500))]).then(start);
+
+
+const R=rnd(7),P=[];
+function setup(){for(let i=0;i<26;i++){P.push({a:R()*6.283,v:2.5+R()*4.5,s:2+R()*2,c:CONF_COLORS[i%5],r:R()*360});const d=document.createElement('div');d.className='cf';d.style.position='absolute';d.style.background=P[i].c;$('conf').appendChild(d)}}
+function render(f){
+  const fi=Math.floor(f);const bw=Math.min(167,BAR[fi%120]);
+  $('fill').style.width=bw+'px';
+  const full=bw>=166;
+  $('fill').style.boxShadow=(fi>=33&&fi<40)||(fi>=90&&fi<94)?'0 0 10px rgba(255,105,180,.9)':'none';
+  const lu=f>=40&&f<90;
+  const xp=lu?220:Math.round(bw/167*1000);
+  $('xp').textContent=fmt(xp)+' / 1,000 XP';
+  $('xp').style.color=full?'#e6e9f5':'#aeb6cc';
+  let r=0;
+  if(f>=39&&f<43)r=eo((f-39)/4);else if(f>=43&&f<93)r=1;else if(f>=93&&f<97)r=1-eio((f-93)/4);
+  $('strip').style.transform='translateY('+(-36*r)+'px)';
+  const a=f-40;
+  const b=$('badge');
+  if(a>=0&&a<16){const k=1-a/16;b.style.boxShadow='inset 0 0 0 1.5px rgba(255,210,77,'+k+'),0 0 '+(16*k)+'px rgba(255,210,77,'+(.9*k)+')';b.style.transform='scale('+(a<6?1.18-.18*eo(a/6):1)+')'}
+  else{b.style.boxShadow='inset 0 0 0 1px #34416a';b.style.transform='scale(1)'}
+  const ring=$('ring');
+  if(a>=0&&a<14){const rr=lerp(34,70,eo(a/12));ring.style.width=ring.style.height=(rr*2)+'px';ring.style.left=(62-rr)+'px';ring.style.top=(62-rr)+'px';ring.style.opacity=(1-a/14)*.9}else ring.style.opacity=0;
+  const L=$('lu');
+  if(lu){const [s,al]=kf([[40,.83,.6],[41,1.12,1],[43,1,1]],f);place(L,195,100,s,al);}else L.style.opacity=0;
+  const cs=$('conf').children;
+  P.forEach((p,i)=>{const e=cs[i];const t=f-40;if(t<0||t>18){e.style.opacity=0;return}
+    const d=p.v*(1-Math.pow(.86,t))/.14;const x=62+Math.cos(p.a)*d,y=62+Math.sin(p.a)*d+.12*t*t;
+    e.style.width=e.style.height=p.s+'px';e.style.left=x+'px';e.style.top=y+'px';e.style.opacity=clamp(1.4-t/13);e.style.transform='rotate('+(p.r+t*20)+'deg)'});
+}
+</script></body></html>

@@ -1,0 +1,95 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>N12 Countdown</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap">
+<style>
+html,body{margin:0;height:100%;background:#090d13}
+body{display:flex;align-items:center;justify-content:center;font-family:"Plus Jakarta Sans",sans-serif}
+body.m{display:block}
+#card{position:relative;width:322px;height:125px;border-radius:12px;overflow:hidden;flex:none;
+ background:radial-gradient(circle,rgba(255,255,255,.055) 1px,transparent 1.3px) 0 0/14px 14px,linear-gradient(180deg,#151b25,#11171f)}
+#card::after{content:"";position:absolute;inset:0;border-radius:12px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);pointer-events:none}
+svg text{font-family:"Plus Jakarta Sans",sans-serif}
+.lab{font-size:9px;font-weight:800;letter-spacing:2.2px;fill:#9aa3b8}
+.big{font-weight:800}
+</style></head><body>
+<div id="card"><svg width="322" height="125" viewBox="0 0 322 125" style="position:absolute;left:0;top:0">
+<defs><radialGradient id="rg"><stop offset="0" stop-color="#6df0a5" stop-opacity=".75"/><stop offset="1" stop-color="#6df0a5" stop-opacity="0"/></radialGradient></defs>
+<circle cx="161" cy="62.5" r="43" fill="#0f131c" stroke="#1d2332" stroke-width="4"/>
+<circle id="burst" cx="161" cy="62.5" r="38" fill="url(#rg)" opacity="0"/>
+<circle id="arc" cx="161" cy="62.5" r="43" fill="none" stroke="#ff5fa2" stroke-width="4" stroke-linecap="round" transform="rotate(-90 161 62.5)" stroke-dasharray="0 400"/>
+<g id="spk"></g>
+<text id="dg" class="big" x="161" y="86.6" text-anchor="middle" font-size="64" fill="#fff">3</text>
+<text id="go" class="big" x="161" y="75" text-anchor="middle" font-size="31" fill="#6df0a5" opacity="0" style="letter-spacing:-.5px">GO!</text>
+</svg></div>
+<script>
+const q=new URLSearchParams(location.search);
+const card=document.getElementById('card');
+const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+const lerp=(a,b,t)=>a+(b-a)*t;
+const outC=u=>1-Math.pow(1-clamp(u),3);
+const ss=u=>{u=clamp(u);return u*u*(3-2*u)};
+const rnd=n=>{const x=Math.sin(n*127.1+311.7)*43758.5453;return x-Math.floor(x)};
+const hex=c=>[1,3,5].map(i=>parseInt(c.substr(i,2),16));
+const mix=(a,b,t)=>{const A=hex(a),B=hex(b);return 'rgb('+A.map((v,i)=>Math.round(lerp(v,B[i],t))).join(',')+')'};
+const NS='http://www.w3.org/2000/svg';
+const mk=(tag,attrs,parent)=>{const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e};
+document.body.classList.toggle('m',q.get('m')==='1');
+card.style.zoom=+q.get('z')||1;
+function start(specs){
+ const go=()=>{
+  build();
+  const t=q.get('t');
+  if(t!==null){render(parseFloat(t)*30);document.body.dataset.ready='1';}
+  else{const t0=performance.now();const loop=n=>{render(((n-t0)/1000*30)%LOOP);requestAnimationFrame(loop)};requestAnimationFrame(loop);}
+ };
+ Promise.all(specs.map(s=>document.fonts.load(s[0],s[1]))).then(go,go);
+}
+
+const CFG={digits:['3','2','1'],starts:[0,22.7,45.4],goStart:68.1,pink:'#ff5fa2',green:'#6df0a5',C:2*Math.PI*43,dx:[1,1,2.5],
+ // 衝入：量測自參考 tau=0..8 幀（倍率先大後過衝縮小再回穩、不透明度、模糊）
+ inSc:[1.75,1.45,1.16,.92,.84,.88,.92,.98,1],inOp:[0,.38,.67,.89,.92,.96,.98,1,1],inBl:[10,8,4.5,2,1,.4,0,0,0]};
+const tab=(a,t)=>{t=clamp(t,0,a.length-1);const i=Math.min(Math.floor(t),a.length-2);return lerp(a[i],a[i+1],t-i)};
+const LOOP=120;
+let arc,dg,go,burst,spk,lines=[];
+function build(){
+ arc=document.getElementById('arc');dg=document.getElementById('dg');go=document.getElementById('go');burst=document.getElementById('burst');spk=document.getElementById('spk');
+ for(let i=0;i<28;i++)lines.push(mk('line',{'stroke-width':1.7,'stroke-linecap':'round'},spk));
+}
+function render(f){
+ let th=0,col=CFG.pink,dop=0,dbl=0,dsc=1,gop=0,gbl=0;
+ const gt=f-CFG.goStart;
+ if(f<CFG.goStart){
+  let k=f<CFG.starts[1]?0:(f<CFG.starts[2]?1:2);
+  const tau=f-CFG.starts[k];
+  th=360*clamp((tau-1)/21);
+  dg.textContent=CFG.digits[k];
+  const tail=ss((tau-20.5)/2.2);
+  dop=tab(CFG.inOp,tau)*(1-.65*tail);
+  dbl=tab(CFG.inBl,tau)+1.6*tail;
+  dsc=tab(CFG.inSc,tau);
+  dg.setAttribute('x',161+CFG.dx[k]);
+ }else if(f<CFG.goStart+30.1){
+  col=CFG.green;
+  th=gt<15.9?360:360*(1-clamp((gt-15.9)/14));
+  gop=clamp(gt/5)*(1-ss((gt-18)/11));
+  gbl=8*(1-clamp(gt/6));
+ }
+ arc.setAttribute('stroke',col);
+ arc.setAttribute('stroke-dasharray',th<2?'0 400':(CFG.C*th/360)+' 400');
+ dg.setAttribute('opacity',dop);
+ dg.setAttribute('transform','translate(161 62.5) scale('+dsc+') translate(-161 -62.5)');
+ dg.style.filter='blur('+dbl+'px)';
+ go.setAttribute('opacity',gop);go.style.filter='blur('+gbl+'px)';
+ const b=(f>=CFG.goStart&&gt<10)?(1-clamp(gt/10))*Math.min(1,gt/1.5+.4):0;
+ burst.setAttribute('opacity',b);
+ const age=(f-CFG.goStart-.5)/16;
+ const cols=['#6df0a5','#ff5fa2','#ffffff','#6df0a5'];
+ lines.forEach((l,i)=>{
+  if(age<0||age>1){l.setAttribute('opacity',0);return}
+  const a=i/28*Math.PI*2+rnd(i)*.4,r0=24+rnd(i+4)*14,d=22+rnd(i+8)*26,len=(4+rnd(i+2)*9)*(1-age*.5);
+  const r=r0+d*outC(age*1.15),ca=Math.cos(a),sa=Math.sin(a);
+  l.setAttribute('x1',161+ca*r);l.setAttribute('y1',62.5+sa*r);l.setAttribute('x2',161+ca*(r+len));l.setAttribute('y2',62.5+sa*(r+len));
+  l.setAttribute('stroke',cols[i%4]);l.setAttribute('opacity',1-Math.pow(age,1.4));
+ });
+}
+start([['800 54px "Plus Jakarta Sans"','0123456789GO!']]);
+</script></body></html>

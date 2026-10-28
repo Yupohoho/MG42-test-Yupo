@@ -1,0 +1,68 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>N10 Water Percent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap">
+<style>
+html,body{margin:0;height:100%;background:#090d13}
+body{display:flex;align-items:center;justify-content:center;font-family:"Plus Jakarta Sans",sans-serif}
+body.m{display:block}
+#card{position:relative;width:322px;height:125px;border-radius:12px;overflow:hidden;flex:none;
+ background:radial-gradient(circle,rgba(255,255,255,.055) 1px,transparent 1.3px) 0 0/14px 14px,linear-gradient(180deg,#151b25,#11171f)}
+#card::after{content:"";position:absolute;inset:0;border-radius:12px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);pointer-events:none}
+svg text{font-family:"Plus Jakarta Sans",sans-serif}
+.lab{font-size:9px;font-weight:800;letter-spacing:2.2px;fill:#9aa3b8}
+.big{font-weight:800}
+</style></head><body>
+<div id="card"><svg width="322" height="125" viewBox="0 0 322 125" style="position:absolute;left:0;top:0">
+<defs><clipPath id="cp"><circle cx="161" cy="62.5" r="51"/></clipPath></defs>
+<circle cx="161" cy="62.5" r="52" fill="#0b0f17" stroke="#2a3040" stroke-width="1.5" style="filter:drop-shadow(0 0 10px rgba(236,107,181,.2))"/>
+<g clip-path="url(#cp)"><path id="w2" fill="#7c66d8" opacity=".9"/><path id="w1" fill="#ec6bb5"/></g>
+<text id="pt" class="big" x="163" y="75" text-anchor="middle" font-size="34" fill="#fff" style="filter:drop-shadow(0 1px 3px rgba(0,0,0,.45))">0<tspan font-size="15" dx="3">%</tspan></text>
+</svg></div>
+<script>
+const q=new URLSearchParams(location.search);
+const card=document.getElementById('card');
+const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+const lerp=(a,b,t)=>a+(b-a)*t;
+const outC=u=>1-Math.pow(1-clamp(u),3);
+const ss=u=>{u=clamp(u);return u*u*(3-2*u)};
+const rnd=n=>{const x=Math.sin(n*127.1+311.7)*43758.5453;return x-Math.floor(x)};
+const hex=c=>[1,3,5].map(i=>parseInt(c.substr(i,2),16));
+const mix=(a,b,t)=>{const A=hex(a),B=hex(b);return 'rgb('+A.map((v,i)=>Math.round(lerp(v,B[i],t))).join(',')+')'};
+const NS='http://www.w3.org/2000/svg';
+const mk=(tag,attrs,parent)=>{const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e};
+document.body.classList.toggle('m',q.get('m')==='1');
+card.style.zoom=+q.get('z')||1;
+function start(specs){
+ const go=()=>{
+  build();
+  const t=q.get('t');
+  if(t!==null){render(parseFloat(t)*30);document.body.dataset.ready='1';}
+  else{const t0=performance.now();const loop=n=>{render(((n-t0)/1000*30)%LOOP);requestAnimationFrame(loop)};requestAnimationFrame(loop);}
+ };
+ Promise.all(specs.map(s=>document.fonts.load(s[0],s[1]))).then(go,go);
+}
+
+const CFG={pct:76};
+const LOOP=120;
+let w1,w2,pt;
+function build(){w1=document.getElementById('w1');w2=document.getElementById('w2');pt=document.getElementById('pt');}
+function pctAt(f){
+ if(f<99)return CFG.pct*outC((f-3)/62);
+ return CFG.pct*(1-ss((f-99)/12.5));
+}
+function wave(yb,A,k,ph,off){
+ let d='M0,130';
+ for(let x=0;x<=322;x+=4)d+=' L'+x+','+(yb+off+A*Math.sin(x*k+ph)).toFixed(2);
+ return d+' L322,130 Z';
+}
+function render(f){
+ const pc=pctAt(f),p=pc/100;
+ const fill=p<=0.001?0:p+0.06*Math.sin(p*Math.PI);
+ const yb=62.5+52-fill*104;
+ const vis=fill>0?1:0;
+ w1.setAttribute('d',wave(yb,3.6,.045,f*Math.PI/30,0));
+ w2.setAttribute('d',wave(yb,4.6,.04,-f*Math.PI/20+1,-3.5));
+ w1.style.display=w2.style.display=vis?'':'none';
+ pt.firstChild.nodeValue=Math.round(pc);
+}
+start([['800 34px "Plus Jakarta Sans"','0123456789%']]);
+</script></body></html>

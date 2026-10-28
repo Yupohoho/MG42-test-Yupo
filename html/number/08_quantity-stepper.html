@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><title>N08 数量ステッパー</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700;800;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f16}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Montserrat',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:122px;border-radius:12px;overflow:hidden;background:#131921;box-shadow:inset 0 0 0 1px #1c2330}
+#card::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.06) 1px,transparent 1.2px) 0 0/12px 12px}
+.lab{position:absolute;left:0;right:0;top:13px;text-align:center;font-size:8px;font-weight:700;letter-spacing:2px;color:#8d95a6}
+.nw{position:absolute;left:100px;width:124px;top:28px;height:68px;overflow:hidden}
+.nw span{position:absolute;left:0;top:0;width:124px;height:68px;line-height:68px;text-align:center;font-size:54px;font-weight:800;color:#f6f7fb}
+.btn{position:absolute;top:40px;width:46px;height:46px;border-radius:50%;background:#171e29;box-shadow:inset 0 0 0 1px #28303e}
+.btn svg{position:absolute;inset:0}
+.ring{position:absolute;top:40px;width:46px;height:46px;border-radius:50%;box-sizing:border-box;border:1.5px solid #ff6fb0;opacity:0}
+#cur{position:absolute;left:0;top:0;width:14px;height:18px;filter:drop-shadow(0 1px 1px rgba(0,0,0,.6))}
+</style></head><body><div id="card"><div class="lab">QUANTITY</div>
+<div class="nw"><span id="o"></span><span id="n"></span></div>
+<div class="btn" id="bm" style="left:47px"><svg viewBox="0 0 46 46"><rect x="16" y="22" width="14" height="2.4" rx="1.2" fill="#ff6fb0"/></svg></div>
+<div class="btn" id="bp" style="left:231px"><svg viewBox="0 0 46 46"><rect x="16" y="22" width="14" height="2.4" rx="1.2" fill="#ff6fb0"/><rect x="21.8" y="16.2" width="2.4" height="14" rx="1.2" fill="#ff6fb0"/></svg></div>
+<div class="ring" id="rm" style="left:47px"></div><div class="ring" id="rp" style="left:231px"></div>
+<svg id="cur" viewBox="0 0 14 18"><path d="M1 1 L1 14 L4.5 11 L7 16.5 L9.2 15.5 L6.8 10.2 L11.5 10 Z" fill="#fff" stroke="#10151c" stroke-width="1"/></svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  start:12,
+  clicks:[{f:12,b:'p',to:13},{f:31,b:'p',to:14},{f:54,b:'m',to:13},{f:72,b:'m',to:12}], // 按下幀、哪顆、結果
+  change:2,dur:7,              // 按下後幾幀開始換數字、換數字用幾幀
+  pPos:[252,74],mPos:[68,74],  // 游標在 + / − 上的位置
+  moveTo:[40,50],moveBack:[92,114], // 游標移到 − 、回到 + 的區間
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3),eio=x=>x<.5?2*x*x:1-Math.pow(-2*x+2,2)/2;
+const $=id=>document.getElementById(id);
+const bt={p:$('bp'),m:$('bm')},rg={p:$('rp'),m:$('rm')};
+function render(f){
+  // 數字
+  let val=CFG.start,prev=CFG.start,tp=1,dir=1;
+  CFG.clicks.forEach(c=>{const t=c.f+CFG.change;if(f>=t){prev=val;val=c.to;tp=seg(f,t,t+CFG.dur);dir=c.b==='p'?1:-1}});
+  const o=$('o'),n=$('n');
+  if(tp>=1){o.style.opacity=0;n.textContent=val;n.style.transform='none';n.style.opacity=1}
+  else{const e=eo(tp);o.textContent=prev;n.textContent=val;
+    o.style.transform='translateY('+(-dir*e*30)+'px)';o.style.opacity=1-e;
+    n.style.transform='translateY('+(dir*(1-e)*30)+'px)';n.style.opacity=e}
+  // 按鈕與水波
+  ['p','m'].forEach(k=>{bt[k].style.transform='none';bt[k].style.boxShadow='inset 0 0 0 1px #28303e';rg[k].style.opacity=0});
+  CFG.clicks.forEach(c=>{const t=f-c.f;if(t<0||t>10)return;
+    const k=t/10;bt[c.b].style.transform='scale('+(t<3?1-.07*t/3:.93+.07*seg(t,3,7))+')';
+    bt[c.b].style.boxShadow='inset 0 0 0 1.5px rgba(255,111,176,'+(1-seg(t,4,10))+')';
+    rg[c.b].style.opacity=.9*(1-k);rg[c.b].style.transform='scale('+(1+.35*eo(k))+')'});
+  // 游標
+  const lerp=(a,b,t)=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];
+  let pos;
+  if(f<CFG.moveTo[0])pos=CFG.pPos;
+  else if(f<CFG.moveTo[1])pos=lerp(CFG.pPos,CFG.mPos,eio(seg(f,...CFG.moveTo)));
+  else if(f<CFG.moveBack[0])pos=CFG.mPos;
+  else pos=lerp(CFG.mPos,CFG.pPos,eio(seg(f,...CFG.moveBack)));
+  $('cur').style.transform='translate('+pos[0]+'px,'+pos[1]+'px)';
+}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+document.fonts.load('800 54px Montserrat','0123456789').then(start,start);
+</script></body></html>

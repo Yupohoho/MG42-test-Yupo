@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>B03 Comic Dots</title>
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; transform-origin:0 0; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<div id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#f4efe6',            // 紙色
+  ink: '#14181e',           // 深色版（在上）
+  pink: '#ff4d87',          // 粉紅版（在下，錯位）
+  offset: [-6, -4],         // 粉紅版相對深色版的錯位（版ズレ）
+  pinkScale: .8,            // 粉紅版的點比深色版小一點（露出來只剩一彎月牙）
+  x0: 10.0, px: 13.3,       // 網點格
+  y0: 9.6, py: 12.65,
+  center: [162, 53],        // 旋轉的漸層以這裡為中心
+  minR: 1.0, maxR: 5.9,     // 最小／最大點半徑
+  rampFrom: -41, rampTo: 54,// 漸層帶：沿旋轉方向的位置 u 從 rampFrom 長到 rampTo，點由小變大
+  angle0: 30, angleStep: 6, // 漸層方向起始角（度）與每幀轉動角度（y 向下，順時針）
+  loopFrames: 60,           // 一輪 60 幀：漸層方向剛好轉一圈
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const Z = +(q.get('z') || 1);
+const card = document.getElementById('card'), cv = document.getElementById('cv');
+card.style.cssText += `width:${CFG.W*Z}px;height:${CFG.H*Z}px;border-radius:${12*Z}px;background:${CFG.bg}`;
+cv.width = CFG.W * Z; cv.height = CFG.H * Z;
+const ctx = cv.getContext('2d');
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  ctx.setTransform(Z, 0, 0, Z, 0, 0);
+  ctx.fillStyle = CFG.bg; ctx.fillRect(0, 0, CFG.W, CFG.H);
+  const th = (CFG.angle0 + CFG.angleStep * f) * Math.PI / 180, ca = Math.cos(th), sa = Math.sin(th);
+  const pts = [];
+  for (let r = -1; r < 9; r++) for (let c = -2; c < 26; c++) {
+    const x = CFG.x0 + c * CFG.px, y = CFG.y0 + r * CFG.py;
+    const u = (x - CFG.center[0]) * ca + (y - CFG.center[1]) * sa;
+    const s = Math.min(1, Math.max(0, (u - CFG.rampFrom) / (CFG.rampTo - CFG.rampFrom)));
+    pts.push([x, y, CFG.minR + (CFG.maxR - CFG.minR) * s]);
+  }
+  ctx.fillStyle = CFG.pink;
+  for (const [x, y, r] of pts) { ctx.beginPath(); ctx.arc(x + CFG.offset[0], y + CFG.offset[1], r * CFG.pinkScale, 0, 6.2832); ctx.fill(); }
+  ctx.fillStyle = CFG.ink;
+  for (const [x, y, r] of pts) { ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fill(); }
+}
+
+if (q.has('t')) render(+q.get('t'));
+else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+</script>
+</body>
+</html>

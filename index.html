@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MG 動態圖鑑</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter+Tight:wght@500;600&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* 扁平風深色版：深灰底、無邊框大圓角卡片、等寬字、膠囊按鈕 */
+  :root {
+    --bg: #161615; --panel: #262624; --panel2: #31312e; --ink: #ececea; --on-ink: #111111;
+    --text: #ececea; --sub: #8e8e89; --line: #46463f;
+    --mono: "Space Mono", "Noto Sans TC", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif; letter-spacing: .04em; }
+  header { position: sticky; top: 0; z-index: 10; background: var(--bg); padding: 24px 28px 6px; }
+  .top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  h1 { font-family: "Inter Tight", "Noto Sans TC", sans-serif; font-size: 40px; font-weight: 500; margin: 0; color: var(--ink); letter-spacing: .05em; line-height: 1.1; }
+  h1 .mg { font-weight: 600; letter-spacing: .03em; margin-right: .12em; }
+  .tools { margin-left: auto; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  #q { background: var(--panel); border: 0; color: var(--text); border-radius: 999px; font-family: var(--mono);
+    padding: 9px 18px; width: 260px; font-size: 13px; outline: none; }
+  #q::placeholder { color: var(--sub); }
+  #q:focus { box-shadow: 0 0 0 2px var(--ink); }
+  nav { display: flex; gap: 8px; margin-top: 16px; overflow-x: auto; padding-bottom: 6px; }
+  nav button { font-family: var(--mono); background: transparent; border: 1px solid transparent; border-radius: 8px; color: var(--sub);
+    padding: 5px 12px; font-size: 14px; letter-spacing: .06em; cursor: pointer; white-space: nowrap;
+    transition: background .15s, color .15s, border-color .15s; }
+  nav button.on { color: var(--ink); font-weight: 700; border-color: var(--ink); }
+  /* 滑鼠指上去反白（跟卡片的複製按鈕一樣） */
+  nav button:not([disabled]):hover { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
+  nav button[disabled] { opacity: .35; cursor: default; }
+  nav .n { font-size: 11px; margin-left: 6px; opacity: .7; }
+  main { padding: 14px 28px 60px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+  /* 每張卡片分五區（標題、動畫、描述、標籤、按鈕）；用 subgrid 讓同一排的卡片各區等高對齊，互不受長短影響 */
+  .card { background: var(--panel); border-radius: 14px; padding: 22px; display: grid; grid-row: span 5; grid-template-rows: subgrid; row-gap: 0; align-content: start; }
+  .card.hide { display: none; }
+  .head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; margin-bottom: 16px; }
+  .id { font-family: "Inter Tight", sans-serif; font-weight: 600; color: #d4d4cf; font-size: 17px; letter-spacing: .06em; flex-basis: 100%; }
+  .id .pre { font-size: 1.2em; letter-spacing: 0; margin-right: .02em; }
+  .zh { font-size: 20px; font-weight: 500; white-space: nowrap; letter-spacing: .07em; }
+  .names { font-family: var(--mono); font-size: 12px; color: var(--sub); letter-spacing: .04em; }
+  .frame { position: relative; aspect-ratio: 324 / 106; border-radius: 8px; overflow: hidden; background: #000; }
+  .frame iframe { position: absolute; left: 0; top: 0; width: 324px; height: 106px; border: 0; transform-origin: 0 0; pointer-events: none; }
+  .desc { font-size: 13px; font-weight: 300; margin: 16px 0 12px; line-height: 1.8; letter-spacing: .07em; color: #c4c4be; min-height: 3.6em; /* 固定兩行高，關鍵字位置才會一致 */ }
+  /* 關鍵字用直線分隔；每行開頭那條線往左推出框外裁掉，換行後才不會多一條線 */
+  .kw { overflow: hidden; }
+  .kw > div { display: flex; flex-wrap: wrap; row-gap: 4px; margin-left: -11px; }
+  .kw span { font-size: 12px; letter-spacing: .06em; color: var(--sub); padding: 0 10px; border-left: 1px solid var(--line); line-height: 1.2; cursor: pointer; }
+  .kw span:hover { color: var(--ink); }
+  .kw { margin-bottom: 14px; }
+  .acts { display: grid; grid-template-columns: 1fr 1fr; margin-top: 0; align-self: end; border: 1px solid var(--ink); border-radius: 8px; overflow: hidden; }   /* 一個圓角矩形，中間切兩半 */
+  .acts button { font-family: var(--mono); font-size: 12px; font-weight: 500; letter-spacing: .05em; padding: 8px 0; cursor: pointer;
+    background: transparent; color: var(--ink); border: 0; border-radius: 0; }
+  .acts button + button { border-left: 1px solid var(--ink); }
+  .acts button:hover { background: var(--ink); color: var(--on-ink); }
+  .acts button.ok { background: var(--ink); color: var(--on-ink); }
+  .empty { color: var(--ink); padding: 60px 0; text-align: center; font-family: var(--mono); }
+  @media (max-width: 640px) {
+    header { padding: 14px 16px 4px; } main { padding: 12px 16px 40px; }
+    .tools { margin-left: 0; width: 100%; } #q { flex: 1; width: auto; }
+    .grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <h1><span class="mg">MG</span> 動態圖鑑</h1>
+    <div class="tools">
+      <input id="q" type="search" placeholder="搜尋名稱、描述、關鍵字…">
+    </div>
+  </div>
+  <nav id="tabs"></nav>
+</header>
+<main id="main"></main>
+
+<script src="gallery-data.js"></script>
+<script src="copy-data.js"></script>
+<script>
+// ===== 分類分頁：之後新增類別，在 MotionGraphic-gallery-data.js 補上對應前綴的資料即可 =====
+const CATS = [
+  { key: 'T',  name: '文字動畫' },
+  { key: 'T2', name: '文字動畫2' },
+  { key: 'T3', name: '文字動畫3' },
+  { key: 'TL', name: 'Telop' },
+  { key: 'N',  name: '數字動畫' },
+  { key: 'S',  name: '轉場' },
+  { key: 'S2', name: '轉場2' },
+  { key: 'B',  name: '背景動畫' },
+  { key: 'SH', name: '圖形動畫' },
+];
+const DATA = window.MG_DATA || {};
+const main = document.getElementById('main'), tabs = document.getElementById('tabs'), q = document.getElementById('q');
+// 網址加 ?tab=TL 可以直接開到指定分頁；否則回到上次看的分頁
+let cur = (() => { const u = new URLSearchParams(location.search).get('tab'); if (u) return u; try { return localStorage.getItem('mg-tab') || 'T'; } catch (e) { return 'T'; } })();
+if (!(DATA[cur] || []).length) cur = 'T';
+
+// 動畫捲到畫面附近才載入；捲出畫面就卸載（停止運算），回來再重新載入，避免 40 個同時跑
+const io = new IntersectionObserver(es => es.forEach(e => {
+  const f = e.target.querySelector('iframe');
+  if (e.isIntersecting) { if (f.getAttribute('src') !== f.dataset.src) f.setAttribute('src', f.dataset.src); }
+  else f.setAttribute('src', 'about:blank');
+}), { rootMargin: '150px' });
+// 動態頁面預設是 324×106；尺寸不同的分頁寫在這裡（預覽框照該尺寸的比例，不會出現捲軸），依格子寬度等比縮放
+const SIZE = { T3: [284, 158], N: [324, 124] };
+const sizeOf = key => SIZE[key] || [324, 106];
+const ro = new ResizeObserver(es => es.forEach(e => {
+  const f = e.target.querySelector('iframe'); if (f) f.style.transform = `scale(${e.contentRect.width / (+f.dataset.w || 324)})`;
+}));
+
+function renderTabs() {
+  tabs.innerHTML = '';
+  CATS.forEach(c => {
+    const n = (DATA[c.key] || []).length, b = document.createElement('button');
+    b.innerHTML = `${c.name}<span class="n">${n ? n : '尚未建立'}</span>`;
+    b.disabled = !n; b.className = c.key === cur ? 'on' : '';
+    b.onclick = () => { cur = c.key; savedY = null;try { localStorage.setItem('mg-tab', cur); } catch (e) {} renderTabs(); renderCat(); };
+    tabs.appendChild(b);
+  });
+}
+
+function copyText(text) {                                   // 優先用剪貼簿 API，不行（例如不安全環境）就退回舊做法
+  if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
+  return new Promise(res => { const t = document.createElement('textarea'); t.value = text; t.style.cssText = 'position:fixed;opacity:0';
+    document.body.appendChild(t); t.select(); try { document.execCommand('copy'); } catch (e) {} t.remove(); res(); });
+}
+
+function card(m) {
+  const d = document.createElement('div'); d.className = 'card';
+  d.dataset.text = [m.id, m.zh, m.en, m.desc, ...m.kw].join(' ').toLowerCase();
+  const [w, h] = sizeOf(cur);
+  d.innerHTML = `
+    <div class="head"><span class="id">${m.id.replace(/^([A-Z]+)/, '<span class="pre">$1</span>')}</span><span class="zh">${m.zh}</span>
+      <span class="names">${m.en}</span></div>
+    <div class="frame" style="aspect-ratio:${w} / ${h}"><iframe data-src="${m.html}" data-w="${w}" style="width:${w}px;height:${h}px" scrolling="no" tabindex="-1"></iframe></div>
+    <div class="desc">${m.desc}</div>
+    <div class="kw"><div>${m.kw.map(k => `<span>${k}</span>`).join('')}</div></div>`;
+  d.querySelectorAll('.kw span').forEach(s => s.onclick = () => { rememberScroll(); q.value = s.textContent; filter(); scrollTo(0, 0); });
+  const cp = (window.MG_COPY || {})[m.id];                 // 有複製內容的動態才出現按鈕（目前先試做 T01）
+  if (cp) {
+    const acts = document.createElement('div'); acts.className = 'acts';
+    [['複製 HTML', cp.html], ['複製描述', cp.prompt]].filter(x => x[1]).forEach(([label, text]) => {
+      const b = document.createElement('button'); b.textContent = label;
+      b.onclick = () => copyText(text).then(() => { b.textContent = '已複製'; b.classList.add('ok'); setTimeout(() => { b.textContent = label; b.classList.remove('ok'); }, 800); });
+      acts.appendChild(b);
+    });
+    d.appendChild(acts);
+  }
+  ro.observe(d.querySelector('.frame'));
+  io.observe(d);
+  return d;
+}
+
+function renderCat() {
+  main.innerHTML = '';
+  // 依編號數字排序（T81 排在 T100 前面）
+  const num = id => +id.replace(/^\D+/, '');
+  const c = CATS.find(x => x.key === cur), list = (DATA[cur] || []).slice().sort((a, b) => num(a.id) - num(b.id));
+  if (!list.length) { main.innerHTML = '<div class="empty">這個類別尚未建立</div>'; return; }
+  const groups = c.groups || [{ n: list.length }];
+  let i = 0;
+  groups.forEach(g => {
+    const part = list.slice(i, i + g.n); i += g.n;
+    if (!part.length) return;
+    const sec = document.createElement('section'); sec.className = 'group';
+    if (g.label) sec.innerHTML = `<h2><b>${g.label}</b>${g.zh}　${part[0].id}–${part[part.length - 1].id}</h2>`;
+    const grid = document.createElement('div'); grid.className = 'grid';
+    part.forEach(m => grid.appendChild(card(m)));
+    sec.appendChild(grid); main.appendChild(sec);
+  });
+  filter();
+}
+
+function filter() {
+  const words = q.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  main.querySelectorAll('.group').forEach(sec => {
+    let any = false;
+    sec.querySelectorAll('.card').forEach(c => {
+      const ok = words.every(w => c.dataset.text.includes(w));
+      c.classList.toggle('hide', !ok); any = any || ok;
+    });
+    sec.style.display = any ? '' : 'none';
+  });
+}
+// 開始搜尋前記住捲動位置；清除搜尋（Esc 或搜尋欄的叉叉）後捲回原位
+let savedY = null;
+function rememberScroll() { if (!q.value && savedY === null) savedY = scrollY; }
+function restoreScroll() { if (savedY !== null) { const y = savedY; savedY = null; requestAnimationFrame(() => scrollTo(0, y)); } }
+q.addEventListener('beforeinput', rememberScroll);
+q.addEventListener('input', () => { filter(); if (!q.value) restoreScroll(); });
+// 快捷鍵：Esc 清除搜尋（不論游標在不在搜尋欄）
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && q.value) { e.preventDefault(); q.value = ''; filter(); q.blur(); restoreScroll(); }
+});
+
+renderTabs(); renderCat();
+</script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><title>N38 弾む桁 (Bouncing Digits)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@800&family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;height:100%;background:#090d13}
+body{display:flex;align-items:center;justify-content:center;overflow:hidden}
+body.m{display:block}
+#wrap{transform-origin:center}
+body.m #wrap{transform-origin:0 0}
+#c{position:relative;width:324px;height:124px;border-radius:12px;overflow:hidden;font-family:Montserrat,sans-serif;color:#fff;
+ background:radial-gradient(circle at 100% 0,rgba(140,80,170,.13),transparent 60%),radial-gradient(rgba(255,255,255,.055) 1px,transparent 1.5px) 5px 5px/11px 11px,#131921;
+ box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
+#c>*{position:absolute}
+.cen{transform:translate(-50%,-50%);white-space:nowrap}
+.big{font-family:Montserrat,sans-serif;font-weight:800}
+.mn{font-family:Manrope,Montserrat,sans-serif}
+
+#row{left:162px;top:64px;font-size:54px;line-height:54px;display:flex;width:max-content;color:#f4f4fa}
+#row span{display:inline-block}
+#ul{left:30px;top:98px;width:264px;height:1px;background:rgba(255,255,255,.12)}
+
+</style></head><body><div id="wrap"><div id="c">
+<div class="cen big" id="row"></div><div id="ul"></div>
+</div></div>
+<script>
+/* CFG：示範用的數值、字、色都集中在這裡 */
+const LOOP=60;
+const FONTS=['800 20px Manrope'];
+const TEXT='12,345';
+// 實測自參考：每位數起跳幀(1,2,逗號,3,4,5)、滯空30幀、離地峰值32.5px、空中拉長/落地壓扁
+const START=[51,56.25,2,7.25,12.75,18],AIR=30,AMP=32.5,EXP=1.75;
+const SQ=[[30,1,1],[31,1.045,.915],[32,1.14,.83],[33,1.18,.79],[34,1.18,.77],[35,1.18,.81],[36,1.09,.89],[37,1.02,.98],[38,1,1]];
+
+const FPS=30;
+const clamp=(v,a=0,b=1)=>Math.min(b,Math.max(a,v));
+const lerp=(a,b,t)=>a+(b-a)*t;
+const eo=t=>1-Math.pow(1-clamp(t),3), ei=t=>Math.pow(clamp(t),3), eio=t=>{t=clamp(t);return t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2};
+function kf(keys,f,smooth){
+  if(f<=keys[0][0])return keys[0].slice(1);
+  for(let i=1;i<keys.length;i++){if(f<=keys[i][0]){const a=keys[i-1],b=keys[i];let t=(f-a[0])/(b[0]-a[0]);if(smooth)t=t*t*(3-2*t);return a.slice(1).map((v,j)=>lerp(v,b[j+1],t))}}
+  return keys[keys.length-1].slice(1)}
+function rnd(seed){let s=seed*9301+49297;return()=>{s=(s*9301+49297)%233280;return s/233280}}
+const fmt=n=>Math.round(n).toLocaleString('en-US');
+const $=id=>document.getElementById(id);
+function mix(c1,c2,t){t=clamp(t);return 'rgb('+c1.map((v,i)=>Math.round(lerp(v,c2[i],t))).join(',')+')'}
+function place(el,x,y,s,a){el.style.transform='translate(-50%,-50%) translate('+x+'px,'+y+'px) scale('+s+')';el.style.opacity=a}
+const q=new URLSearchParams(location.search);
+$('wrap').style.transform='scale('+(+q.get('z')||1)+')';
+if(q.get('m')==='1')document.body.classList.add('m');
+function start(){
+  if(typeof setup==='function')setup();
+  if(q.has('t')){render(+q.get('t')*FPS);}
+  else{const st=performance.now();(function tick(){render(((performance.now()-st)/1000*FPS)%LOOP);requestAnimationFrame(tick)})()}
+}
+Promise.race([Promise.all(FONTS.map(f=>document.fonts.load(f,'0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ?,.'))),new Promise(r=>setTimeout(r,2500))]).then(start);
+
+
+function setup(){const row=$('row');TEXT.split('').forEach(ch=>{const s=document.createElement('span');s.textContent=ch;row.appendChild(s)});row.style.transform='translate(-50%,-50%) scaleX('+(232/row.offsetWidth)+')'}
+function render(F){
+  const sp=$('row').children;
+  for(let i=0;i<sp.length;i++){
+    const t=(((F-START[i])%60)+60)%60;let lift=0,sx=1,sy=1,up=0;
+    if(t<AIR){const u=Math.min(t,AIR-t)/(AIR/2);up=1-Math.pow(1-u,EXP);lift=AMP*up;sy=1+.115*up;sx=1-.125*up}
+    else if(t<38){const q=kf(SQ,t);sx=q[0];sy=q[1]}
+    sp[i].style.transformOrigin='50% 85%';
+    sp[i].style.transform='translateY('+(-lift)+'px) scale('+sx+','+sy+')';
+    sp[i].style.color=mix([244,244,250],[255,111,174],clamp(up*1.6));
+    sp[i].style.textShadow=up>.05?'0 0 '+(14*up)+'px rgba(255,100,170,'+(.8*up)+')':'none';
+  }
+}
+</script></body></html>

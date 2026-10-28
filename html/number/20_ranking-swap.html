@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><title>N20 Ranking Swap</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700;800&family=Noto+Sans+JP:wght@500;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;height:100%;background:#0a0d13}
+body{display:flex;align-items:center;justify-content:center;overflow:hidden}
+body.m{display:block}
+#wrap{width:322px;height:126px;transform-origin:center center}
+body.m #wrap{transform-origin:0 0}
+#card{position:relative;width:322px;height:126px;border-radius:12px;overflow:hidden;background:#131921;font-family:'Montserrat','Noto Sans JP',sans-serif;color:#f3f4f8;-webkit-font-smoothing:antialiased}
+#card::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(244,114,182,.10),transparent 70%),radial-gradient(rgba(255,255,255,.045) 1px,transparent 1.2px) 0 0/14px 14px}
+#card::after{content:'';position:absolute;inset:0;border-radius:12px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);pointer-events:none;z-index:60}
+#card>*{position:absolute}
+svg{overflow:visible}
+#g,#lg,#lbs,#rws,#bks{left:0;top:0;width:322px;height:126px}
+#g>*,#lg>*,#lbs>*,#rws>*,#bks>*{position:absolute}
+
+.rw{left:24px;width:273px;height:26px;border-radius:8px;background:#19202a;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+.rw>*{position:absolute}
+.rk{left:14px;top:5px;width:12px;text-align:center;font:800 11px/16px Montserrat,sans-serif}
+.dt{left:39px;top:5px;width:16px;height:16px;border-radius:50%}
+.nm{left:62px;top:5px;font:700 11px/16px Montserrat,sans-serif;color:#e6e8ee}
+.vl{right:17px;top:5px;font:700 12px/16px Montserrat,sans-serif;color:#f3f4f8;text-align:right}
+</style></head>
+<body><div id="wrap"><div id="card"><div id="rws"></div></div></div>
+<script>
+
+const P=new URLSearchParams(location.search);
+const FPS=30;
+const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+const lerp=(a,b,t)=>a+(b-a)*t;
+const eo2=t=>{t=clamp(t);return 1-(1-t)*(1-t)};
+const eo3=t=>{t=clamp(t);return 1-Math.pow(1-t,3)};
+const ei2=t=>{t=clamp(t);return t*t};
+const eio=t=>{t=clamp(t);return t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2};
+const sst=t=>{t=clamp(t);return t*t*(3-2*t)};
+const ebk=t=>{t=clamp(t);const c1=1.70158,c3=c1+1;return 1+c3*Math.pow(t-1,3)+c1*Math.pow(t-1,2)};
+const $=id=>document.getElementById(id);
+function render(t){const c=(((t*FPS)%LOOP)+LOOP)%LOOP;draw(c)}
+function boot(){
+  if(P.get('m')==='1')document.body.classList.add('m');
+  const z=+(P.get('z')||1);$('wrap').style.transform='scale('+z+')';
+  const t0=P.get('t');
+  if(t0!==null){render(+t0)}else{const s=performance.now();(function f(){render((performance.now()-s)/1000);requestAnimationFrame(f)})()}
+}
+
+
+const CFG={top:19,pitch:30.5,rows:[{n:'Aoi',v:820,col:'#f472b6'},{n:'Ren',v:760,col:'#a78bfa'},{n:'Mika',v:700,col:'#6ee7b7'},{n:'Sora',v:640,col:'#8b93a1'}]};
+const LOOP=120;
+/* 實測：Mika 列移動進度(0=第3名,1=第1名,>1=浮起過衝,<0=下沉過衝)與縮放，每幀1格。UP自第6幀、DN自第51幀 */
+const UPU=[0,0,.234,.439,.604,.742,.852,.94,1.003,1.049,1.07,1.087,1.087,1.081,1.063,1.05,1.032,1.011,.997,.994,.996,1.002,.997,.999,.998,.999,.999,.999,.999],
+  UPS=[1,1,1.003,1.01,1.015,1.019,1.021,1.024,1.03,1.033,1.039,1.043,1.049,1.051,1.046,1.042,1.04,1.035,1.031,1.024,1.021,1.017,1.014,1.01,1.006,1,1,1,1],
+  DNU=[1,1,.765,.564,.397,.259,.144,.061,.001,-.045,-.074,-.085,-.085,-.078,-.064,-.048,-.03,-.016,-.003,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  DNS=[1,1,1,1,1,1.006,1.009,1.018,1.023,1.027,1.033,1.041,1.045,1.052,1.048,1.041,1.034,1.028,1.022,1.019,1.013,1.005,1,1,1,1,1,1,1,1,1,1];
+function tab(a,t){if(t<=0)return a[0];if(t>=a.length-1)return a[a.length-1];const i=Math.floor(t);return lerp(a[i],a[i+1],t-i)}
+function uof(c){if(c<6)return 0;if(c<35)return tab(UPU,c-6);if(c<51)return 1;if(c<83)return tab(DNU,c-51);return 0}
+function sof(c){if(c<6)return 1;if(c<35)return tab(UPS,c-6);if(c<51)return 1;if(c<83)return tab(DNS,c-51);return 1}
+const els=CFG.rows.map(r=>{
+  const d=document.createElement('div');d.className='rw';
+  d.innerHTML='<div class="rk"></div><div class="dt" style="background:'+r.col+'"></div><div class="nm">'+r.n+'</div><div class="vl"></div>';
+  $('rws').appendChild(d);return d});
+function setRow(i,pos,val,hl,sc,lift){
+  const d=els[i];d.style.top=(CFG.top+(pos-1)*CFG.pitch-13)+'px';
+  const rk=Math.round(pos);const k=d.children[0];k.textContent=rk;k.style.color=rk===1?'#e9c95a':(hl>.5?'#6ee7b7':'#f472b6');
+  d.children[3].textContent=Math.round(val);d.children[3].style.color=hl>0?'rgb('+Math.round(lerp(243,150,hl))+','+Math.round(lerp(244,240,hl))+','+Math.round(lerp(248,200,hl))+')':'';
+  d.style.boxShadow=hl>0?'inset 0 0 0 1px rgba(110,231,183,'+(.85*hl)+'),0 0 '+(10*hl)+'px rgba(110,231,183,'+(.28*hl)+')'+(lift>0?',0 '+(7*lift)+'px '+(12*lift)+'px rgba(0,0,0,'+(.5*lift)+')':''):'';
+  d.style.transform=sc&&sc!==1?'scale('+sc+')':'';
+  d.style.background=hl>0?'rgba(40,66,66,'+(.5*hl+.5)+')':'';
+  d.style.background=hl>0?'#'+[0,1,2].map(j=>Math.round(lerp([25,32,42][j],[26,50,50][j],hl)).toString(16).padStart(2,'0')).join(''):'';
+  d.style.zIndex=hl>0?5:1;
+}
+function draw(c){
+  const u=uof(c),sc=sof(c),uo=clamp(u),m=3-2*u,mo=3-2*uo;
+  const hl=clamp((c-1)/3)*(1-clamp((c-60)/8));
+  let v=700;
+  if(c<49)v=700+210*eo2((c+1)/18);else v=700+210*(1-sst((c-49)/22));
+  setRow(0,1+clamp(2-mo),820,0);
+  setRow(1,2+clamp(3-mo),760,0);
+  setRow(2,m,v,hl,sc,clamp((sc-1)/.05));
+  setRow(3,4,640,0);
+}
+
+const FONT_LOADS=[document.fonts.load('800 20px Montserrat','0123456789+%¥.,'),document.fonts.load('700 12px Montserrat','AoiRenMikaSora'),document.fonts.load('500 12px Montserrat','MobileDesktopTablet'),document.fonts.load('700 12px "Noto Sans JP"','1月2月3月4月5月')];
+Promise.race([Promise.all(FONT_LOADS),new Promise(r=>setTimeout(r,2500))]).then(boot,boot);
+
+</script></body></html>

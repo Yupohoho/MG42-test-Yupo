@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>B37 Minimal Stripes</title>
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; transform-origin:0 0; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<div id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#14181e',
+  // 三條橫帶，由上而下：[顏色, 上緣 y, 高度, 方向]（方向 −1＝往左、+1＝往右）
+  bands: [
+    ['#ff883c',  7, 27.5, -1],      // 橘
+    ['#f4f0e6', 41, 22,    1],      // 奶油
+    ['#0e0f15', 70, 31,   -1],      // 黑（比底色稍深）
+  ],
+  barW: 110, period: 200, x0: 1,    // 每條帶由一段段長 110 的長條組成，每 200 px 一段
+  speed: 10 / 3,                    // 每幀移動 px（一輪 60 幀剛好移一個週期 200 px）
+  loopFrames: 60,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const Z = +(q.get('z') || 1);
+const card = document.getElementById('card'), cv = document.getElementById('cv');
+card.style.cssText += `width:${CFG.W*Z}px;height:${CFG.H*Z}px;border-radius:${12*Z}px;background:${CFG.bg}`;
+cv.width = CFG.W * Z; cv.height = CFG.H * Z;
+const ctx = cv.getContext('2d');
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  ctx.setTransform(Z, 0, 0, Z, 0, 0);
+  ctx.fillStyle = CFG.bg; ctx.fillRect(0, 0, CFG.W, CFG.H);
+  for (const [col, y, h, dir] of CFG.bands) {
+    ctx.fillStyle = col;
+    for (let k = -2; k <= 3; k++) ctx.fillRect(CFG.x0 + k * CFG.period + dir * CFG.speed * f, y, CFG.barW, h);
+  }
+}
+
+if (q.has('t')) render(+q.get('t'));
+else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+</script>
+</body>
+</html>

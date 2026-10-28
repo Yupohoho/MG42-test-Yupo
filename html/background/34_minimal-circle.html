@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>B34 Minimal Circle</title>
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; transform-origin:0 0; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<div id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#ff883c',            // 橘色底
+  disc: '#f4f0e6',          // 奶油色大圓
+  ink: '#0e0f16',           // 輪廓圓線
+  center: [161.5, 53.5],    // 兩個圓的軌道中心
+  // 大圓繞橢圓軌道：x = 中心 + ax × cos(2π(幀 − 相位) ÷ 60)，y = 中心 + ay × sin(同一角度)
+  discR: 49.3, discAx: 66.7, discAy: 16, discPhase: 0,
+  // 輪廓圓比大圓大，走同一種橢圓，但晚 4.8 幀（跟在後面）
+  ringR: 56.4, ringAx: 64.9, ringAy: 15.5, ringPhase: 4.8, ringWidth: 2.6,
+  loopFrames: 60,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const Z = +(q.get('z') || 1);
+const card = document.getElementById('card'), cv = document.getElementById('cv');
+card.style.cssText += `width:${CFG.W*Z}px;height:${CFG.H*Z}px;border-radius:${12*Z}px;background:${CFG.bg}`;
+cv.width = CFG.W * Z; cv.height = CFG.H * Z;
+const ctx = cv.getContext('2d');
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames, [cx, cy] = CFG.center, TAU = 2 * Math.PI;
+  ctx.setTransform(Z, 0, 0, Z, 0, 0);
+  ctx.fillStyle = CFG.bg; ctx.fillRect(0, 0, CFG.W, CFG.H);
+  let a = TAU * (f - CFG.discPhase) / CFG.loopFrames;
+  ctx.fillStyle = CFG.disc; ctx.beginPath();
+  ctx.arc(cx + CFG.discAx * Math.cos(a), cy + CFG.discAy * Math.sin(a), CFG.discR, 0, TAU); ctx.fill();
+  a = TAU * (f - CFG.ringPhase) / CFG.loopFrames;
+  ctx.strokeStyle = CFG.ink; ctx.lineWidth = CFG.ringWidth; ctx.beginPath();
+  ctx.arc(cx + CFG.ringAx * Math.cos(a), cy + CFG.ringAy * Math.sin(a), CFG.ringR, 0, TAU); ctx.stroke();
+}
+
+if (q.has('t')) render(+q.get('t'));
+else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+</script>
+</body>
+</html>

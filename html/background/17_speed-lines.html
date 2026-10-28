@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>B17 Speed Lines</title>
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; transform-origin:0 0; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<div id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#14181e',
+  yellow: [255, 207, 47], white: [251, 251, 249],
+  // 每一條「線道」：y、粗細 h、顏色、不透明度 a、每輪幀數 P（60 的因數）、頭部速度 v（px／幀）、
+  // 第一次從左邊緣長出來的幀 phi（頭 = v × (幀 − phi)）、線長 L
+  // 一條線從左邊緣長出來（頭往右跑、尾巴留在邊緣），長到 L 之後尾巴跟上，頭先離開右邊緣、尾巴最後離開；每 P 幀再來一條
+  lanes: [
+    { y: 9,    h: 2.0,  c: 'yellow', a: .68, P: 20, v: 22.85, phi: 17.9, L: 127 },
+    { y: 16,   h: 1.4,  c: 'white',  a: 1,   P: 30, v: 14.85, phi: 13.25, L: 121 },
+    { y: 24.1, h: 2.45, c: 'yellow', a: 1,   P: 60, v: 7.72,  phi: 54.7, L: 139 },
+    { y: 31,   h: 2.0,  c: 'yellow', a: .66, P: 20, v: 25.0,  phi: 17.1, L: 172 },
+    { y: 33.4, h: 2.5,  c: 'yellow', a: 1,   P: 20, v: 23.6,  phi: 6.5,  L: 148 },
+    { y: 32.7, h: 3.2,  c: 'white',  a: 1,   P: 60, v: 7.9,   phi: 18.9, L: 182 },
+    { y: 36,   h: 1.4,  c: 'white',  a: 1,   P: 20, v: 25.1,  phi: 16.0, L: 181 },
+    { y: 36,   h: 1.4,  c: 'white',  a: 1,   P: 30, v: 14.8,  phi: 6.2,  L: 121 },
+    { y: 45.5, h: 4.0,  c: 'yellow', a: 1,   P: 60, v: 8.34,  phi: 42.65, L: 175 },
+    { y: 51.5, h: 4.4,  c: 'white',  a: 1,   P: 60, v: 6.45,  phi: 13.8, L: 60 },
+    { y: 60,   h: 2.0,  c: 'white',  a: 1,   P: 60, v: 8.07,  phi: 31.4, L: 156 },
+    { y: 62,   h: 3.0,  c: 'white',  a: 1,   P: 60, v: 8.34,  phi: 13.5, L: 312 },
+    { y: 64,   h: 2.0,  c: 'white',  a: 1,   P: 30, v: 14.85, phi: 28.1, L: 119 },
+    { y: 65,   h: 3.0,  c: 'white',  a: 1,   P: 60, v: 8.3,   phi: 13.3, L: 174 },
+    { y: 66,   h: 1.8,  c: 'yellow', a: 1,   P: 20, v: 21.6,  phi: 19.0, L: 150 },
+    { y: 76,   h: 2.0,  c: 'white',  a: 1,   P: 20, v: 21.2,  phi: 15.0, L: 96 },
+    { y: 78,   h: 3.0,  c: 'white',  a: 1,   P: 60, v: 8.1,   phi: 20.4, L: 159 },
+    { y: 79,   h: 3.7,  c: 'white',  a: 1,   P: 30, v: 13.9,  phi: 10.0, L: 90 },
+    { y: 91,   h: 2.0,  c: 'white',  a: 1,   P: 30, v: 12.4,  phi: 10.9, L: 49 },
+    { y: 95.45, h: 3.0, c: 'yellow', a: 1,   P: 60, v: 8.1,   phi: 46.4, L: 159 },
+  ],
+  loopFrames: 60,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const Z = +(q.get('z') || 1);
+const card = document.getElementById('card'), cv = document.getElementById('cv');
+card.style.cssText += `width:${CFG.W*Z}px;height:${CFG.H*Z}px;border-radius:${12*Z}px;background:${CFG.bg}`;
+cv.width = CFG.W * Z; cv.height = CFG.H * Z;
+const ctx = cv.getContext('2d');
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  ctx.setTransform(Z, 0, 0, Z, 0, 0);
+  ctx.fillStyle = CFG.bg; ctx.fillRect(0, 0, CFG.W, CFG.H);
+  for (const ln of CFG.lanes) {
+    const [r, g, b] = CFG[ln.c];
+    ctx.fillStyle = `rgba(${r},${g},${b},${ln.a})`;
+    for (let n = -3; n <= 1; n++) {
+      const head = ln.v * (f - ln.phi - n * ln.P);
+      if (head <= 0) continue;
+      const tail = Math.max(0, head - ln.L);
+      if (tail >= CFG.W) continue;
+      const x0 = tail <= 0 ? -ln.h : tail, x1 = Math.min(head, CFG.W + ln.h);
+      ctx.beginPath(); ctx.roundRect(x0, ln.y, x1 - x0, ln.h, ln.h / 2); ctx.fill();
+    }
+  }
+}
+
+if (q.has('t')) render(+q.get('t'));
+else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+</script>
+</body>
+</html>

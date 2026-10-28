@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>B04 Halftone Sweep</title>
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; transform-origin:0 0; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<div id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#14181e',
+  small: '#ffffff',         // 小點色
+  big: '#ff4d87',           // 帶中央的大點色（半徑超過 bigFrom 就變粉紅）
+  bigFrom: 4.6,
+  x0: 2.5, px: 13.3,        // 網點格
+  y0: 2.7, py: 12.65,
+  slant: 1.5,               // 帶的斜度：每往下一列，帶往左移 1.5 欄
+  peak0: 21.3,              // 第 0 幀帶中心的位置（v = 欄 + 1.5×列）
+  speed: .84,               // 帶每幀往右移幾欄
+  period: 50.4,             // 帶繞回去的長度（欄）：speed × 60
+  // 帶的剖面：離帶中心幾欄 → 點半徑
+  profile: [[0, 8], [2, 7.9], [3, 7.2], [4, 6.1], [5, 5.3], [6, 4.6], [7, 3.8], [8, 3.3], [9, 2.7], [10.5, 2.4], [12, 1.8], [14, 1.3], [18, 1.1]],
+  loopFrames: 60,           // 一輪 60 幀（2 秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const Z = +(q.get('z') || 1);
+const card = document.getElementById('card'), cv = document.getElementById('cv');
+card.style.cssText += `width:${CFG.W*Z}px;height:${CFG.H*Z}px;border-radius:${12*Z}px;background:${CFG.bg}`;
+cv.width = CFG.W * Z; cv.height = CFG.H * Z;
+const ctx = cv.getContext('2d');
+
+const table = (t, f) => {
+  if (f <= t[0][0]) return t[0][1];
+  for (let i = 1; i < t.length; i++) if (f <= t[i][0]) { const [a, b] = [t[i-1], t[i]]; return a[1] + (b[1] - a[1]) * (f - a[0]) / (b[0] - a[0]); }
+  return t[t.length-1][1];
+};
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  ctx.setTransform(Z, 0, 0, Z, 0, 0);
+  ctx.fillStyle = CFG.bg; ctx.fillRect(0, 0, CFG.W, CFG.H);
+  const peak = CFG.peak0 + CFG.speed * f, P = CFG.period;
+  for (let r = -1; r < 10; r++) for (let c = -1; c < 26; c++) {
+    const x = CFG.x0 + c * CFG.px, y = CFG.y0 + r * CFG.py;
+    let d = (c + CFG.slant * r - peak) % P; if (d > P / 2) d -= P; if (d < -P / 2) d += P;
+    const rad = table(CFG.profile, Math.abs(d));
+    ctx.fillStyle = rad > CFG.bigFrom ? CFG.big : CFG.small;
+    ctx.beginPath(); ctx.arc(x, y, rad, 0, 6.2832); ctx.fill();
+  }
+}
+
+if (q.has('t')) render(+q.get('t'));
+else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+</script>
+</body>
+</html>

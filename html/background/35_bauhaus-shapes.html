@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>B35 Bauhaus Shapes</title>
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; transform-origin:0 0; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<div id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  cream: '#f4f0e6', gray: '#d6d6cf',     // 棋盤底的兩色（(欄＋列) 偶數＝奶油，奇數＝淡灰）
+  orange: '#ff883c', ink: '#0e0f16',
+  cols: 6, rows: 2,
+  x0: 3.55, pitchX: 53.3, y0: 0, pitchY: 53.5,   // 磚的起點與大小
+  size: 42,                                // 圖樣大小（圓直徑＝四分之一圓半徑＝半圓磚的寬）
+  // 每片磚的圖樣：(欄＋列) 除以 3 的餘數 0＝橘色圓、1＝黑色四分之一圓、2＝上橘半圓＋下黑色方塊
+  // 圓不會轉；其餘兩種每隔一小段順時針轉 90°，一輪轉 4 次（轉完 360° 回到原樣）
+  start: 6.9, stepPerTile: .45,            // 第 n 片磚（左→右、上→下編號）第一次轉到一半的幀 = 6.9 + 0.45 × n
+  stepGap: 13.35,                          // 同一片磚兩次轉動的間隔
+  turnFrames: 3.4,                         // 一次轉 90° 花的幀數（緩入緩出）
+  loopFrames: 57,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const Z = +(q.get('z') || 1);
+const card = document.getElementById('card'), cv = document.getElementById('cv');
+card.style.cssText += `width:${CFG.W*Z}px;height:${CFG.H*Z}px;border-radius:${12*Z}px;background:${CFG.cream}`;
+cv.width = CFG.W * Z; cv.height = CFG.H * Z;
+const ctx = cv.getContext('2d');
+
+const ss = u => { u = Math.min(1, Math.max(0, u)); return u * u * (3 - 2 * u); };
+const tint = (r, c) => (r + c) % 2 ? CFG.gray : CFG.cream;
+
+function rotation(f, n) {                      // 這片磚此刻轉了幾度（順時針）
+  let a = 0;
+  for (let k = 0; k < 4; k++) {
+    const mid = CFG.start + CFG.stepPerTile * n + CFG.stepGap * k;
+    a += 90 * ss((f - (mid - CFG.turnFrames / 2)) / CFG.turnFrames);
+  }
+  return a;
+}
+
+function pattern(kind, s) {                    // 以磚中心為原點畫圖樣
+  const h = s / 2;
+  if (kind === 0) { ctx.fillStyle = CFG.orange; ctx.beginPath(); ctx.arc(0, 0, h, 0, 2 * Math.PI); ctx.fill(); }
+  else if (kind === 1) {                       // 圓心在左下角的四分之一圓
+    ctx.fillStyle = CFG.ink; ctx.beginPath(); ctx.moveTo(-h, h); ctx.arc(-h, h, s, -Math.PI / 2, 0); ctx.closePath(); ctx.fill();
+  } else {
+    ctx.fillStyle = CFG.orange; ctx.beginPath(); ctx.arc(0, 0, h, Math.PI, 2 * Math.PI); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = CFG.ink; ctx.fillRect(-h, 0, s, h);
+  }
+}
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  ctx.setTransform(Z, 0, 0, Z, 0, 0);
+  ctx.fillStyle = CFG.cream; ctx.fillRect(0, 0, CFG.W, CFG.H);
+  for (let r = 0; r < CFG.rows; r++) for (let c = 0; c < CFG.cols; c++) {   // 靜止的棋盤底
+    const x = CFG.x0 + c * CFG.pitchX, y = CFG.y0 + r * CFG.pitchY;
+    ctx.fillStyle = tint(r, c);
+    ctx.fillRect(c === 0 ? 0 : x, y, CFG.pitchX + (c === 0 ? CFG.x0 : 0) + (c === CFG.cols - 1 ? 1 : .4), CFG.pitchY + .4);
+  }
+  for (let r = 0; r < CFG.rows; r++) for (let c = 0; c < CFG.cols; c++) {
+    const kind = (c + r) % 3, n = r * CFG.cols + c;
+    const cx = CFG.x0 + (c + .5) * CFG.pitchX, cy = CFG.y0 + (r + .5) * CFG.pitchY;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(cx - CFG.pitchX / 2, cy - CFG.pitchY / 2, CFG.pitchX, CFG.pitchY); ctx.clip();   // 圖樣轉動時不超出自己那一格
+    ctx.translate(cx, cy);
+    if (kind !== 0) ctx.rotate(rotation(f, n) * Math.PI / 180);
+    pattern(kind, CFG.size);
+    ctx.restore();
+  }
+}
+
+if (q.has('t')) render(+q.get('t'));
+else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+</script>
+</body>
+</html>

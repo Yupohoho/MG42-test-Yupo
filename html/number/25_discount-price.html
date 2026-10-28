@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>N25 discount-price</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800&family=Noto+Sans+JP:wght@700;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0a0d12}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;overflow:hidden}
+body.m{display:block;min-height:0}
+#wrap{position:relative;width:324px;height:124px;transform-origin:center}
+body.m #wrap{transform-origin:0 0}
+#card{position:absolute;left:0;top:0;width:324px;height:124px;border-radius:12px;overflow:hidden;
+ background:radial-gradient(130% 100% at 50% 0%,#1d1a2f 0%,#141824 55%,#0f131b 100%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.05)}
+#card *{box-sizing:border-box}
+.abs{position:absolute}
+
+.lab{position:absolute;left:41px;top:14px;font:700 7.5px 'Noto Sans JP';letter-spacing:.14em;color:#ff6fae}
+.old{position:absolute;left:41px;top:34px;font:700 25px/30px Outfit;color:#9aa0b0;white-space:nowrap}
+#strike{position:absolute;left:-3px;top:15px;height:2px;background:#ff5a5a;width:0}
+.price{position:absolute;left:0;width:330px;text-align:center;top:66px;font:800 44px/48px Outfit;white-space:nowrap}
+#badge{position:absolute;left:224px;top:20px;padding:3px 8px;border-radius:7px;background:#7dffb9;color:#0c2a1c;font:800 12px Outfit}
+.sp{position:absolute;width:3px;height:3px;border-radius:2px;background:#bfffe0}
+</style></head><body>
+<div id="wrap"><div id="card"><div class="lab" id="lab"></div><div class="old" id="old"><span id="oldt"></span><i id="strike"></i></div><div class="price" id="price"></div><div id="badge"></div><div id="sp"></div></div></div>
+<script>
+// N25 割引価格 / discount-price
+var LOOP=120; // frames @30fps (4s)
+var CFG={label:"SPECIAL PRICE",old:"¥9,800",price:"¥6,980",badge:"-29%",oldScale:[[8,1],[9,.944],[10,.925],[11,.925]],priceScale:[[22,.2],[23,.3],[24,.95],[25,1],[27,1],[28,.885],[29,.885],[30,.97],[31,1],[33,1]],priceTy:[[22,16],[23,14],[24,1],[25,0]],badgeScale:[[33,0],[34,.81],[35,1.36],[36,1.23],[37,.94],[38,.89],[39,1],[40,1.06],[41,1.03],[42,1]]};
+var FONTS=[["800 40px Outfit","0123456789,.%¥"],["700 12px Outfit","SECONDS"],["700 12px 'Noto Sans JP'","カートに追加残り点あとわずか"]];
+
+var FPS=30;
+var q=new URLSearchParams(location.search);
+function C(v,a,b){a=a==null?0:a;b=b==null?1:b;return Math.min(b,Math.max(a,v))}
+var E={lin:function(x){return x},out:function(x){return 1-Math.pow(1-x,3)},inn:function(x){return x*x*x},
+ io:function(x){return x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2},
+ back:function(x){var c1=1.70158,c3=c1+1;return 1+c3*Math.pow(x-1,3)+c1*Math.pow(x-1,2)}};
+function seg(f,a,b,e){return (e||E.lin)(C((f-a)/(b-a)))}
+function kf(f,a){if(f<=a[0][0])return a[0][1];for(var i=1;i<a.length;i++){if(f<a[i][0]){var p=a[i-1],n=a[i];return p[1]+(n[1]-p[1])*(f-p[0])/(n[0]-p[0])}}return a[a.length-1][1]}
+function $(id){return document.getElementById(id)}
+function mix(a,b,t){return [Math.round(a[0]+(b[0]-a[0])*t),Math.round(a[1]+(b[1]-a[1])*t),Math.round(a[2]+(b[2]-a[2])*t)]}
+function rgb(c,al){return al==null?'rgb('+c[0]+','+c[1]+','+c[2]+')':'rgba('+c[0]+','+c[1]+','+c[2]+','+al+')'}
+function comma(n){n=Math.round(n);var s=String(n);return s.length>3?s.slice(0,s.length-3)+','+s.slice(-3):s}
+var CURSOR='<svg width="12" height="17" viewBox="0 0 12 17"><path d="M1 1v13l3.4-3.2 2.4 5 2.2-1-2.3-4.9H11z" fill="#fff" stroke="#1a1d26" stroke-width="1"/></svg>';
+function boot(){
+ if(q.get('m'))document.body.classList.add('m');
+ var z=+q.get('z')||1;$('wrap').style.transform='scale('+z+')';
+ if(typeof init==='function')init();
+ if(q.has('t')){render(((+q.get('t')*FPS)%LOOP+LOOP)%LOOP);return}
+ var t0=performance.now();
+ (function tick(now){render(((now-t0)/1000*FPS)%LOOP);requestAnimationFrame(tick)})(t0);
+}
+Promise.all(FONTS.map(function(f){return document.fonts.load(f[0],f[1])})).then(boot,boot);
+
+
+var SP=[];
+function init(){
+ $('lab').textContent=CFG.label;$('oldt').textContent=CFG.old;$('price').textContent=CFG.price;$('badge').textContent=CFG.badge;
+ for(var i=0;i<12;i++){var d=document.createElement('div');d.className='sp';$('sp').appendChild(d);SP.push(d)}
+}
+var MINT=[150,255,205],WHITE=[255,255,255],GRAY=[140,146,160];
+function render(f){
+ var oo=f<106?kf(f,[[0,1],[8,1],[20,.45],[100,.45],[106,0]]):seg(f,109,114);
+ $('old').style.opacity=oo;
+ $('old').style.transform='scale('+(f>=106?1:kf(f,CFG.oldScale))+')';
+ $('strike').style.width=(f<106?seg(f,7,14,E.out)*100:0)+'%';
+ // price
+ var ex=seg(f,96,106,E.inn);
+ var p=seg(f,20,30,E.back),op=seg(f,21,24)*(1-ex);
+ if(f>=106)op=0;
+ var sc=kf(f,CFG.priceScale)*(1-.1*ex);
+ var ty=kf(f,CFG.priceTy)+ex*20;
+ var col=mix(mix(MINT,WHITE,seg(f,34,46)),GRAY,seg(f,96,102));
+ var g=seg(f,34,46)*(1-seg(f,96,102)),m=seg(f,24,28)*(1-seg(f,34,46));
+ var pr=$('price');
+ pr.style.opacity=op;pr.style.color=rgb(col);
+ pr.style.transform='translateY('+ty+'px) scale('+sc+')';
+ pr.style.textShadow='0 0 '+(14*m)+'px '+rgb([125,255,185],.7*m)+',0 0 '+(10*g+1)+'px '+rgb([255,150,200],.6*g)+',0 0 4px '+rgb([255,255,255],.35*g);
+ // badge
+ var b=kf(f,CFG.badgeScale),bo=1-seg(f,96,100);
+ $('badge').style.transform='scale('+b+') rotate('+(-6*(1-seg(f,33,44))-3*seg(f,40,50))+'deg)';
+ $('badge').style.opacity=f<33?0:bo;
+ // sparks
+ var sp=seg(f,26,42,E.out),so=seg(f,26,28)*(1-seg(f,30,44));
+ for(var i=0;i<SP.length;i++){
+  var a=i/SP.length*Math.PI*2+.4,d=(26+(i%3)*10)*sp;
+  SP[i].style.left=(165+Math.cos(a)*(40+d*1.5))+'px';
+  SP[i].style.top=(88+Math.sin(a)*(14+d*.6))+'px';
+  SP[i].style.opacity=so;
+ }
+}
+
+</script></body></html>

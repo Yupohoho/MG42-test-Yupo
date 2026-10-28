@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>B02 Halftone Wave</title>
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; transform-origin:0 0; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<div id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#ff4b85',            // 粉紅底
+  layers: [                 // 兩層網點：白點在下、深色點在上，上下錯開半列
+    { color: '#ffffff', y0: 20.5, minR: 1.4, maxR: 4.3, peakU: 7.67 },
+    { color: '#14181e', y0: 13.4, minR: 1.5, maxR: 4.8, peakU: 11.67 },
+  ],
+  x0: 15.5, px: 13.3,       // 兩層共用的欄（欄距）
+  py: 14.8,                 // 每層的列距
+  waveCols: 9.4,            // 波長（以欄數計），一輪 60 幀剛好走一個波長
+  slant: 0,                 // 波前斜度：0 = 波前是垂直的（大小只跟橫向位置有關）
+  loopFrames: 60,           // 一輪 60 幀（2 秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const Z = +(q.get('z') || 1);
+const card = document.getElementById('card'), cv = document.getElementById('cv');
+card.style.cssText += `width:${CFG.W*Z}px;height:${CFG.H*Z}px;border-radius:${12*Z}px;background:${CFG.bg}`;
+cv.width = CFG.W * Z; cv.height = CFG.H * Z;
+const ctx = cv.getContext('2d');
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  ctx.setTransform(Z, 0, 0, Z, 0, 0);
+  ctx.fillStyle = CFG.bg; ctx.fillRect(0, 0, CFG.W, CFG.H);
+  for (const L of CFG.layers) {
+    ctx.fillStyle = L.color;
+    for (let m = -2; m < 9; m++) for (let k = -2; k < 26; k++) {
+      const x = CFG.x0 + k * CFG.px, y = L.y0 + m * CFG.py;
+      const u = x / CFG.px + CFG.slant * y / CFG.py;                       // 沿波前法線方向的位置（欄）
+      const g = .5 + .5 * Math.cos(2 * Math.PI * ((u - L.peakU) / CFG.waveCols - f / CFG.loopFrames));
+      const rad = L.minR + (L.maxR - L.minR) * g;
+      ctx.beginPath(); ctx.arc(x, y, rad, 0, 6.2832); ctx.fill();
+    }
+  }
+}
+
+if (q.has('t')) render(+q.get('t'));
+else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+</script>
+</body>
+</html>

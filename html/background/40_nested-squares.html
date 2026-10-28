@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>B40 Nested Squares</title>
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; transform-origin:0 0; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<div id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#14181e',
+  white: '#ffffff', whiteWidth: 2.1,          // 偶數號（0、2、4…）的粗白框
+  orange: '#ff8a3c', orangeWidth: 1.3, orangeAlpha: .9,   // 奇數號的細橘框
+  center: [161.5, 53.5],
+  count: 9,                                   // 由內到外 9 個正方形（0 號最小）
+  // 半邊長 = (編號 + 1) ÷ 2 × (base + swing × cos(2π (幀 − sizeLag × 編號) ÷ 60))
+  base: 14.6, swing: 1.14, sizeLag: 3.83,
+  // 旋轉角（度）= angleAmp × cos(2π (幀 − (peak0 − angleLag × 編號)) ÷ 60)，每個方塊都左右擺 ±21.5°，外面的比裡面晚擺
+  angleAmp: 21.5, peak0: 15.1, angleLag: 4.8,
+  loopFrames: 60,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const Z = +(q.get('z') || 1);
+const card = document.getElementById('card'), cv = document.getElementById('cv');
+card.style.cssText += `width:${CFG.W*Z}px;height:${CFG.H*Z}px;border-radius:${12*Z}px;background:${CFG.bg}`;
+cv.width = CFG.W * Z; cv.height = CFG.H * Z;
+const ctx = cv.getContext('2d');
+
+function square(k, f) {
+  const TAU = 2 * Math.PI, L = CFG.loopFrames;
+  const s = (k + 1) / 2 * (CFG.base + CFG.swing * Math.cos(TAU * (f - CFG.sizeLag * k) / L));
+  const a = CFG.angleAmp * Math.cos(TAU * (f - (CFG.peak0 - CFG.angleLag * k)) / L) * Math.PI / 180;
+  ctx.save(); ctx.translate(CFG.center[0], CFG.center[1]); ctx.rotate(a);
+  ctx.strokeRect(-s, -s, 2 * s, 2 * s); ctx.restore();
+}
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  ctx.setTransform(Z, 0, 0, Z, 0, 0);
+  ctx.fillStyle = CFG.bg; ctx.fillRect(0, 0, CFG.W, CFG.H);
+  ctx.lineJoin = 'miter';
+  ctx.strokeStyle = CFG.orange; ctx.lineWidth = CFG.orangeWidth; ctx.globalAlpha = CFG.orangeAlpha;
+  for (let k = 1; k < CFG.count; k += 2) square(k, f);
+  ctx.globalAlpha = 1; ctx.strokeStyle = CFG.white; ctx.lineWidth = CFG.whiteWidth;
+  for (let k = 0; k < CFG.count; k += 2) square(k, f);
+}
+
+if (q.has('t')) render(+q.get('t'));
+else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+</script>
+</body>
+</html>

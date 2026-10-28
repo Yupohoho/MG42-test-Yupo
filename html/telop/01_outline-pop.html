@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>TL01 Outline Pop</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #word { position:absolute; left:0; top:0; width:0; height:0; }
+  #word svg { position:absolute; left:0; top:0; width:1px; height:1px; overflow:visible; }
+</style>
+</head>
+<body>
+<div id="card"><div id="word"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: 'まさかの展開！',
+  W: 324, H: 106,
+  bg: '#14161c',
+  color: '#f4efe4',        // 字色
+  outline: '#ff5a5f',      // 外框色
+  outlineW: 4.5,            // 外框寬度（px，往外長）
+  fontSize: 33.5,
+  cx: .506, cy: .512,      // 字中心（畫面比例）
+  rot: -2,                 // 整體傾斜（度）
+  // 彈出：每幀硬切的橫向寬度比例（寬 100% 對應 1.0），字高幾乎不變，所以是「橫向撐開」
+  popW: [.47, .61, .80, .95, 1.06, 1.13, 1.17, 1.18, 1.17, 1.14, 1.11, 1.07, 1.04, 1.01],
+  popH: [.82, .92, .97, .99, 1.01, 1.01, 1.01, 1.01, 1.01, 1.01, 1.01, 1.00, 1.00, 1.00],
+  // 停住後慢慢「呼吸」：高度緩慢縮小再回來（原版約 0.5 秒縮 5%，再放回）
+  breathe: { start: 20, end: 40, depth: .05 },
+  // 淡出：最後 4 幀變暗縮小
+  fadeFrom: 54, fadeFrames: 4,
+  loopFrames: 59,          // 一輪 59 幀（約 1.97 秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), word = document.getElementById('word');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+// 描邊字用 SVG 文字＋圓角連接（HTML 文字的描邊轉折會長尖刺）
+const NS = 'http://www.w3.org/2000/svg';
+const svg = document.createElementNS(NS, 'svg');
+const tx = document.createElementNS(NS, 'text');
+tx.textContent = CFG.text;
+const ls = CFG.fontSize * .02;
+for (const [k, v] of Object.entries({ x: ls/2, y: 0, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-family': "'Dela Gothic One',sans-serif",
+  'font-size': CFG.fontSize, 'letter-spacing': ls, fill: CFG.color, stroke: CFG.outline, 'stroke-width': CFG.outlineW*2,
+  'stroke-linejoin': 'round', 'stroke-linecap': 'round', 'paint-order': 'stroke fill' })) tx.setAttribute(k, v);
+svg.appendChild(tx); word.appendChild(svg);
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  let sx = 1, sy = 1, o = 1;
+  if (f < 4) o = 0;                                         // 開頭先空白 4 幀
+  else if (f < 4 + CFG.popW.length) { sx = CFG.popW[f-4]; sy = CFG.popH[f-4]; }
+  else sx = CFG.popW[CFG.popW.length-1];
+  // 停住後高度慢慢縮小再回來
+  const b = CFG.breathe;
+  if (f >= b.start && f <= b.end) { const k = Math.sin((f - b.start) / (b.end - b.start) * Math.PI); sy *= 1 - b.depth * k; }
+  // 淡出
+  if (f >= CFG.fadeFrom) { const k = Math.min(1, (f - CFG.fadeFrom) / CFG.fadeFrames); o = 1 - k; sx *= 1 - .03 * k; sy *= 1 - .05 * k; }
+  if (f >= CFG.fadeFrom + CFG.fadeFrames) o = 0;
+  word.style.opacity = o;
+  word.style.transform = `translate(${CFG.cx*CFG.W}px,${CFG.cy*CFG.H}px) rotate(${CFG.rot}deg) scale(${sx},${sy})`;
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "Dela Gothic One"`, CFG.text).then(start);
+</script>
+</body>
+</html>

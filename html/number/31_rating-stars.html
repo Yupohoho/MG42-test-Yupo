@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>N31 rating-stars</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800&family=Noto+Sans+JP:wght@700;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0a0d12}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;overflow:hidden}
+body.m{display:block;min-height:0}
+#wrap{position:relative;width:324px;height:124px;transform-origin:center}
+body.m #wrap{transform-origin:0 0}
+#card{position:absolute;left:0;top:0;width:324px;height:124px;border-radius:12px;overflow:hidden;
+ background:radial-gradient(130% 100% at 50% 0%,#1d1a2f 0%,#141824 55%,#0f131b 100%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.05)}
+#card *{box-sizing:border-box}
+.abs{position:absolute}
+
+#num{position:absolute;left:28px;top:30px;font:800 58px/52px Outfit;color:#f8f7f2;white-space:nowrap}
+#unit{position:absolute;left:113px;top:65px;font:700 13px 'Noto Sans JP';color:#8a90a2}
+#rev{position:absolute;left:45px;top:92.5px;font:700 9.6px 'Noto Sans JP';color:#7b8294;white-space:nowrap}
+.st{position:absolute;top:46.5px;width:23px;height:23px}
+.st svg{position:absolute;left:0;top:0}
+</style></head><body>
+<div id="wrap"><div id="card"><div id="num"></div><div id="unit"></div><div id="rev"></div><div id="stars"></div></div></div>
+<script>
+// N31 評価スター / rating-stars
+var LOOP=120; // frames @30fps (4s)
+var CFG={unit:"/ 5.0",pop:[1.7,7.4,14.4,26.7],popS:[[0,1],[1.5,1.16],[4,1.06],[7,1.0],[8,1]],popR:[[0,0],[1.5,-10],[3.5,7],[5.5,-3],[8,0]],land:{t:44,s:1.2,a:9,p:11},reviews:"(1,284 reviews)",curve:[[-4,0],[0,0.7],[4,1.4],[8,2.1],[12,2.7],[16,3.2],[20,3.6],[24,3.9],[28,4.2],[32,4.4],[36,4.5],[40,4.6],[44,4.7],[48,4.8],[90,4.8],[96,3.6],[100,0.7],[104,0],[116,0]]};
+var FONTS=[["800 40px Outfit","0123456789,.%¥"],["700 12px Outfit","SECONDS"],["700 12px 'Noto Sans JP'","カートに追加残り点あとわずか"]];
+
+var FPS=30;
+var q=new URLSearchParams(location.search);
+function C(v,a,b){a=a==null?0:a;b=b==null?1:b;return Math.min(b,Math.max(a,v))}
+var E={lin:function(x){return x},out:function(x){return 1-Math.pow(1-x,3)},inn:function(x){return x*x*x},
+ io:function(x){return x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2},
+ back:function(x){var c1=1.70158,c3=c1+1;return 1+c3*Math.pow(x-1,3)+c1*Math.pow(x-1,2)}};
+function seg(f,a,b,e){return (e||E.lin)(C((f-a)/(b-a)))}
+function kf(f,a){if(f<=a[0][0])return a[0][1];for(var i=1;i<a.length;i++){if(f<a[i][0]){var p=a[i-1],n=a[i];return p[1]+(n[1]-p[1])*(f-p[0])/(n[0]-p[0])}}return a[a.length-1][1]}
+function $(id){return document.getElementById(id)}
+function mix(a,b,t){return [Math.round(a[0]+(b[0]-a[0])*t),Math.round(a[1]+(b[1]-a[1])*t),Math.round(a[2]+(b[2]-a[2])*t)]}
+function rgb(c,al){return al==null?'rgb('+c[0]+','+c[1]+','+c[2]+')':'rgba('+c[0]+','+c[1]+','+c[2]+','+al+')'}
+function comma(n){n=Math.round(n);var s=String(n);return s.length>3?s.slice(0,s.length-3)+','+s.slice(-3):s}
+var CURSOR='<svg width="12" height="17" viewBox="0 0 12 17"><path d="M1 1v13l3.4-3.2 2.4 5 2.2-1-2.3-4.9H11z" fill="#fff" stroke="#1a1d26" stroke-width="1"/></svg>';
+function boot(){
+ if(q.get('m'))document.body.classList.add('m');
+ var z=+q.get('z')||1;$('wrap').style.transform='scale('+z+')';
+ if(typeof init==='function')init();
+ if(q.has('t')){render(((+q.get('t')*FPS)%LOOP+LOOP)%LOOP);return}
+ var t0=performance.now();
+ (function tick(now){render(((now-t0)/1000*FPS)%LOOP);requestAnimationFrame(tick)})(t0);
+}
+Promise.all(FONTS.map(function(f){return document.fonts.load(f[0],f[1])})).then(boot,boot);
+
+
+var ST=[],ST2=[];
+var SP='M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.9L12 17.8 5.8 21.1 7 14.2 2 9.3l6.9-1z';
+function init(){
+ $('unit').textContent=CFG.unit;$('rev').textContent=CFG.reviews;
+ for(var i=0;i<5;i++){
+  var d=document.createElement('div');d.className='st';d.style.left=(146+i*30.5)+'px';ST2.push(d);
+  d.innerHTML='<svg width="23" height="23" viewBox="0 0 24 24"><path d="'+SP+'" fill="#2a3040"/></svg><svg class="fl" width="23" height="23" viewBox="0 0 24 24"><path d="'+SP+'" fill="#ffd23f"/></svg>';
+  $('stars').appendChild(d);ST.push(d.querySelector('.fl'));
+ }
+}
+function render(f){
+ var r=kf(f,CFG.curve);
+ $('num').textContent=r.toFixed(1);
+ for(var i=0;i<5;i++){var fr=C(r-i);ST[i].style.clipPath='inset(0 '+((1-fr)*100)+'% 0 0)';ST[i].style.filter=fr>0&&fr<1?'drop-shadow(0 0 3px rgba(255,210,63,.8))':'none'}
+ var g=f<52?1:f<64?1-.7*seg(f,52,64):f<96?.3:0;
+ if(f>=100)g=.5*(r>0.3?1:0);
+ for(var i=0;i<5;i++){var sc=1,ro=0;
+  if(f<96){if(i<4){var a=f-CFG.pop[i];if(a>=0&&a<8){sc=kf(a,CFG.popS);ro=kf(a,CFG.popR)}}
+  else{var L=CFG.land;if(f>=L.t){sc=f<90?kf(f,[[L.t,1],[L.t+4,L.s+.06],[L.t+8,L.s]]):kf(f,[[90,L.s],[96,1]]);ro=L.a*Math.sin(2*Math.PI*(f-L.t)/L.p)*seg(f,L.t,L.t+4)}}}
+  ST2[i].style.transform='rotate('+ro+'deg) scale('+sc+')'}
+ $('num').style.textShadow='0 0 '+(14*g)+'px rgba(255,255,255,'+(.6*g)+')';
+}
+
+</script></body></html>

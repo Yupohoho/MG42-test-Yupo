@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>B21 Ripple Rings</title>
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; transform-origin:0 0; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<div id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#14181e',
+  // 兩個波源：白色（左）與黃色（右），各自往外一圈一圈放出圓環
+  sources: [
+    { c: [101, 40],   color: [244, 244, 250],
+      a: [[4,.94],[8,.87],[16.5,.82],[25,.81],[33.5,.77],[42,.68],[50,.64],[59,.58],[67.5,.52],[76,.45],[84,.41],[92,.35],[101,.25],[110,.2],[122,.14],[135,.08],[160,0]] },
+    { c: [227.5, 67], color: [255, 205, 45],
+      a: [[4,1],[8.5,.93],[16.5,.92],[25,.9],[33.5,.83],[42,.8],[50.5,.7],[59,.65],[67.5,.6],[76,.54],[88,.5],[110,.35],[135,.2],[170,.05],[200,0]] },
+  ],
+  r0: 4,                    // 新環剛出現時的半徑
+  spacing: 25.4,            // 相鄰兩圈的間距
+  loopFrames: 12,           // 一輪 12 幀：每個環剛好走到前一個環的位置
+  lineWidth: 1.9,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const Z = +(q.get('z') || 1);
+const card = document.getElementById('card'), cv = document.getElementById('cv');
+card.style.cssText += `width:${CFG.W*Z}px;height:${CFG.H*Z}px;border-radius:${12*Z}px;background:${CFG.bg}`;
+cv.width = CFG.W * Z; cv.height = CFG.H * Z;
+const ctx = cv.getContext('2d');
+
+function alphaAt(tab, r) {
+  if (r <= tab[0][0]) return tab[0][1];
+  for (let i = 1; i < tab.length; i++) if (r <= tab[i][0]) { const [a, b] = [tab[i - 1], tab[i]]; return a[1] + (b[1] - a[1]) * (r - a[0]) / (b[0] - a[0]); }
+  return 0;
+}
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  ctx.setTransform(Z, 0, 0, Z, 0, 0);
+  ctx.fillStyle = CFG.bg; ctx.fillRect(0, 0, CFG.W, CFG.H);
+  ctx.lineWidth = CFG.lineWidth;
+  for (const s of CFG.sources) {
+    const [r, g, b] = s.color;
+    for (let k = 0; ; k++) {
+      const rad = CFG.r0 + CFG.spacing * (f / CFG.loopFrames + k);
+      const al = alphaAt(s.a, rad);
+      if (al <= .005) break;
+      ctx.strokeStyle = `rgba(${r},${g},${b},${al.toFixed(3)})`;
+      ctx.beginPath(); ctx.arc(s.c[0], s.c[1], rad, 0, 6.2832); ctx.stroke();
+    }
+  }
+}
+
+if (q.has('t')) render(+q.get('t'));
+else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+</script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>B05 Spiral Dots</title>
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; transform-origin:0 0; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<div id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#14181e',
+  colors: ['#ffffff', '#ff4d87'], pinkRatio: .3,  // 白點為主，約三成粉紅（依編號固定，不閃）
+  center: [163, 53.9],
+  c: 7.1,                   // 第 k 顆距離中心 = c × √k
+  goldenAngle: 137.508,     // 黃金角（度）
+  angle0: 142,              // 第 1 顆的起始角（度，y 向下）
+  rotate: 1,                // 整體每幀轉 1 度（慢慢轉）
+  count: 135,               // 點數（半徑約 82px 為止）
+  r0: .9, rPerPx: .042,    // 點半徑 = r0 + rPerPx × 離中心距離（越外越大）
+  pulse: .15,               // 每顆點半徑的小幅呼吸（60 幀一輪）
+  loopFrames: 360,          // 轉一圈 360 幀才完全回到原樣（呼吸 60 幀一輪）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const Z = +(q.get('z') || 1);
+const card = document.getElementById('card'), cv = document.getElementById('cv');
+card.style.cssText += `width:${CFG.W*Z}px;height:${CFG.H*Z}px;border-radius:${12*Z}px;background:${CFG.bg}`;
+cv.width = CFG.W * Z; cv.height = CFG.H * Z;
+const ctx = cv.getContext('2d');
+
+const hash = k => { const s = Math.sin(k * 12.9898) * 43758.5453; return s - Math.floor(s); };
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  ctx.setTransform(Z, 0, 0, Z, 0, 0);
+  ctx.fillStyle = CFG.bg; ctx.fillRect(0, 0, CFG.W, CFG.H);
+  for (let k = 1; k <= CFG.count; k++) {
+    const R = CFG.c * Math.sqrt(k);
+    const a = (CFG.angle0 + (k - 1) * CFG.goldenAngle + CFG.rotate * f) * Math.PI / 180;
+    const x = CFG.center[0] + R * Math.cos(a), y = CFG.center[1] + R * Math.sin(a);
+    if (x < -6 || x > CFG.W + 6 || y < -6 || y > CFG.H + 6) continue;
+    const rad = (CFG.r0 + CFG.rPerPx * R) * (1 + CFG.pulse * Math.sin(2 * Math.PI * f / 60 + k * .9));
+    ctx.fillStyle = CFG.colors[hash(k) < CFG.pinkRatio ? 1 : 0];
+    ctx.beginPath(); ctx.arc(x, y, rad, 0, 6.2832); ctx.fill();
+  }
+}
+
+if (q.has('t')) render(+q.get('t'));
+else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+</script>
+</body>
+</html>

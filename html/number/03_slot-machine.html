@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><title>N03 スロットマシン</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700;800;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f16}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Montserrat',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:122px;border-radius:12px;overflow:hidden;background:#131921;box-shadow:inset 0 0 0 1px #1c2330}
+#card::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.06) 1px,transparent 1.2px) 0 0/12px 12px}
+.jp{position:absolute;left:0;width:100%;top:6px;text-align:center;font-size:8px;font-weight:800;letter-spacing:2px;color:#ffd45e;opacity:0}
+.reel{position:absolute;top:25px;width:67px;height:78px;border-radius:9px;overflow:hidden;background:linear-gradient(#171d27,#10151d);box-shadow:inset 0 0 0 1px #2a3240}
+.strip{position:absolute;left:0;top:0;width:67px}
+.strip div{height:78px;line-height:78px;text-align:center;font-size:46px;font-weight:800;color:#ffd45e}
+.reel::after{content:"";position:absolute;inset:0;background:linear-gradient(rgba(0,0,0,.45),transparent 30%,transparent 70%,rgba(0,0,0,.45))}
+.stick{position:absolute;left:274px;top:42px;width:7px;height:38px;border-radius:4px;background:linear-gradient(90deg,#4a5260,#9aa3b2,#4a5260)}
+.ball{position:absolute;left:270px;top:29px;width:14px;height:14px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ff9cc6,#ff4f98 60%,#c42b6c)}
+#fx{position:absolute;inset:0;pointer-events:none}
+</style></head><body><div id="card"><div class="jp" id="jp">JACKPOT</div><div id="reels"></div><div class="stick" id="stk"></div><div class="ball" id="ball"></div><canvas id="fx" width="648" height="244" style="width:324px;height:122px"></canvas></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  target:7,                 // 停住的數字
+  stop:[28,38,47],          // 三軸停止幀
+  spinEnd:111,              // 此幀起轉下一輪（參考實測：與拉桿拉下同一幀開轉）
+  glow:[46,84,96],          // 中獎光暈：亮起幀、開始退去幀、全退幀
+  jpFlash:[.08,.62,.96,.83,.47,.34,.40,.57,.82,1,1,.83,.67,.47,.31,.47,.65,.82,1,1,.73,.52,.32,.31,.51,.72,.95,.99,.87,.60,.35,.26,.34,.60,.89,.99,.98,.80,.48,.29,.29],   // JACKPOT 閃爍：自 glow[0] 起逐幀亮度（實測參考 f52–92，約每 8–9 幀一次閃，亮→暗(約0.3)→亮，第 41 幀後熄滅）
+  boxX:[45,120,195],
+  gold:'255,212,94',
+  confetti:22,
+  leverAt:111,                // 拉桿猛拉到底的幀（實測 ball y 36→63，持續4幀，再彈回，過衝約-3px 後回穩）
+  leverDy:[26.8,26.8,26.8,26.8,21.9,11.4,3.8,-1,-2.9,-2.9,-1.9,-.6,-.1],  // 自 leverAt 起逐幀位移（px），接 f0..f3 為第9~12項
+  leverS:[.65,.65,.65,.65,.72,.9,.95,1.03,1.04,1.04,1.02,1,1],             // 拉桿球逐幀縮放（被拉近時變小）
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3);
+const H=78,R=document.getElementById('reels'),jp=document.getElementById('jp');
+const reels=CFG.boxX.map(x=>{const r=document.createElement('div');r.className='reel';r.style.left=x+'px';
+  const s=document.createElement('div');s.className='strip';let h='';for(let k=0;k<44;k++)h+='<div>'+(k%10)+'</div>';s.innerHTML=h;r.appendChild(s);R.appendChild(r);return{r,s}});
+let sd=7;const rnd=()=>(sd=(sd*16807)%2147483647)/2147483647;
+const parts=[...Array(CFG.confetti)].map(()=>({a:rnd()*Math.PI*2,v:.8+rnd()*1.8,w:2+rnd()*2.5,h:1+rnd()*1.5,c:['255,212,94','94,230,168','255,111,176','240,240,250'][Math.floor(rnd()*4)],r:rnd()*6}));
+const fx=document.getElementById('fx'),g=fx.getContext('2d');
+const P=(i,f)=>{ // 位置（單位：格），終點為 target+30
+  const s=CFG.stop[i],d=CFG.target+30;
+  if(f>=CFG.spinEnd)return d+3*(f-CFG.spinEnd)*Math.min(1,(f-CFG.spinEnd)/4);
+  return f>=s?d:d*eo(f/s)};
+const stk=document.getElementById("stk"),ball=document.getElementById("ball");
+function lever(f){const k=Math.floor(f);let i=-1;if(k>=CFG.leverAt)i=k-CFG.leverAt;else if(k<=3)i=k+CFG.LOOP-CFG.leverAt;
+  const dy=i>=0?CFG.leverDy[i]||0:0,sc=i>=0?CFG.leverS[i]||1:1;
+  ball.style.transform='translateY('+dy+'px) scale('+sc+')';
+  stk.style.top=(42+dy*.82)+'px';stk.style.height=(38-dy*.82+5*Math.max(0,dy)/26.8)+'px'}
+function render(f){lever(f);
+  reels.forEach((o,i)=>{
+    const p=P(i,f),sp=Math.abs(P(i,f+.5)-P(i,f-.5))*H;
+    o.s.style.transform='translateY('+(-(p%40)*H)+'px)';
+    const b=Math.min(3,sp/7);o.s.style.filter=b>.3?'blur('+b.toFixed(2)+'px)':'none';
+    const gl=f<CFG.stop[i]?0:Math.min(seg(f,CFG.glow[0],CFG.glow[0]+4),1-seg(f,CFG.glow[1],CFG.glow[2]));
+    const gg=(f>=CFG.glow[0]&&f<CFG.glow[2])?Math.min(seg(f,CFG.glow[0],CFG.glow[0]+4),1-seg(f,CFG.glow[1],CFG.glow[2])):0;
+    o.r.style.boxShadow=gg>0?'inset 0 0 0 1.5px rgba('+CFG.gold+','+gg+'),0 0 '+(14*gg)+'px rgba('+CFG.gold+','+.6*gg+')':'inset 0 0 0 1px #2a3240';
+  });
+  {const k=f-CFG.glow[0],A=CFG.jpFlash,i=Math.floor(k);let lv=0;
+   if(k>=0&&i<A.length-1)lv=A[i]+(A[i+1]-A[i])*(k-i);else if(k>=0&&i==A.length-1)lv=A[i]*Math.max(0,1-(k-i)*2);
+   const w=cl((lv-.8)/.2);
+   jp.style.opacity=lv;jp.style.color='rgb(255,'+Math.round(212+43*w*.8)+','+Math.round(94+160*w*.8)+')';
+   jp.style.textShadow=lv>.05?'0 0 '+(8*lv).toFixed(1)+'px rgba('+CFG.gold+','+(.9*lv).toFixed(2)+')':'none'}
+  g.setTransform(2,0,0,2,0,0);g.clearRect(0,0,324,122);
+  if(f>=CFG.glow[0]&&f<CFG.glow[0]+36){
+    const t=f-CFG.glow[0];
+    parts.forEach(p=>{const x=162+Math.cos(p.a)*p.v*t*1.9,y=64+Math.sin(p.a)*p.v*t*1.2+.045*t*t;
+      g.save();g.translate(x,y);g.rotate(p.r+t*.1);g.globalAlpha=1-t/36;g.fillStyle='rgb('+p.c+')';g.fillRect(-p.w/2,-p.h/2,p.w,p.h);g.restore()});
+  }
+}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+document.fonts.load('800 46px Montserrat','0123456789JACKPOT').then(start,start);
+</script></body></html>

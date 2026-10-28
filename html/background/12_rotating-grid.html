@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>B12 Rotating Grid</title>
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; transform-origin:0 0; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<div id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#14181e',
+  teal: '#18d4c4', white: '#e8f4f4',   // 兩張格子的顏色（青綠順時針轉，白色逆時針轉）
+  pitch: 24, lineWidth: 2,
+  center: [162.5, 54.3],               // 旋轉中心（正好在一個格子的正中央）
+  // 前半輪轉角（度）：幀 → 角度；第 30 幀兩張格子各轉 45°（剛好重疊成斜格），後半輪是前半輪的鏡像，到第 60 幀各轉了 90°（回到正格）
+  angle: [[0,0],[2,4],[4,8],[6,12],[8,17],[10,22],[12,27],[14,31],[16,35],[18,39.5],[20,42],[22,44],[24,45],[30,45]],
+  loopFrames: 60,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const Z = +(q.get('z') || 1);
+const card = document.getElementById('card'), cv = document.getElementById('cv');
+card.style.cssText += `width:${CFG.W*Z}px;height:${CFG.H*Z}px;border-radius:${12*Z}px;background:${CFG.bg}`;
+cv.width = CFG.W * Z; cv.height = CFG.H * Z;
+const ctx = cv.getContext('2d');
+
+const table = (t, f) => {
+  if (f <= t[0][0]) return t[0][1];
+  for (let i = 1; i < t.length; i++) if (f <= t[i][0]) { const [a, b] = [t[i-1], t[i]]; return a[1] + (b[1] - a[1]) * (f - a[0]) / (b[0] - a[0]); }
+  return t[t.length-1][1];
+};
+const ang = f => f <= 30 ? table(CFG.angle, f) : 90 - table(CFG.angle, 60 - f);
+
+function grid(deg, color) {
+  const [cx, cy] = CFG.center, p = CFG.pitch, n = 12;
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(deg * Math.PI / 180);
+  ctx.strokeStyle = color; ctx.lineWidth = CFG.lineWidth; ctx.beginPath();
+  for (let k = -n; k <= n; k++) {
+    const o = p / 2 + k * p;
+    ctx.moveTo(o, -300); ctx.lineTo(o, 300);
+    ctx.moveTo(-300, o); ctx.lineTo(300, o);
+  }
+  ctx.stroke(); ctx.restore();
+}
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  ctx.setTransform(Z, 0, 0, Z, 0, 0);
+  ctx.fillStyle = CFG.bg; ctx.fillRect(0, 0, CFG.W, CFG.H);
+  const a = ang(f);
+  grid(-a, CFG.white);
+  ctx.globalAlpha = .85; grid(a, CFG.teal); ctx.globalAlpha = 1;
+}
+
+if (q.has('t')) render(+q.get('t'));
+else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+</script>
+</body>
+</html>

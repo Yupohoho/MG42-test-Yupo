@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>B15 Truchet Tiles</title>
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; transform-origin:0 0; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<div id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  cream: '#f1f0e9', pale: '#c7d5cb',     // 棋盤底的兩色（每一格 = 一片磚）
+  ink: '#111418', green: '#1c7f66',       // 弧線色：(欄＋列) 偶數的磚用深色，奇數的磚用綠色
+  tile: 26.5,                              // 磚的邊長；弧線是以磚的四角為圓心、半徑 = 邊長的一半的四分之一圓
+  x0: 18, y0: 13.5,                        // 某片磚的左上角
+  arcWidth: 2.4,
+  // 每片磚：在第 t0 幀由 A（左上＋右下弧）轉 90° 變成 B（右上＋左下弧），晚 28 幀再翻回 A
+  // t0 只跟「欄 − 列」有關：8 + 5.4 × (−d 繞進 0–16.2) + 0.67 × d（d > 0 時），整片看起來是斜向一條一條掃過去
+  t0Base: 8, t0Step: 5.4, t0Wrap: 16.2, t0Drift: .67,
+  holdB: 28,
+  flipFrames: 4,                           // 轉動的過程：整片磚的圖樣繞中心順時針轉 90°（A 轉完就是 B）
+  loopFrames: 56.7,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const Z = +(q.get('z') || 1);
+const card = document.getElementById('card'), cv = document.getElementById('cv');
+card.style.cssText += `width:${CFG.W*Z}px;height:${CFG.H*Z}px;border-radius:${12*Z}px;background:${CFG.cream}`;
+cv.width = CFG.W * Z; cv.height = CFG.H * Z;
+const ctx = cv.getContext('2d');
+
+const mod = (a, n) => ((a % n) + n) % n;
+
+function t0Of(i, j) {
+  const d = i - j, x = CFG.t0Step * (-d);
+  let r = mod(x, CFG.t0Wrap);
+  if (x > 0 && r < 1e-6) r = CFG.t0Wrap;
+  return CFG.t0Base + r + (d > 0 ? CFG.t0Drift * d : 0);
+}
+
+// 回傳這片磚此刻的弧線：[[方向, 長度比例 0–1], ...]，方向 'A' 或 'B'
+function state(f, i, j) {
+  const L = CFG.loopFrames, a = t0Of(i, j), b = a + CFG.holdB, hw = CFG.flipFrames / 2;
+  const sd = (x) => mod(x + L / 2, L) - L / 2;            // 與某個翻面時間的有號距離
+  const da = sd(f - a), db = sd(f - b);
+  const ease = (u) => u * u * (3 - 2 * u);                // 整片磚繞中心轉 90°：A 轉完就是 B，B 轉完就是 A
+  if (Math.abs(da) < hw) return ['A', 90 * ease((da + hw) / CFG.flipFrames)];
+  if (Math.abs(db) < hw) return ['B', 90 * ease((db + hw) / CFG.flipFrames)];
+  return [da >= hw && db < -hw ? 'B' : 'A', 0];
+}
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames, T = CFG.tile, r = T / 2;
+  ctx.setTransform(Z, 0, 0, Z, 0, 0);
+  ctx.fillStyle = CFG.cream; ctx.fillRect(0, 0, CFG.W, CFG.H);
+  const iMin = -Math.ceil(CFG.x0 / T) - 1, iMax = Math.ceil((CFG.W - CFG.x0) / T) + 1;
+  const jMin = -Math.ceil(CFG.y0 / T) - 1, jMax = Math.ceil((CFG.H - CFG.y0) / T) + 1;
+  for (let j = jMin; j <= jMax; j++) for (let i = iMin; i <= iMax; i++) {
+    const x = CFG.x0 + i * T, y = CFG.y0 + j * T;
+    ctx.fillStyle = mod(i + j, 2) ? CFG.pale : CFG.cream; ctx.fillRect(x, y, T + .5, T + .5);
+  }
+  ctx.lineWidth = CFG.arcWidth; ctx.lineCap = 'butt';
+  for (let j = jMin; j <= jMax; j++) for (let i = iMin; i <= iMax; i++) {
+    const x = CFG.x0 + i * T, y = CFG.y0 + j * T;
+    ctx.strokeStyle = mod(i + j, 2) ? CFG.green : CFG.ink;
+    const [dir, rot] = state(f, i, j);
+    ctx.save();
+    ctx.beginPath(); ctx.rect(x, y, T, T); ctx.clip();                 // 弧線轉動時不超出這片磚
+    ctx.translate(x + T / 2, y + T / 2); ctx.rotate(rot * Math.PI / 180); ctx.translate(-x - T / 2, -y - T / 2);
+    // 兩段弧：[圓心 x, 圓心 y, 起始角（度）]，每段 90°，y 向下順時針
+    const corners = dir === 'A' ? [[x, y, 0], [x + T, y + T, 180]] : [[x + T, y, 90], [x, y + T, 270]];
+    for (const [cx, cy, a0] of corners) { ctx.beginPath(); ctx.arc(cx, cy, r, a0 * Math.PI / 180, (a0 + 90) * Math.PI / 180); ctx.stroke(); }
+    ctx.restore();
+  }
+}
+
+if (q.has('t')) render(+q.get('t'));
+else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+</script>
+</body>
+</html>

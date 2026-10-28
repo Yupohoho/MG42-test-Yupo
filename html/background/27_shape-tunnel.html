@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>B27 Shape Tunnel</title>
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; transform-origin:0 0; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<div id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#f4f0e6',
+  ink: '#121216', violet: '#a28bf7',     // 黑色六角框、紫色六角框
+  fill: [210, 185, 250], fillAlpha: .21, fillFadeFrom: 120, fillFadeTo: 200,   // 每個紫框裡面各填一層淡紫（疊越多層越深）；半徑超過 120 就逐漸變淡、200 以上不填
+  center: [162.6, 53.7], squash: .62,    // 六角形中心；縱向壓扁成 62%（正六角形再把 y 乘 0.62）
+  // 兩組同心六角框從中心往外長：半徑 = 起始半徑 × e^(growth × 幀) × 倍率^j，同色相鄰兩圈的半徑比 = ratio
+  inkR0: 19.1, violetR0: 32.3,           // 第 0 幀各色最靠近中心那一圈（黑 19.1、紫 32.3）
+  growth: .0627, ratio: 2.93,            // 每幀半徑 ×e^0.0627（約 +6.5%）；同色相鄰兩圈 ×2.93，所以黑紫交錯時相鄰兩圈約 ×1.7
+  // 每一圈的轉角（度）= twist × ln(半徑 ÷ 20) + spin × 幀：越外圈轉得越多（扭轉），整體再以 −2°／幀逆時針轉
+  twist: 53.5, spin: -2,
+  lineBase: .6, linePow: .33,            // 線寬 = 0.6 × 半徑^0.33：內圈約 1.5 px、外圈約 3.3 px
+  loopFrames: 120,                       // 120 幀剛好轉整 4×60°，圈數也剛好錯開 7 圈
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const Z = +(q.get('z') || 1);
+const card = document.getElementById('card'), cv = document.getElementById('cv');
+card.style.cssText += `width:${CFG.W*Z}px;height:${CFG.H*Z}px;border-radius:${12*Z}px;background:${CFG.bg}`;
+cv.width = CFG.W * Z; cv.height = CFG.H * Z;
+const ctx = cv.getContext('2d');
+
+function hexPath(R, deg) {
+  const [cx, cy] = CFG.center;
+  ctx.beginPath();
+  for (let j = 0; j < 6; j++) { const a = (deg + 60 * j) * Math.PI / 180, x = cx + R * Math.cos(a), y = cy + CFG.squash * R * Math.sin(a); j ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+  ctx.closePath();
+}
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  ctx.setTransform(Z, 0, 0, Z, 0, 0);
+  ctx.fillStyle = CFG.bg; ctx.fillRect(0, 0, CFG.W, CFG.H);
+  const rings = [];
+  for (const [kind, R0] of [['ink', CFG.inkR0], ['violet', CFG.violetR0]])
+    for (let j = -9; j <= 9; j++) {
+      const R = R0 * Math.exp(CFG.growth * f) * Math.pow(CFG.ratio, j);
+      if (R < 3 || R > 420) continue;
+      rings.push({ kind, R, deg: CFG.twist * Math.log(R / 20) + CFG.spin * f });
+    }
+  rings.sort((a, b) => b.R - a.R);                          // 大的先畫
+  for (const r of rings) if (r.kind === 'violet') {
+    const k = Math.min(1, Math.max(0, (CFG.fillFadeTo - r.R) / (CFG.fillFadeTo - CFG.fillFadeFrom)));
+    ctx.fillStyle = `rgba(${CFG.fill},${CFG.fillAlpha * k})`; hexPath(r.R, r.deg); ctx.fill();
+  }
+  ctx.lineJoin = 'miter';
+  for (const r of rings) { ctx.strokeStyle = CFG[r.kind]; ctx.lineWidth = CFG.lineBase * Math.pow(r.R, CFG.linePow); hexPath(r.R, r.deg); ctx.stroke(); }
+}
+
+if (q.has('t')) render(+q.get('t'));
+else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+</script>
+</body>
+</html>

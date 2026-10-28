@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><title>N21 Gauge Meter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700;800&family=Noto+Sans+JP:wght@500;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;height:100%;background:#0a0d13}
+body{display:flex;align-items:center;justify-content:center;overflow:hidden}
+body.m{display:block}
+#wrap{width:322px;height:126px;transform-origin:center center}
+body.m #wrap{transform-origin:0 0}
+#card{position:relative;width:322px;height:126px;border-radius:12px;overflow:hidden;background:#131921;font-family:'Montserrat','Noto Sans JP',sans-serif;color:#f3f4f8;-webkit-font-smoothing:antialiased}
+#card::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(244,114,182,.10),transparent 70%),radial-gradient(rgba(255,255,255,.045) 1px,transparent 1.2px) 0 0/14px 14px}
+#card::after{content:'';position:absolute;inset:0;border-radius:12px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);pointer-events:none;z-index:60}
+#card>*{position:absolute}
+svg{overflow:visible}
+#g,#lg,#lbs,#rws,#bks{left:0;top:0;width:322px;height:126px}
+#g>*,#lg>*,#lbs>*,#rws>*,#bks>*{position:absolute}
+
+.nb{left:60.5px;width:200px;top:94px;text-align:center;font:800 26px/26px Montserrat,sans-serif}
+.nb span{position:relative}
+.nb i{position:absolute;left:100%;margin-left:3px;bottom:2px;font:500 8px/10px Montserrat,sans-serif;font-style:normal;color:#8a92a1;white-space:nowrap}
+</style></head>
+<body><div id="wrap"><div id="card"><svg id="sv" width="322" height="126" style="left:0;top:0"></svg><div class="nb"><span id="nv">0<i>km/h</i></span></div></div></div>
+<script>
+
+const P=new URLSearchParams(location.search);
+const FPS=30;
+const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+const lerp=(a,b,t)=>a+(b-a)*t;
+const eo2=t=>{t=clamp(t);return 1-(1-t)*(1-t)};
+const eo3=t=>{t=clamp(t);return 1-Math.pow(1-t,3)};
+const ei2=t=>{t=clamp(t);return t*t};
+const eio=t=>{t=clamp(t);return t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2};
+const sst=t=>{t=clamp(t);return t*t*(3-2*t)};
+const ebk=t=>{t=clamp(t);const c1=1.70158,c3=c1+1;return 1+c3*Math.pow(t-1,3)+c1*Math.pow(t-1,2)};
+const $=id=>document.getElementById(id);
+function render(t){const c=(((t*FPS)%LOOP)+LOOP)%LOOP;draw(c)}
+function boot(){
+  if(P.get('m')==='1')document.body.classList.add('m');
+  const z=+(P.get('z')||1);$('wrap').style.transform='scale('+z+')';
+  const t0=P.get('t');
+  if(t0!==null){render(+t0)}else{const s=performance.now();(function f(){render((performance.now()-s)/1000);requestAnimationFrame(f)})()}
+}
+
+
+const CFG={cx:160.5,cy:85.5,r:49,sw:7,range:210,nl:44,unit:'km/h'};
+const LOOP=120;
+const KEYS=[[0,0],[1,0],[2,45],[3,100],[4,147],[8,200],[12,151],[16,139],[20,160],[24,161],[28,154],[32,155],[36,157],[40,156],[91,156]];
+function vof(c){if(c>=91)return 156*(1-sst((c-91)/14));for(let i=1;i<KEYS.length;i++){if(c<=KEYS[i][0]){const u=(c-KEYS[i-1][0])/(KEYS[i][0]-KEYS[i-1][0]);return lerp(KEYS[i-1][1],KEYS[i][1],(1-Math.cos(Math.PI*u))/2)}}return 156}
+const NS='http://www.w3.org/2000/svg';
+const sv=$('sv');
+const {cx,cy,r}=CFG;
+sv.innerHTML='<defs><linearGradient id="gg" gradientUnits="userSpaceOnUse" x1="'+(cx-r)+'" y1="0" x2="'+(cx+r)+'" y2="0"><stop offset="0" stop-color="#6ee7b7"/><stop offset=".55" stop-color="#f472b6"/><stop offset="1" stop-color="#a78bfa"/></linearGradient></defs>';
+let tk='';for(let a=0;a<=180;a+=15){const t=a*Math.PI/180;tk+='<line x1="'+(cx+Math.cos(t)*(r+8))+'" y1="'+(cy-Math.sin(t)*(r+8))+'" x2="'+(cx+Math.cos(t)*(r+13))+'" y2="'+(cy-Math.sin(t)*(r+13))+'" stroke="#3b4453" stroke-width="1" stroke-linecap="round"/>'}
+sv.insertAdjacentHTML('beforeend',tk);
+const arcD='M'+(cx-r)+','+cy+' A'+r+','+r+' 0 0 1 '+(cx+r)+','+cy;
+sv.insertAdjacentHTML('beforeend','<path d="'+arcD+'" fill="none" stroke="#1b222c" stroke-width="'+CFG.sw+'" stroke-linecap="round"/>');
+const fill=document.createElementNS(NS,'path');fill.setAttribute('d',arcD);fill.setAttribute('fill','none');fill.setAttribute('stroke','url(#gg)');fill.setAttribute('stroke-width',CFG.sw);fill.setAttribute('stroke-linecap','round');fill.setAttribute('pathLength',100);sv.appendChild(fill);
+const nd=document.createElementNS(NS,'line');nd.setAttribute('stroke','#f3f4f8');nd.setAttribute('stroke-width',2.4);nd.setAttribute('stroke-linecap','round');nd.setAttribute('x1',cx);nd.setAttribute('y1',cy);sv.appendChild(nd);
+sv.insertAdjacentHTML('beforeend','<circle cx="'+cx+'" cy="'+cy+'" r="5.5" fill="#f3f4f8"/>');
+function draw(c){
+  const v=vof(c),f=clamp(v/CFG.range);
+  fill.setAttribute('stroke-dasharray',(f*100)+' 200');
+  fill.setAttribute('opacity',f<.004?0:1);
+  const th=Math.PI*(1-f);
+  nd.setAttribute('x2',cx+Math.cos(th)*CFG.nl);nd.setAttribute('y2',cy-Math.sin(th)*CFG.nl);
+  $('nv').firstChild.nodeValue=Math.round(v);
+}
+
+const FONT_LOADS=[document.fonts.load('800 20px Montserrat','0123456789+%¥.,'),document.fonts.load('700 12px Montserrat','AoiRenMikaSora'),document.fonts.load('500 12px Montserrat','MobileDesktopTablet'),document.fonts.load('700 12px "Noto Sans JP"','1月2月3月4月5月')];
+Promise.race([Promise.all(FONT_LOADS),new Promise(r=>setTimeout(r,2500))]).then(boot,boot);
+
+</script></body></html>

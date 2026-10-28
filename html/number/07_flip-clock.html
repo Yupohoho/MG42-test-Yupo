@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><title>N07 フリップクロック</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700;800;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f16}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Montserrat',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:122px;border-radius:12px;overflow:hidden;background:#131921;box-shadow:inset 0 0 0 1px #1c2330}
+#card::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.06) 1px,transparent 1.2px) 0 0/12px 12px}
+.tile{position:absolute;top:24px;width:47px;height:73px;perspective:260px}
+.h{position:absolute;left:0;width:47px;height:36px;overflow:hidden;background:linear-gradient(#1f2a3d,#18202f);backface-visibility:hidden}
+.h.t{top:0;border-radius:6px 6px 0 0;transform-origin:50% 100%;border-bottom:1px solid #0b0f16}
+.h.b{top:37px;border-radius:0 0 6px 6px;transform-origin:50% 0;background:linear-gradient(#18202f,#141b28)}
+.h div{position:absolute;left:0;width:47px;height:73px;line-height:73px;text-align:center;font-size:42px;font-weight:800;color:#f6f7fb}
+.h.b div{top:-37px}
+.dot{position:absolute;left:160px;width:6px;height:6px;border-radius:50%;background:#ff6fb0}
+</style></head><body><div id="card"><div class="dot" style="top:48px"></div><div class="dot" style="top:70px"></div></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  seq:['0956','0957','0958','0959','1000','0956'], // 每次翻頁後的時間（分秒）
+  ticks:[8,32,58,84,106],                          // 各次翻頁開始幀
+  flip:8,                                          // 翻一次的幀數
+  x:[38,91,187,239],
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const card=document.getElementById('card');
+const mk=(cls,)=>{const h=document.createElement('div');h.className='h '+cls;const d=document.createElement('div');h.appendChild(d);return h};
+const tiles=CFG.x.map(x=>{
+  const t=document.createElement('div');t.className='tile';t.style.left=x+'px';
+  const bt=mk('t'),bb=mk('b'),ft=mk('t'),fb=mk('b');
+  t.append(bt,bb,ft,fb);card.appendChild(t);return{bt,bb,ft,fb}
+});
+const set=(h,v)=>h.firstChild.textContent=v;
+function render(f){
+  let k=0;CFG.ticks.forEach(t=>{if(f>=t)k++});
+  const cur=CFG.seq[k],old=CFG.seq[Math.max(0,k-1)];
+  const p=k>0?seg(f,CFG.ticks[k-1],CFG.ticks[k-1]+CFG.flip):1;
+  tiles.forEach((T,j)=>{
+    const n=cur[j],o=old[j],flipping=p<1&&n!==o;
+    set(T.bt,n);set(T.bb,flipping?o:n);set(T.ft,o);set(T.fb,n);
+    if(!flipping){T.ft.style.display='none';T.fb.style.display='none';return}
+    const a=Math.min(1,p*2),b=Math.max(0,p*2-1);
+    T.ft.style.display=a<1?'block':'none';T.ft.style.transform='rotateX('+(-90*a*a)+'deg)';
+    T.fb.style.display=a>=1?'block':'none';T.fb.style.transform='rotateX('+(90*(1-b)*(1-b))+'deg)';
+    if(a>=1)T.bb.style.visibility='visible';
+  });
+}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+document.fonts.load('800 42px Montserrat','0123456789').then(start,start);
+</script></body></html>

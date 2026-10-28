@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>N29 score-combo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800&family=Noto+Sans+JP:wght@700;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0a0d12}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;overflow:hidden}
+body.m{display:block;min-height:0}
+#wrap{position:relative;width:324px;height:124px;transform-origin:center}
+body.m #wrap{transform-origin:0 0}
+#card{position:absolute;left:0;top:0;width:324px;height:124px;border-radius:12px;overflow:hidden;
+ background:radial-gradient(130% 100% at 50% 0%,#1d1a2f 0%,#141824 55%,#0f131b 100%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.05)}
+#card *{box-sizing:border-box}
+.abs{position:absolute}
+
+#lab{position:absolute;left:53.5px;top:17px;font:700 8.5px Outfit;letter-spacing:.36em;color:#8a90a2}
+#sc{position:absolute;left:67px;width:140px;text-align:center;top:29px;font:800 51px/56px Outfit;color:#f6f4ec;white-space:nowrap}
+#cb{position:absolute;left:226.5px;width:64px;text-align:center;top:31.5px;font:800 38px/44px Outfit;white-space:nowrap}
+#cs{position:absolute;left:228.5px;width:64px;text-align:center;top:78px;font:700 8px Outfit;letter-spacing:.45em;color:#ffd54a}
+.ray{position:absolute;width:2px;height:8px;background:#ffb03c;border-radius:1px;transform-origin:50% 0}
+</style></head><body>
+<div id="wrap"><div id="card"><div id="lab"></div><div id="sc"></div><div id="cb"></div><div id="cs"></div><div id="rays"></div></div></div>
+<script>
+// N29 スコアコンボ / score-combo
+var LOOP=120; // frames @30fps (4s)
+var CFG={label:"SCORE",sub:"COMBO",events:[3,18,32,44,55,63,71],scores:[100,200,400,600,900,1300,1800],reset:90,scorePop:[[0,1.14],[1,1.12],[2,1.08],[3,1.07],[4,1.05],[6,1.03],[8,1.01],[11,1]],comboPop:[[0,1.46],[1,1.39],[2,1.32],[3,1.25],[4,1.18],[5,1.14],[7,1.09],[9,1.06],[12,1.03],[15,1]]};
+var FONTS=[["800 40px Outfit","0123456789,.%¥"],["700 12px Outfit","SECONDS"],["700 12px 'Noto Sans JP'","カートに追加残り点あとわずか"]];
+
+var FPS=30;
+var q=new URLSearchParams(location.search);
+function C(v,a,b){a=a==null?0:a;b=b==null?1:b;return Math.min(b,Math.max(a,v))}
+var E={lin:function(x){return x},out:function(x){return 1-Math.pow(1-x,3)},inn:function(x){return x*x*x},
+ io:function(x){return x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2},
+ back:function(x){var c1=1.70158,c3=c1+1;return 1+c3*Math.pow(x-1,3)+c1*Math.pow(x-1,2)}};
+function seg(f,a,b,e){return (e||E.lin)(C((f-a)/(b-a)))}
+function kf(f,a){if(f<=a[0][0])return a[0][1];for(var i=1;i<a.length;i++){if(f<a[i][0]){var p=a[i-1],n=a[i];return p[1]+(n[1]-p[1])*(f-p[0])/(n[0]-p[0])}}return a[a.length-1][1]}
+function $(id){return document.getElementById(id)}
+function mix(a,b,t){return [Math.round(a[0]+(b[0]-a[0])*t),Math.round(a[1]+(b[1]-a[1])*t),Math.round(a[2]+(b[2]-a[2])*t)]}
+function rgb(c,al){return al==null?'rgb('+c[0]+','+c[1]+','+c[2]+')':'rgba('+c[0]+','+c[1]+','+c[2]+','+al+')'}
+function comma(n){n=Math.round(n);var s=String(n);return s.length>3?s.slice(0,s.length-3)+','+s.slice(-3):s}
+var CURSOR='<svg width="12" height="17" viewBox="0 0 12 17"><path d="M1 1v13l3.4-3.2 2.4 5 2.2-1-2.3-4.9H11z" fill="#fff" stroke="#1a1d26" stroke-width="1"/></svg>';
+function boot(){
+ if(q.get('m'))document.body.classList.add('m');
+ var z=+q.get('z')||1;$('wrap').style.transform='scale('+z+')';
+ if(typeof init==='function')init();
+ if(q.has('t')){render(((+q.get('t')*FPS)%LOOP+LOOP)%LOOP);return}
+ var t0=performance.now();
+ (function tick(now){render(((now-t0)/1000*FPS)%LOOP);requestAnimationFrame(tick)})(t0);
+}
+Promise.all(FONTS.map(function(f){return document.fonts.load(f[0],f[1])})).then(boot,boot);
+
+
+var R=[];
+function init(){
+ $('lab').textContent=CFG.label;$('cs').textContent=CFG.sub;
+ for(var i=0;i<14;i++){var d=document.createElement('div');d.className='ray';$('rays').appendChild(d);R.push(d)}
+}
+function render(f){
+ var E0=CFG.events,S=CFG.scores,idx=-1;
+ for(var i=0;i<E0.length;i++){if(f>=E0[i]&&f<CFG.reset)idx=i}
+ var score=0,age=99;
+ if(idx>=0){
+  age=f-E0[idx];
+  score=S[idx];
+ }
+ var pulse=idx>=0?1-seg(f,E0[idx],E0[idx]+11):0;
+ var sc=$('sc');sc.textContent=comma(score);
+ sc.style.transform='scale('+(idx>=0?kf(age,CFG.scorePop):1)+')';
+ sc.style.textShadow='0 0 '+(16*pulse+3)+'px rgba(255,236,160,'+(.35+.55*pulse)+')';
+ var cb=$('cb');
+ if(idx>=0){
+  cb.style.opacity=1;cb.textContent='×'+(idx+1);
+  cb.style.color=rgb(mix([255,214,74],[255,140,50],idx/6));
+  var cp=kf(age,CFG.comboPop);
+  cb.style.transform='scale('+cp+')';
+  cb.style.textShadow='0 0 '+(12*pulse)+'px rgba(255,170,60,'+.8*pulse+')';
+  $('cs').style.opacity=seg(f,E0[0]+2,E0[0]+6);
+ }else{cb.style.opacity=0;$('cs').style.opacity=0}
+ // burst on the last combo
+ var bs=f-E0[6];
+ for(var i=0;i<R.length;i++){
+  var a=i/R.length*Math.PI*2,cx=260,cy=56;
+  if(bs>=0&&f<CFG.reset){
+   var u=C(bs/16),r=16+22*E.out(u),len=8*(1-u*.4);
+   var tw=.5+.5*Math.sin(f*.9+i*1.7);
+   R[i].style.opacity=(1-seg(f,E0[6]+14,CFG.reset))*(.35+.65*tw);
+   R[i].style.left=(cx+Math.cos(a)*r)+'px';R[i].style.top=(cy+Math.sin(a)*r)+'px';
+   R[i].style.height=len+'px';R[i].style.transform='rotate('+(a*180/Math.PI-90)+'deg)';
+  }else if(f>=CFG.reset&&f<CFG.reset+8){
+   var u2=(f-CFG.reset)/8;
+   R[i].style.opacity=.5*(1-u2);R[i].style.height='3px';R[i].style.background='#8a90a2';
+   R[i].style.left=(138+Math.cos(a)*(10+30*u2))+'px';R[i].style.top=(60+Math.sin(a)*(6+16*u2))+'px';R[i].style.transform='none';
+  }else R[i].style.opacity=0;
+  if(!(f>=CFG.reset&&f<CFG.reset+8))R[i].style.background='#ffb03c';
+ }
+}
+
+</script></body></html>

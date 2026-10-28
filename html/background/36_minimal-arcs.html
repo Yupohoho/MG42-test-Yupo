@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>B36 Minimal Arcs</title>
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; transform-origin:0 0; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<div id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#14181e',
+  orange: '#ff883c', cream: '#f4f0e6',
+  center: [161.5, 53.5],
+  width: 6.8,                                  // 每圈弧線的粗細（平頭）
+  // 由內往外 5 圈：[半徑, 弧長（度）, 每幀轉幾度（正＝順時針）, 顏色]；第 0 幀每一圈的弧都從正右方（0°）順時針畫出去
+  rings: [
+    [10.8, 165,   6, 'orange'],
+    [20.5, 218, -12, 'cream'],
+    [30.2, 127,  18, 'orange'],
+    [40.0, 199,  -6, 'cream'],
+    [49.7, 144,  12, 'orange'],
+  ],
+  loopFrames: 60,                              // 一輪：每一圈剛好轉整數圈（1、2、3、1、2 圈）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const Z = +(q.get('z') || 1);
+const card = document.getElementById('card'), cv = document.getElementById('cv');
+card.style.cssText += `width:${CFG.W*Z}px;height:${CFG.H*Z}px;border-radius:${12*Z}px;background:${CFG.bg}`;
+cv.width = CFG.W * Z; cv.height = CFG.H * Z;
+const ctx = cv.getContext('2d');
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames, [cx, cy] = CFG.center, rad = Math.PI / 180;
+  ctx.setTransform(Z, 0, 0, Z, 0, 0);
+  ctx.fillStyle = CFG.bg; ctx.fillRect(0, 0, CFG.W, CFG.H);
+  ctx.lineWidth = CFG.width; ctx.lineCap = 'butt';
+  for (const [r, len, rate, col] of CFG.rings) {
+    const a0 = rate * f * rad;
+    ctx.strokeStyle = CFG[col]; ctx.beginPath(); ctx.arc(cx, cy, r, a0, a0 + len * rad); ctx.stroke();
+  }
+}
+
+if (q.has('t')) render(+q.get('t'));
+else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+</script>
+</body>
+</html>

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>B06 Halftone Rings</title>
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; transform-origin:0 0; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<div id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#ff4b85',
+  colors: ['#14181e', '#ffffff'],   // 奇數環深色、偶數環白色
+  center: [161, 54],
+  gap: 21.75,               // 環與環的橫向間距
+  squash: .46,              // 橢圓扁度：縱向 = 橫向 × 0.46（像斜躺的圓環）
+  rings: 6,                 // 環數
+  perRing: 7,               // 第 j 環有 7×j 顆
+  dotR: 3.1,
+  speed: 1.05,              // 第 j 環每幀轉 1.05/j 度，奇偶環方向相反
+  loopFrames: 360,          // 第 1 環剛好轉一圈
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const Z = +(q.get('z') || 1);
+const card = document.getElementById('card'), cv = document.getElementById('cv');
+card.style.cssText += `width:${CFG.W*Z}px;height:${CFG.H*Z}px;border-radius:${12*Z}px;background:${CFG.bg}`;
+cv.width = CFG.W * Z; cv.height = CFG.H * Z;
+const ctx = cv.getContext('2d');
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  ctx.setTransform(Z, 0, 0, Z, 0, 0);
+  ctx.fillStyle = CFG.bg; ctx.fillRect(0, 0, CFG.W, CFG.H);
+  for (let j = 1; j <= CFG.rings; j++) {
+    const n = CFG.perRing * j, dir = j % 2 ? 1 : -1;
+    ctx.fillStyle = CFG.colors[j % 2 ? 0 : 1];
+    for (let i = 0; i < n; i++) {
+      const a = (i * 360 / n + dir * CFG.speed / j * f) * Math.PI / 180;
+      const x = CFG.center[0] + CFG.gap * j * Math.cos(a), y = CFG.center[1] + CFG.gap * j * CFG.squash * Math.sin(a);
+      ctx.beginPath(); ctx.arc(x, y, CFG.dotR, 0, 6.2832); ctx.fill();
+    }
+  }
+}
+
+if (q.has('t')) render(+q.get('t'));
+else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+</script>
+</body>
+</html>

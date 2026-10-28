@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>B14 Hex Grid</title>
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; transform-origin:0 0; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<div id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bright: [24, 213, 197],   // 亮格的顏色
+  dim: [4, 102, 102],       // 暗到最深的顏色
+  edge: [5, 24, 32],        // 外框線顏色
+  x0: .5, y0: 14,           // 第 0 列第 0 顆六角形中心
+  dx: 20, dy: 17.32,        // 橫向中心距、列距（尖頂六角形）；奇數列右移半格
+  R: 11.55,                 // 六角形外接圓半徑
+  // 每 3 顆裡有 1 顆會「呼吸變暗」，其他永遠是亮格；暗度 = 0.55 + 0.4 cos(2π (幀 − 相位) ÷ 60)，最暗那一幀 = 15.9 − 0.242 × 中心 x
+  phase0: 15.9, phaseX: -.242,
+  pulseMid: .55, pulseAmp: .4,
+  // 外框線濃淡（所有格邊都有）：一道往右下移動的波，濃度 = 0.45 + 0.65 cos(…)，最濃那一幀 = 22 + 0.26 (x − 20.5) + 0.32 (y − 14)
+  edgePeak0: 22, edgeX: .26, edgeY: .32, edgeMid: .45, edgeAmp: .65, edgeW: 1.4,
+  loopFrames: 60,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const Z = +(q.get('z') || 1);
+const card = document.getElementById('card'), cv = document.getElementById('cv');
+card.style.cssText += `width:${CFG.W*Z}px;height:${CFG.H*Z}px;border-radius:${12*Z}px;background:rgb(${CFG.bright})`;
+cv.width = CFG.W * Z; cv.height = CFG.H * Z;
+const ctx = cv.getContext('2d');
+
+const mod = (a, n) => ((a % n) + n) % n;
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames, L = CFG.loopFrames, TAU = 2 * Math.PI;
+  ctx.setTransform(Z, 0, 0, Z, 0, 0);
+  ctx.fillStyle = `rgb(${CFG.bright})`; ctx.fillRect(0, 0, CFG.W, CFG.H);
+  const R = CFG.R, hex = (x, y) => { ctx.beginPath(); for (let k = 0; k < 6; k++) { const a = (60 * k - 90) * Math.PI / 180; const px = x + R * Math.cos(a), py = y + R * Math.sin(a); k ? ctx.lineTo(px, py) : ctx.moveTo(px, py); } ctx.closePath(); };
+  const cells = [];
+  for (let j = -2; j <= 7; j++) for (let i = -2; i <= 18; i++) {
+    const x = CFG.x0 + CFG.dx * i + (mod(j, 2) ? CFG.dx / 2 : 0), y = CFG.y0 + CFG.dy * j;
+    if (x < -14 || x > CFG.W + 14 || y < -14 || y > CFG.H + 14) continue;
+    cells.push([i, j, x, y]);
+  }
+  for (const [i, j, x, y] of cells) {                         // 填色
+    const pulsing = mod(i - mod(1 - Math.floor(j / 2), 3), 3) === 0;
+    let d = 0;
+    if (pulsing) d = CFG.pulseMid + CFG.pulseAmp * Math.cos(TAU * (f - (CFG.phase0 + CFG.phaseX * x)) / L);
+    ctx.fillStyle = `rgb(${mix(CFG.bright, CFG.dim, d)})`; hex(x, y); ctx.fill();
+  }
+  const s = R * Math.sqrt(3) / 2, h = R / 2;                  // 邊
+  ctx.lineWidth = CFG.edgeW; ctx.lineCap = 'round';
+  const seg = (x1, y1, x2, y2) => {
+    const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+    const w = clamp(CFG.edgeMid + CFG.edgeAmp * Math.cos(TAU * (f - (CFG.edgePeak0 + CFG.edgeX * (mx - 20.5) + CFG.edgeY * (my - 14))) / L), .08, 1);
+    ctx.strokeStyle = `rgba(${CFG.edge},${(w * .95).toFixed(3)})`;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  };
+  for (const [, , x, y] of cells) {
+    seg(x + s, y - h, x + s, y + h);                          // 與右邊鄰居共用的邊
+    seg(x + s, y + h, x, y + R);                              // 與右下鄰居共用的邊
+    seg(x, y + R, x - s, y + h);                              // 與左下鄰居共用的邊
+  }
+}
+
+if (q.has('t')) render(+q.get('t'));
+else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+</script>
+</body>
+</html>

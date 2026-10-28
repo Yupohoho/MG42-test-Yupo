@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>B09 Perspective Grid</title>
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; transform-origin:0 0; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<div id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#14181e',            // 底色
+  teal: '#18d4c4',          // 往消失點收斂的放射線
+  rung: '#e8f6f4',          // 橫線（地板與天花板的格線）
+  center: [162.5, 52.5],    // 消失點
+  spokeStep: .66,           // 放射線：離消失點每 1 px 高度，相鄰兩條在水平方向相隔 0.66 px
+  spokeCount: 40,           // 中軸左右各幾條
+  curve: 1.85,              // 橫線距消失點的距離 = 1.85 × u²（u 越大越靠近鏡頭、間距越大）
+  rungs: 7,                 // 同時存在的橫線數
+  loopFrames: 58.6,         // 一輪：每條橫線剛好走到下一條的位置
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const Z = +(q.get('z') || 1);
+const card = document.getElementById('card'), cv = document.getElementById('cv');
+card.style.cssText += `width:${CFG.W*Z}px;height:${CFG.H*Z}px;border-radius:${12*Z}px;background:${CFG.bg}`;
+cv.width = CFG.W * Z; cv.height = CFG.H * Z;
+const ctx = cv.getContext('2d');
+
+function render(t) {
+  const f = (Math.floor(t * 30 + 1e-6)) % CFG.loopFrames;
+  ctx.setTransform(Z, 0, 0, Z, 0, 0);
+  ctx.fillStyle = CFG.bg; ctx.fillRect(0, 0, CFG.W, CFG.H);
+  const [cx, cy] = CFG.center;
+  // 放射線（地板線，穿過消失點延伸到上方天花板）
+  ctx.strokeStyle = CFG.teal; ctx.lineWidth = 1; ctx.globalAlpha = .85;
+  ctx.beginPath();
+  for (let k = -CFG.spokeCount; k <= CFG.spokeCount; k++) {
+    const s = CFG.spokeStep * k;
+    ctx.moveTo(cx + s * (-6 - cy), -6); ctx.lineTo(cx + s * (CFG.H + 6 - cy), CFG.H + 6);
+  }
+  ctx.stroke();
+  // 橫線：由消失點往上下兩側加速散開
+  ctx.strokeStyle = CFG.rung; ctx.lineWidth = 1.2; ctx.globalAlpha = .9;
+  ctx.beginPath();
+  for (let n = 0; n < CFG.rungs; n++) {
+    const u = n + f / CFG.loopFrames, d = CFG.curve * u * u;
+    if (d > 60) continue;
+    ctx.moveTo(0, cy - d); ctx.lineTo(CFG.W, cy - d);
+    ctx.moveTo(0, cy + d); ctx.lineTo(CFG.W, cy + d);
+  }
+  ctx.stroke();
+  // 消失點的光暈
+  ctx.globalAlpha = 1;
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, 16);
+  g.addColorStop(0, 'rgba(190,255,246,.75)'); g.addColorStop(1, 'rgba(24,212,196,0)');
+  ctx.fillStyle = g; ctx.fillRect(cx - 18, cy - 18, 36, 36);
+}
+
+if (q.has('t')) render(+q.get('t'));
+else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+</script>
+</body>
+</html>

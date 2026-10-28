@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><title>N34 ダメージ数字 (Damage Number)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@800&family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;height:100%;background:#090d13}
+body{display:flex;align-items:center;justify-content:center;overflow:hidden}
+body.m{display:block}
+#wrap{transform-origin:center}
+body.m #wrap{transform-origin:0 0}
+#c{position:relative;width:324px;height:124px;border-radius:12px;overflow:hidden;font-family:Montserrat,sans-serif;color:#fff;
+ background:radial-gradient(circle at 100% 0,rgba(140,80,170,.13),transparent 60%),radial-gradient(rgba(255,255,255,.055) 1px,transparent 1.5px) 5px 5px/11px 11px,#131921;
+ box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
+#c>*{position:absolute}
+.cen{transform:translate(-50%,-50%);white-space:nowrap}
+.big{font-family:Montserrat,sans-serif;font-weight:800}
+.mn{font-family:Manrope,Montserrat,sans-serif}
+
+#tg{left:40px;top:31px;width:74px;height:74px}
+#tg div{position:absolute;border-radius:50%;box-sizing:border-box}
+#disc{inset:0;background:radial-gradient(circle,rgba(70,82,170,.5),rgba(50,60,130,.45));border:1px solid rgba(115,130,240,.55)}
+#r1{left:13px;top:13px;width:48px;height:48px;border:2px solid #6f78e8}
+#r2{left:24px;top:24px;width:26px;height:26px;border:2px solid #8089f2}
+#dot{left:33px;top:33px;width:8px;height:8px;background:#ff5e70;box-shadow:0 0 6px rgba(255,94,112,.8)}
+#sp{left:0;top:0}
+.n{font-family:Manrope,Montserrat,sans-serif;font-weight:800;opacity:0;left:0;top:0}
+.cr{font:800 9px Montserrat;letter-spacing:.14em;left:0;top:0;opacity:0}
+
+</style></head><body><div id="wrap"><div id="c">
+<div id="tg"><div id="disc"></div><div id="r1"></div><div id="r2"></div><div id="dot"></div></div>
+<svg id="sp" width="324" height="124" viewBox="0 0 324 124" style="left:0;top:0"></svg>
+<div class="n cen" id="n1" style="font-size:20px;color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.6)">1,280</div>
+<div class="n cen" id="n2" style="font-size:24px;color:#ffd75e;text-shadow:0 0 10px rgba(255,200,60,.6)">2,450</div>
+<div class="n cen" id="n3" style="font-size:20px;color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.6)">980</div>
+<div class="n cen" id="n4" style="font-size:34px;color:#ff9b64;text-shadow:0 0 12px rgba(255,140,80,.6)">5,120</div>
+<div class="cr cen" id="c2" style="color:#ffd75e">CRITICAL!</div><div class="cr cen" id="c4" style="color:#ff9b64">CRITICAL!</div>
+</div></div>
+<script>
+/* CFG：示範用的數值、字、色都集中在這裡 */
+const LOOP=120;
+const FONTS=['800 20px Manrope','800 12px Montserrat'];
+const HITS=[2,18,35,52];
+const K1=[[2,96,52,1.85,1],[3,99,49,1.38,1],[4,102,46,1.13,1],[5,102,45.3,0.94,1],[6,102,44.7,0.88,1],[7,102,44,0.88,1],[8,101.3,42,0.94,1],[9,100.7,40,1,1],[10,100,38,1.04,1],[11,99.6,37,1.02,1],[15,98,33,1,1],[20,96,32,1,1],[26,91.6,29.8,1,1],[28,90.8,29.4,1,0.7],[29,90.4,29.2,1,0.5],[30,90,29,1,0.3],[31,90,28.7,1,0.2],[32,90,28.3,1,0]];
+const K2=[[18,150,50,2.1,1],[19,150,46,1.54,1],[20,150,42,1.18,1],[21,150.3,40.7,0.95,1],[22,150.7,39.3,0.85,1],[23,151,38,0.84,1],[24,152.5,36.5,0.9,1],[25,154,35,0.93,1],[26,154.6,34,0.98,1],[27,155.2,33,1,1],[30,157,30,1,1],[40,160,25,1,1],[44,163.2,24.2,1,1],[46,164.3,24,1,0.7],[47,164.7,24,1,0.3],[49,165,24,1,0.1],[51,165,24,1,0]];
+const K3=[[35,116,58,1.85,1],[36,115.5,55,1.4,1],[37,115,52,1.08,1],[38,114.3,50.3,0.93,1],[39,113.7,48.7,0.86,1],[40,113,47,0.86,1],[41,112.6,46,0.93,1],[42,112.2,45,0.98,1],[43,111.8,44,1,1],[45,111,42,1,1],[50,110,39,1,1],[60,103,37,1,1],[61,102.3,36.8,1,0.87],[62,101.5,36.5,1,0.68],[63,100.8,36.3,1,0.55],[64,100,36,1,0.4],[65,100,36,1,0.2],[66,100,36,1,0]];
+const K4=[[52,159,46,1.58,1],[53,159,40.5,1.2,1],[54,159,35,0.96,1],[55,159.3,34.3,0.875,1],[56,159.7,33.7,0.875,1],[57,160,33,0.92,1],[58,160,32,0.92,1],[59,160,31,1,1],[60,160.8,30.2,1.04,1],[61,161.6,29.4,1,1],[65,164,26.6,1,1],[70,164.4,24.8,1,1],[76,168.4,24,1,1],[77,169.6,24,1,0.8],[78,170.8,24,1,0.72],[79,172,24,1,0.47],[80,172,24,1,0.27],[81,172,24,1,0]];
+const CR2=[[19,.5,0],[20,.5,1],[21,1.13,1],[22,1.05,1],[23,1,1],[44,1,1],[45,1,.72],[46,1,.45],[47,1,.16],[48,1,0]],CR4=[[52,.5,0],[53,.5,1],[54,1.5,1],[55,1.23,1],[56,1.05,1],[57,1,1],[76,1,1],[77,1,.74],[78,1,.55],[79,1,.36],[80,1,.2],[81,1,0]];
+
+const FPS=30;
+const clamp=(v,a=0,b=1)=>Math.min(b,Math.max(a,v));
+const lerp=(a,b,t)=>a+(b-a)*t;
+const eo=t=>1-Math.pow(1-clamp(t),3), ei=t=>Math.pow(clamp(t),3), eio=t=>{t=clamp(t);return t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2};
+function kf(keys,f,smooth){
+  if(f<=keys[0][0])return keys[0].slice(1);
+  for(let i=1;i<keys.length;i++){if(f<=keys[i][0]){const a=keys[i-1],b=keys[i];let t=(f-a[0])/(b[0]-a[0]);if(smooth)t=t*t*(3-2*t);return a.slice(1).map((v,j)=>lerp(v,b[j+1],t))}}
+  return keys[keys.length-1].slice(1)}
+function rnd(seed){let s=seed*9301+49297;return()=>{s=(s*9301+49297)%233280;return s/233280}}
+const fmt=n=>Math.round(n).toLocaleString('en-US');
+const $=id=>document.getElementById(id);
+function mix(c1,c2,t){t=clamp(t);return 'rgb('+c1.map((v,i)=>Math.round(lerp(v,c2[i],t))).join(',')+')'}
+function place(el,x,y,s,a){el.style.transform='translate(-50%,-50%) translate('+x+'px,'+y+'px) scale('+s+')';el.style.opacity=a}
+const q=new URLSearchParams(location.search);
+$('wrap').style.transform='scale('+(+q.get('z')||1)+')';
+if(q.get('m')==='1')document.body.classList.add('m');
+function start(){
+  if(typeof setup==='function')setup();
+  if(q.has('t')){render(+q.get('t')*FPS);}
+  else{const st=performance.now();(function tick(){render(((performance.now()-st)/1000*FPS)%LOOP);requestAnimationFrame(tick)})()}
+}
+Promise.race([Promise.all(FONTS.map(f=>document.fonts.load(f,'0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ?,.'))),new Promise(r=>setTimeout(r,2500))]).then(start);
+
+
+const R=rnd(11),SP=[];
+function setup(){HITS.forEach(h=>{for(let i=0;i<9;i++)SP.push({h,a:R()*6.283,l:7+R()*5,s:2+R()*1.5})});
+  const sv=$('sp');SP.forEach(()=>{const l=document.createElementNS('http://www.w3.org/2000/svg','line');l.setAttribute('stroke','#fff');l.setAttribute('stroke-width','1.5');l.setAttribute('stroke-linecap','round');sv.appendChild(l)})}
+function render(f){
+  let pulse=0;HITS.forEach(h=>{const a=f-h;if(a>=0&&a<9)pulse=Math.max(pulse,1-a/9)});
+  const dsc=$('disc');dsc.style.transform='scale('+(1+.1*pulse)+')';
+  dsc.style.background='radial-gradient(circle,rgba('+Math.round(70+90*pulse)+','+Math.round(82+90*pulse)+','+Math.round(170+60*pulse)+',.5),rgba('+Math.round(50+70*pulse)+','+Math.round(60+70*pulse)+',130,'+(.45+.2*pulse)+'))';
+  $('r1').style.borderColor=pulse>0?mix([111,120,232],[210,220,255],pulse):'#6f78e8';
+  $('r2').style.borderColor=pulse>0?mix([128,137,242],[230,235,255],pulse):'#8089f2';
+  const ls=$('sp').children;
+  SP.forEach((s,i)=>{const a=f-s.h,l=ls[i];if(a<0||a>=8){l.setAttribute('opacity',0);return}
+    const r0=26+a*s.s,r1=r0+s.l*(1-a/10);l.setAttribute('x1',77+Math.cos(s.a)*r0);l.setAttribute('y1',68+Math.sin(s.a)*r0);l.setAttribute('x2',77+Math.cos(s.a)*r1);l.setAttribute('y2',68+Math.sin(s.a)*r1);l.setAttribute('opacity',1-a/8)});
+  [[K1,'n1'],[K2,'n2'],[K3,'n3'],[K4,'n4']].forEach(([K,id])=>{const [x,y,s,al]=kf(K,f);place($(id),x,y,s,f<K[0][0]||f>K[K.length-1][0]?0:al)});
+  [[CR2,'c2',145,63],[CR4,'c4',156.5,64.5]].forEach(([K,id,x,y])=>{const [s,al]=kf(K,f);place($(id),x,y,s,al)});
+}
+</script></body></html>

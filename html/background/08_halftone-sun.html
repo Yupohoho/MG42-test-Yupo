@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>B08 Halftone Sun</title>
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; transform-origin:0 0; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<div id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#14181e',
+  dot: '#ffffff',
+  sun: '#ff4d87', sunC: [161.5, 80], sunR: 24.5,   // 下方的粉紅太陽
+  x0: 10, px: 18,           // 網點格：橫距 18，奇數列錯開半格
+  y0: 80.7, py: 10.4,       // 第 0 列剛好穿過太陽中心，往上每列 10.4
+  baseR: 1.05, litAdd: 2.25,// 小點半徑 1.05；光芒正中央的點最大到 3.3
+  halfWidth: 32,            // 光芒的半寬（度）：離光軸 32° 以外都是小點
+  fade: .0016,              // 越遠的點稍微縮一點
+  axis0: 0, axisStep: 6,    // 光軸起始角與每幀轉動角度（兩道光芒相反方向，y 向下順時針）
+  loopFrames: 30,           // 光軸轉 180° 回到原樣（兩道光芒對稱）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const Z = +(q.get('z') || 1);
+const card = document.getElementById('card'), cv = document.getElementById('cv');
+card.style.cssText += `width:${CFG.W*Z}px;height:${CFG.H*Z}px;border-radius:${12*Z}px;background:${CFG.bg}`;
+cv.width = CFG.W * Z; cv.height = CFG.H * Z;
+const ctx = cv.getContext('2d');
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  ctx.setTransform(Z, 0, 0, Z, 0, 0);
+  ctx.fillStyle = CFG.bg; ctx.fillRect(0, 0, CFG.W, CFG.H);
+  const axis = CFG.axis0 + CFG.axisStep * f;
+  ctx.fillStyle = CFG.dot;
+  for (let m = -3; m < 9; m++) for (let i = -2; i < 21; i++) {
+    const x = CFG.x0 + i * CFG.px + (((m % 2) + 2) % 2 ? CFG.px / 2 : 0), y = CFG.y0 - m * CFG.py;
+    const dx = x - CFG.sunC[0], dy = y - CFG.sunC[1], dist = Math.hypot(dx, dy);
+    const a = Math.atan2(dy, dx) * 180 / Math.PI;
+    const delta = Math.abs((((a - axis + 90) % 180) + 180) % 180 - 90);          // 離最近一道光軸的角度
+    const g = delta < CFG.halfWidth ? Math.cos(Math.PI * delta / (2 * CFG.halfWidth)) : 0;
+    const rad = CFG.baseR + CFG.litAdd * g * (1 - CFG.fade * dist);
+    if (dist < CFG.sunR + rad) continue;                                          // 被太陽蓋住的不畫
+    ctx.beginPath(); ctx.arc(x, y, rad, 0, 6.2832); ctx.fill();
+  }
+  ctx.fillStyle = CFG.sun;
+  ctx.beginPath(); ctx.arc(CFG.sunC[0], CFG.sunC[1], CFG.sunR, 0, 6.2832); ctx.fill();
+}
+
+if (q.has('t')) render(+q.get('t'));
+else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+</script>
+</body>
+</html>

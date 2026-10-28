@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>B28 Orbit Shapes</title>
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; transform-origin:0 0; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<div id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#14181e',
+  center: [161.6, 53.5],                 // 三條橢圓軌道共用的中心
+  dot: 'rgba(255,255,255,.3)', dotR: .95, dotStep: 6,   // 軌道是一顆一顆的小點，點距 6 px，不動
+  white: '#efece4', purple: '#ad8df3',
+  depth: .47,                            // 越靠近下緣（離鏡頭近）越大：大小 = 基準 × (1 + 0.47 × sin 角度)；sin 為負的在後面、較小
+  // 每個物件：[形狀, 軌道半徑 rx, ry, 起始角（度）, 每幀轉角（度）, 基準大小, 自轉起始角, 每幀自轉]
+  objects: [
+    { shape: 'circle', rx: 150, ry: 32, a0: 115,  da: -6, size: 6,    },            // 白色圓：中間軌道，一輪 60 幀，逆時針（往上）
+    { shape: 'square', rx: 100, ry: 22, a0: -131, da: 12, size: 11.2, rot0: -30, dr: 12 },   // 小紫方塊：內圈，一輪 30 幀
+    { shape: 'square', rx: 200, ry: 50, a0: 0,    da: 6,  size: 16,   rot0: 0,   dr: 6 },    // 大紫方塊：外圈，一輪 60 幀
+  ],
+  squareRadius: .12,                     // 方塊圓角（佔邊長的比例）
+  loopFrames: 60,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const Z = +(q.get('z') || 1);
+const card = document.getElementById('card'), cv = document.getElementById('cv');
+card.style.cssText += `width:${CFG.W*Z}px;height:${CFG.H*Z}px;border-radius:${12*Z}px;background:${CFG.bg}`;
+cv.width = CFG.W * Z; cv.height = CFG.H * Z;
+const ctx = cv.getContext('2d');
+
+const RAD = Math.PI / 180;
+// 把軌道每隔 dotStep 放一顆點：先對橢圓取樣算弧長，再等距取點
+const orbitDots = [[100, 22], [150, 32], [200, 50]].map(([rx, ry]) => {
+  const N = 2400, pts = [], cum = [0];
+  for (let i = 0; i <= N; i++) { const a = -Math.PI / 2 + (i / N) * Math.PI * 2; pts.push([rx * Math.cos(a), ry * Math.sin(a)]); if (i) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1])); }
+  const out = []; let k = 0;
+  for (let s = 1.4; s < cum[N]; s += CFG.dotStep) { while (cum[k + 1] < s) k++; out.push(pts[k]); }
+  return out;
+});
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  ctx.setTransform(Z, 0, 0, Z, 0, 0);
+  ctx.fillStyle = CFG.bg; ctx.fillRect(0, 0, CFG.W, CFG.H);
+  const [cx, cy] = CFG.center;
+  ctx.fillStyle = CFG.dot;
+  for (const dots of orbitDots) for (const [x, y] of dots) { ctx.beginPath(); ctx.arc(cx + x, cy + y, CFG.dotR, 0, 6.2832); ctx.fill(); }
+  const items = CFG.objects.map(o => {
+    const a = (o.a0 + o.da * f) * RAD, s = Math.sin(a);
+    return { o, x: cx + o.rx * Math.cos(a), y: cy + o.ry * s, size: o.size * (1 + CFG.depth * s), s };
+  }).sort((p, q2) => p.s - q2.s);                           // 後面的先畫
+  for (const { o, x, y, size } of items) {
+    if (o.shape === 'circle') { ctx.fillStyle = CFG.white; ctx.beginPath(); ctx.arc(x, y, size, 0, 6.2832); ctx.fill(); }
+    else {
+      ctx.save(); ctx.translate(x, y); ctx.rotate((o.rot0 + o.dr * f) * RAD);
+      ctx.fillStyle = CFG.purple; ctx.beginPath(); ctx.roundRect(-size / 2, -size / 2, size, size, size * CFG.squareRadius); ctx.fill(); ctx.restore();
+    }
+  }
+}
+
+if (q.has('t')) render(+q.get('t'));
+else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+</script>
+</body>
+</html>

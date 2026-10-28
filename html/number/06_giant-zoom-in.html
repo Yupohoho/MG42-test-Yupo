@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><title>N06 巨大ズームイン</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700;800;900&family=Noto+Sans+JP:wght@900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f16}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Montserrat',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:122px;border-radius:12px;overflow:hidden;background:#131921;box-shadow:inset 0 0 0 1px #1c2330}
+#card::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.06) 1px,transparent 1.2px) 0 0/12px 12px}
+#grp{position:absolute;inset:0}
+#num{position:absolute;left:0;right:0;top:12px;height:92px;line-height:92px;text-align:center;font-size:88px;font-weight:900;letter-spacing:-3px;color:#fff;white-space:nowrap}
+#num b{font-family:'Noto Sans JP',sans-serif;font-weight:900;font-size:46px;letter-spacing:0;color:#ff6fb0;display:inline-block;margin-left:-6px;transform:translateY(12px)}
+#lab{position:absolute;left:0;right:0;top:104px;text-align:center;font-size:8px;font-weight:800;letter-spacing:3px;color:#8d95a6}
+#fx{position:absolute;inset:0}
+</style></head><body><div id="card">
+<canvas id="fx" width="648" height="244" style="width:324px;height:122px"></canvas>
+<div id="grp"><div id="num">100<b>万</b></div><div id="lab">VIEWS</div></div></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  inAt:3,                      // 數字砸入的第一幀（參考實測）
+  zoom:[3.8,3.2,2.6,2.0,1.45,1.03,1.04,1.04,1.025,1.01], // 逐幀倍率：快速砸下→過衝1.04→回穩1.0（f3起，實測）
+  blur:[14,12,10,7,3,0],       // 逐幀模糊（f3起）
+  outAt:92,outEnd:108,         // 淡出區間
+  rings:[{c:'255,255,255',at:10,end:32,r0:26,r1:104,a:.75},{c:'255,111,176',at:13,end:36,r0:34,r1:134,a:.8}],
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3);
+const grp=document.getElementById('grp'),lab=document.getElementById('lab');
+const fx=document.getElementById('fx'),g=fx.getContext('2d');
+function render(f){
+  const o=seg(f,CFG.outAt,CFG.outEnd),k=Math.floor(f-CFG.inAt);
+  const S=(k<0?CFG.zoom[0]:(k<CFG.zoom.length?CFG.zoom[k]:1))*(1+.04*o),bl=k<0?CFG.blur[0]:(CFG.blur[k]||0);
+  grp.style.transform='scale('+S+')';
+  grp.style.filter=bl>.3?'blur('+bl.toFixed(2)+'px)':'none';
+  grp.style.opacity=(f<CFG.inAt?0:1)*(1-o);
+  lab.style.opacity=seg(f,14,22);
+  g.setTransform(2,0,0,2,0,0);g.clearRect(0,0,324,122);
+  if(f>=3&&f<12){ // 放射狀速度線
+    const a=1-seg(f,3,12);g.strokeStyle='rgba(255,255,255,'+a*.8+')';g.lineWidth=1;
+    for(let i=0;i<28;i++){const t=i/28*Math.PI*2,d=36+seg(f,3,12)*60;g.beginPath();g.moveTo(162+Math.cos(t)*d,60+Math.sin(t)*d*.8);g.lineTo(162+Math.cos(t)*(d+22),60+Math.sin(t)*(d+22)*.8);g.stroke()}
+  }
+  CFG.rings.forEach(R=>{if(f<R.at||f>R.end)return;const k=seg(f,R.at,R.end),r=R.r0+(R.r1-R.r0)*eo(k);
+    g.strokeStyle='rgba('+R.c+','+R.a*(1-k)+')';g.lineWidth=1.4;g.beginPath();g.arc(162,60,r,0,7);g.stroke()});
+}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+Promise.all([document.fonts.load('900 88px Montserrat','100'),document.fonts.load('900 46px "Noto Sans JP"','万'),document.fonts.load('800 8px Montserrat','VIEWS')]).then(start,start);
+</script></body></html>

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><title>N35 ハイスコア更新 (High Score Update)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@800&family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;height:100%;background:#090d13}
+body{display:flex;align-items:center;justify-content:center;overflow:hidden}
+body.m{display:block}
+#wrap{transform-origin:center}
+body.m #wrap{transform-origin:0 0}
+#c{position:relative;width:324px;height:124px;border-radius:12px;overflow:hidden;font-family:Montserrat,sans-serif;color:#fff;
+ background:radial-gradient(circle at 100% 0,rgba(140,80,170,.13),transparent 60%),radial-gradient(rgba(255,255,255,.055) 1px,transparent 1.5px) 5px 5px/11px 11px,#131921;
+ box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
+#c>*{position:absolute}
+.cen{transform:translate(-50%,-50%);white-space:nowrap}
+.big{font-family:Montserrat,sans-serif;font-weight:800}
+.mn{font-family:Manrope,Montserrat,sans-serif}
+
+#hs{left:162px;top:19px;font:700 8.5px Montserrat;letter-spacing:.22em;color:#8d96ad}
+#top{left:162px;top:36px;font-size:17px;color:#9aa2b8}
+#sc{left:162px;top:73px;font-size:54px;color:#fff;letter-spacing:5px}
+#ln{left:77px;top:46px;width:170px;height:1.5px;background:linear-gradient(90deg,transparent,#ffd24d,transparent);opacity:0}
+#pill{left:162px;top:110px;width:146px;height:25px;border-radius:13px;background:linear-gradient(180deg,#ffd75a,#f2a925);color:#3a2a05;font:800 11px Montserrat;letter-spacing:.12em;line-height:25px;text-align:center;opacity:0;box-shadow:0 2px 8px rgba(255,190,50,.35)}
+#pt{left:0;top:0}
+
+</style></head><body><div id="wrap"><div id="c">
+<div class="cen" id="hs">HIGH SCORE</div><div class="cen big" id="top">12,000</div><div class="cen big" id="sc">0</div>
+<div id="ln"></div><div class="cen" id="pill">★ NEW RECORD</div><svg id="pt" width="324" height="124" viewBox="0 0 324 124" style="left:0;top:0"></svg>
+</div></div>
+<script>
+/* CFG：示範用的數值、字、色都集中在這裡 */
+const LOOP=120;
+const FONTS=['800 20px Manrope','700 12px Montserrat'];
+const RECORD=12000;
+const V=[[0,6],[5,109],[10,466],[15,1236],[20,2579],[25,4653],[30,7527],[35,9938],[40,11554],[41,11796],[42,12014],[43,12209],[44,12382],[45,12535],[46,12668],[47,12784],[48,12884],[49,12968],[50,13038],[51,13095],[52,13141],[53,13177],[54,13204],[55,13224],[60,13250],[90,13250],[92,13000],[95,11287],[98,6000],[100,1963],[102,300],[103,0],[119,0]];
+const GOLD_FROM=42,GOLD_TO=90;
+const SC_POP=[[42,1],[43,1.065],[44,1.08],[45,1.065],[46,1.05],[47,.97],[48,.97],[49,.97],[50,.98],[51,.99],[52,1]];
+const PILL=[[44,.38,-8,1],[45,1.22,-4,1],[46,1.35,-3,1],[47,1.03,-2,1],[48,.87,-1,1],[49,.92,-1,1],[50,1.03,-.5,1],[52,1,0,1]];
+
+const FPS=30;
+const clamp=(v,a=0,b=1)=>Math.min(b,Math.max(a,v));
+const lerp=(a,b,t)=>a+(b-a)*t;
+const eo=t=>1-Math.pow(1-clamp(t),3), ei=t=>Math.pow(clamp(t),3), eio=t=>{t=clamp(t);return t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2};
+function kf(keys,f,smooth){
+  if(f<=keys[0][0])return keys[0].slice(1);
+  for(let i=1;i<keys.length;i++){if(f<=keys[i][0]){const a=keys[i-1],b=keys[i];let t=(f-a[0])/(b[0]-a[0]);if(smooth)t=t*t*(3-2*t);return a.slice(1).map((v,j)=>lerp(v,b[j+1],t))}}
+  return keys[keys.length-1].slice(1)}
+function rnd(seed){let s=seed*9301+49297;return()=>{s=(s*9301+49297)%233280;return s/233280}}
+const fmt=n=>Math.round(n).toLocaleString('en-US');
+const $=id=>document.getElementById(id);
+function mix(c1,c2,t){t=clamp(t);return 'rgb('+c1.map((v,i)=>Math.round(lerp(v,c2[i],t))).join(',')+')'}
+function place(el,x,y,s,a){el.style.transform='translate(-50%,-50%) translate('+x+'px,'+y+'px) scale('+s+')';el.style.opacity=a}
+const q=new URLSearchParams(location.search);
+$('wrap').style.transform='scale('+(+q.get('z')||1)+')';
+if(q.get('m')==='1')document.body.classList.add('m');
+function start(){
+  if(typeof setup==='function')setup();
+  if(q.has('t')){render(+q.get('t')*FPS);}
+  else{const st=performance.now();(function tick(){render(((performance.now()-st)/1000*FPS)%LOOP);requestAnimationFrame(tick)})()}
+}
+Promise.race([Promise.all(FONTS.map(f=>document.fonts.load(f,'0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ?,.'))),new Promise(r=>setTimeout(r,2500))]).then(start);
+
+
+const R=rnd(5),PT=[];
+function setup(){[43,50].forEach(h=>{for(let i=0;i<14;i++)PT.push({h,a:R()*6.283,v:1.5+R()*3,c:['#ff8ac8','#ffd24d','#fff','#7fe9ff'][i%4]})});
+  const sv=$('pt');PT.forEach(p=>{const c=document.createElementNS('http://www.w3.org/2000/svg','circle');c.setAttribute('r',1.5);c.setAttribute('fill',p.c);sv.appendChild(c)})}
+function render(f){
+  const v=kf(V,f)[0];
+  const gold=f>=GOLD_FROM&&f<GOLD_TO;
+  $('sc').textContent=fmt(v);
+  $('sc').style.transform='translate(-50%,-50%) scale('+(gold?kf(SC_POP,f)[0]:1)+')';
+  $('top').textContent=gold?fmt(Math.max(v,RECORD+1)):'12,000';
+  $('sc').style.color=gold?'#ffd24d':'#fff';
+  $('sc').style.textShadow=gold?'0 0 14px rgba(255,190,50,.65)':'0 2px 6px rgba(0,0,0,.5)';
+  $('top').style.color=gold?'#ffd24d':'#9aa2b8';
+  $('top').style.textShadow=gold?'0 0 8px rgba(255,190,50,.55)':'none';
+  $('ln').style.opacity=f>=43&&f<58?(f<56?.9:.4):0;
+  const pill=$('pill');
+  if(gold&&f>=44){const [s,rot,al]=kf(PILL,f);pill.style.transform='translate(-50%,-50%) translate(0,0) rotate('+rot+'deg) scale('+s+')';pill.style.opacity=al}else pill.style.opacity=0;
+  const cs=$('pt').children;
+  PT.forEach((p,i)=>{const t=f-p.h,c=cs[i];if(t<0||t>14){c.setAttribute('opacity',0);return}
+    c.setAttribute('cx',162+Math.cos(p.a)*p.v*t*1.6*(1.2));c.setAttribute('cy',62+Math.sin(p.a)*p.v*t*.9+.06*t*t);c.setAttribute('opacity',1-t/14)});
+}
+</script></body></html>

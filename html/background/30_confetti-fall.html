@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>B30 Confetti Fall</title>
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; transform-origin:0 0; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<div id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#b794fe',
+  W_: '#f6efe8', K_: '#12101c',          // 奶油白紙片、近黑紙片
+  // 每片紙片：[顏色 W/K, x（不動）, 第 0 幀的 y, 速度 v（px／幀）, 長, 寬, 第 0 幀的長邊角度（度）]
+  // 速度只有兩種：2.2（慢，60 幀落一輪）與 4.4（快，30 幀落一輪）；一輪 = 掉 132 px（畫面高 106 + 上下各留 13 的緩衝）
+  pieces: [
+    ['K', 3.7, 85.3, 2.2, 7.3, 5.5, 31],
+    ['K', 4.2, 108.5, 4.4, 7.3, 5.6, 171],
+    ['W', 7.2, 50.9, 2.2, 6.6, 5.4, 111],
+    ['K', 10.4, 26.6, 2.2, 8.5, 4.2, 147],
+    ['K', 36.6, 49.1, 2.2, 5.2, 4.5, 86],
+    ['W', 40.4, 37.9, 4.4, 8.6, 6.7, 63],
+    ['K', 69.4, -1.2, 4.4, 7.9, 6.1, 32],
+    ['K', 71.7, 85.1, 4.4, 8.6, 4.8, 139],
+    ['W', 95.8, 26.5, 4.4, 8.6, 6.7, 85],
+    ['K', 101.9, 116.5, 2.2, 7.9, 4.2, 17],
+    ['W', 143.7, 17.4, 2.2, 11.5, 9.5, 127],
+    ['W', 168.8, 51.1, 4.4, 5.9, 4.9, 139],
+    ['K', 172.5, 38.3, 4.4, 11.3, 8.7, 137],
+    ['K', 180.3, 12, 4.4, 8, 6.7, 3],
+    ['W', 185.5, 17.2, 2.2, 10, 8.7, 34],
+    ['K', 196.4, 106.4, 2.2, 5.9, 4, 70],
+    ['W', 198.5, 18.3, 2.2, 8.1, 7.3, 14],
+    ['K', 209.5, 104.4, 4.4, 9.5, 8.5, 47],
+    ['W', 220.9, 21.7, 2.2, 12.8, 9.5, 108],
+    ['K', 224, 41.5, 2.2, 7.4, 5.9, 164],
+    ['W', 226.6, -8.4, 4.4, 7.3, 5.4, 176],
+    ['W', 236.8, 109.6, 4.4, 8.7, 7.4, 86],
+    ['W', 259.3, 35.4, 2.2, 6.7, 5.4, 105],
+    ['W', 261.7, 94.4, 4.4, 10.3, 9.4, 122],
+    ['K', 261.9, 20.5, 2.2, 5.9, 2.9, 2],
+    ['K', 272.6, 48.9, 2.2, 8.7, 6.6, 39],
+    ['K', 285.3, 48.7, 4.4, 4.8, 4, 129],
+    ['W', 293.5, 29.7, 2.2, 7.4, 6.7, 146],
+    ['W', 302, 87.2, 2.2, 7.2, 3.5, 172],
+    ['W', 305.5, 74.8, 4.4, 7.3, 4.9, 81],
+    ['K', 306, 107, 4.4, 8.8, 8, 73],
+  ],
+  wrap: 132, top: -12,                   // 紙片中心的 y 在 −12 到 120 之間循環
+  spinSlow: -11.5, spinFast: 24.5,       // 自轉：慢的逆時針 11.5°／幀，快的順時針 24.5°／幀
+  loopFrames: 60,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const Z = +(q.get('z') || 1);
+const card = document.getElementById('card'), cv = document.getElementById('cv');
+card.style.cssText += `width:${CFG.W*Z}px;height:${CFG.H*Z}px;border-radius:${12*Z}px;background:${CFG.bg}`;
+cv.width = CFG.W * Z; cv.height = CFG.H * Z;
+const ctx = cv.getContext('2d');
+
+const mod = (a, n) => ((a % n) + n) % n;
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  ctx.setTransform(Z, 0, 0, Z, 0, 0);
+  ctx.fillStyle = CFG.bg; ctx.fillRect(0, 0, CFG.W, CFG.H);
+  for (const [col, x, y0, v, L, T, ph] of CFG.pieces) {
+    const y = CFG.top + mod(y0 - CFG.top + v * f, CFG.wrap);
+    if (y < -8 || y > CFG.H + 8) continue;
+    ctx.save(); ctx.translate(x, y); ctx.rotate((ph + (v > 3 ? CFG.spinFast : CFG.spinSlow) * f) * Math.PI / 180);
+    ctx.fillStyle = CFG[col + '_']; ctx.fillRect(-L / 2, -T / 2, L, T); ctx.restore();
+  }
+}
+
+if (q.has('t')) render(+q.get('t'));
+else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+</script>
+</body>
+</html>

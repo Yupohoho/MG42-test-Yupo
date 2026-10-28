@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>B32 Pinwheels</title>
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; transform-origin:0 0; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<div id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#14181e',
+  cream: '#f2f0e8', purple: '#b394ff',
+  // 風車：4 片等腰三角形，一邊貼在中心往外的「軸」上（長度 L），尖端偏到軸的順時針側（高 h）；奇偶片交替奶油、紫
+  // [中心 x, 中心 y, 軸長 L, 高 h, 第 0 幀角度（度）, 每幀轉角（度，正 = 順時針）]；由下往上疊（最後一個在最上面）
+  pinwheels: [
+    [133.3, 74.0, 44.5, 29.5, -1, -12],   // 下方大風車：逆時針，一圈 30 幀（4 片對稱，轉 90° 就換色，視覺週期 15 幀）
+    [53.4, 33.9, 30.4, 20.8, -1, 6],      // 左上：順時針，一圈 60 幀
+    [213.3, 32.7, 36.0, 24.5, -1, 12],    // 右上大風車：順時針，一圈 30 幀
+    [280.0, 72.6, 27.8, 18.7, -1, -6],    // 右下：逆時針，一圈 60 幀
+    [100.0, 20.6, 17.9, 12.3, -1, 18],    // 左上小風車：順時針，一圈 20 幀
+    [253.4, 52.6, 21.0, 14.3, -1, -18],   // 右中小風車：逆時針，一圈 20 幀，疊在右上、右下那兩支上面
+  ],
+  loopFrames: 60,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const Z = +(q.get('z') || 1);
+const card = document.getElementById('card'), cv = document.getElementById('cv');
+card.style.cssText += `width:${CFG.W*Z}px;height:${CFG.H*Z}px;border-radius:${12*Z}px;background:${CFG.bg}`;
+cv.width = CFG.W * Z; cv.height = CFG.H * Z;
+const ctx = cv.getContext('2d');
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  ctx.setTransform(Z, 0, 0, Z, 0, 0);
+  ctx.fillStyle = CFG.bg; ctx.fillRect(0, 0, CFG.W, CFG.H);
+  for (const [cx, cy, L, h, th0, rate] of CFG.pinwheels) {
+    for (let k = 0; k < 4; k++) {
+      const a = (th0 + rate * f + 90 * k) * Math.PI / 180, ux = Math.cos(a), uy = Math.sin(a), vx = -uy, vy = ux;
+      ctx.fillStyle = k % 2 ? CFG.purple : CFG.cream;
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + L * ux, cy + L * uy); ctx.lineTo(cx + L / 2 * ux + h * vx, cy + L / 2 * uy + h * vy); ctx.closePath(); ctx.fill();
+    }
+  }
+}
+
+if (q.has('t')) render(+q.get('t'));
+else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+</script>
+</body>
+</html>

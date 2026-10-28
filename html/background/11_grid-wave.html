@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>B11 Grid Wave</title>
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; transform-origin:0 0; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<div id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#f4f0e6',            // 紙色
+  minor: '#57524d', minorW: 1.1,      // 細格線
+  major: '#16543f', majorW: 1.9,      // 每 4 條一條的粗綠線
+  majorEvery: 4,
+  px: 13.32, py: 13.4,      // 格距（欄、列）
+  x0: 1.03, y0: 13.29,      // 第 0 條直線的 x、第 0 條橫線的 y（直線 i % 4 = 0、橫線 (j + 1) % 4 = 0 為粗線）
+  // 位移 = 兩道正弦波相加：[振幅 px, kx, ky, 相位, 時間頻率]，kx、ky 是每 px 的弧度
+  dx: [[-.1272, -.0362, .0455, 1.0424, 1], [3.3771, -.0094, .0813, 6.1764, 1]],   // 直線橫向的位移（主要隨 y 起伏）
+  dy: [[4.1895, .0358, .0272, 6.2512, 1], [.6458, .0244, .057, 3.0147, 1]],       // 橫線縱向的位移（隨 x、y 起伏）
+  loopFrames: 58.3,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const Z = +(q.get('z') || 1);
+const card = document.getElementById('card'), cv = document.getElementById('cv');
+card.style.cssText += `width:${CFG.W*Z}px;height:${CFG.H*Z}px;border-radius:${12*Z}px;background:${CFG.bg}`;
+cv.width = CFG.W * Z; cv.height = CFG.H * Z;
+const ctx = cv.getContext('2d');
+
+const mod = (a, n) => ((a % n) + n) % n;
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames, ph = 2 * Math.PI * f / CFG.loopFrames;
+  const disp = (set, X, Y) => { let d = 0; for (const [A, kx, ky, p0, c] of set) d += A * Math.sin(kx * X + ky * Y + c * ph + p0); return d; };
+  ctx.setTransform(Z, 0, 0, Z, 0, 0);
+  ctx.fillStyle = CFG.bg; ctx.fillRect(0, 0, CFG.W, CFG.H);
+  ctx.lineJoin = 'round';
+  const nI = Math.ceil(CFG.W / CFG.px) + 4, nJ = Math.ceil(CFG.H / CFG.py) + 4;
+  for (const pass of [0, 1]) {            // 先畫細線，再畫粗線
+    ctx.strokeStyle = pass ? CFG.major : CFG.minor; ctx.lineWidth = pass ? CFG.majorW : CFG.minorW;
+    ctx.beginPath();
+    for (let i = -4; i <= nI; i++) {
+      if ((mod(i, CFG.majorEvery) === 0) !== !!pass) continue;
+      const X = CFG.x0 + i * CFG.px;
+      for (let Y = CFG.y0 - 4 * CFG.py, k = 0; Y <= CFG.y0 + nJ * CFG.py; Y += 4, k++) {
+        const x = X + disp(CFG.dx, X, Y), y = Y + disp(CFG.dy, X, Y);
+        k ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      }
+    }
+    for (let j = -4; j <= nJ; j++) {
+      if ((mod(j + 1, CFG.majorEvery) === 0) !== !!pass) continue;
+      const Y = CFG.y0 + j * CFG.py;
+      for (let X = CFG.x0 - 4 * CFG.px, k = 0; X <= CFG.x0 + nI * CFG.px; X += 4, k++) {
+        const x = X + disp(CFG.dx, X, Y), y = Y + disp(CFG.dy, X, Y);
+        k ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      }
+    }
+    ctx.stroke();
+  }
+}
+
+if (q.has('t')) render(+q.get('t'));
+else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+</script>
+</body>
+</html>

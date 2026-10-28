@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>B19 Line Burst</title>
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; transform-origin:0 0; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<div id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#f4f0e6',
+  ink: [12, 12, 12], gold: [100, 78, 0],
+  center: [162, 53],            // 透視中心（所有線都從這一點往外射）
+  lineCount: 30,                // 放射線的方向數
+  gapRange: [.55, 1.75],        // 相鄰兩條的角度間隔 = 平均間隔 × 這個範圍內的值（由編號決定，不是亂數），間距有疏有密；最小間隔約 6° 以上
+  rStart: 14, rEnd: 215,        // 線頭從距中心 14 px 長出來，跑到 215 px（畫面外）
+  loops: 2,                     // 一輪（60 幀）每條線穿越畫面 2 次
+  tailFrac: [.09, .30],         // 線長：尾巴落後頭多少「進度」（每條不同）；進度是指數的，所以線越往外越長，有透視的速度感
+  fadeIn: .16, fadeOut: .1,     // 剛長出來與跑出去時的淡入淡出（占進度的比例）
+  widthMin: .7, widthMax: 3.6,  // 線粗：越靠近鏡頭越粗
+  goldEvery: 4,                 // 每 4 條有 1 條金褐色，其餘近黑
+  loopFrames: 60,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const Z = +(q.get('z') || 1);
+const card = document.getElementById('card'), cv = document.getElementById('cv');
+card.style.cssText += `width:${CFG.W*Z}px;height:${CFG.H*Z}px;border-radius:${12*Z}px;background:${CFG.bg}`;
+cv.width = CFG.W * Z; cv.height = CFG.H * Z;
+const ctx = cv.getContext('2d');
+
+const mod = (a, n) => ((a % n) + n) % n;
+const ss = u => { u = Math.min(1, Math.max(0, u)); return u * u * (3 - 2 * u); };
+const frac = x => x - Math.floor(x);
+const rOf = u => CFG.rStart * Math.pow(CFG.rEnd / CFG.rStart, u);
+
+// 每條線的固定屬性：方向、起始進度、尾巴長度、顏色；全部由編號決定，不用亂數
+const lines = [], gaps = [];
+for (let i = 0; i < CFG.lineCount; i++) gaps.push(CFG.gapRange[0] + (CFG.gapRange[1] - CFG.gapRange[0]) * frac(Math.sin(i * 12.9898 + 4.1) * 43758.5453));
+const gapSum = gaps.reduce((x, y) => x + y, 0);
+let ang = 17;
+for (let i = 0; i < CFG.lineCount; i++) {
+  lines.push({ th: ang, phase: frac(i * .618034), tail: CFG.tailFrac[0] + (CFG.tailFrac[1] - CFG.tailFrac[0]) * frac(i * .381966 + .17), c: i % CFG.goldEvery === 1 ? CFG.gold : CFG.ink });
+  ang += gaps[i] / gapSum * 360;
+}
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  ctx.setTransform(Z, 0, 0, Z, 0, 0);
+  ctx.fillStyle = CFG.bg; ctx.fillRect(0, 0, CFG.W, CFG.H);
+  ctx.lineCap = 'round';
+  const [cx, cy] = CFG.center;
+  for (const L of lines) {
+    const u = mod(f / CFG.loopFrames * CFG.loops + L.phase, 1);            // 這條線頭的進度 0–1
+    const ut = Math.max(0, u - L.tail);                                    // 尾巴
+    const a = ss(u / CFG.fadeIn) * (1 - ss((u - 1 + CFG.fadeOut) / CFG.fadeOut));
+    if (a <= .01) continue;
+    const th = L.th * Math.PI / 180, dx = Math.cos(th), dy = Math.sin(th);
+    ctx.strokeStyle = `rgba(${L.c},${(a * .95).toFixed(3)})`;
+    ctx.lineWidth = CFG.widthMin + (CFG.widthMax - CFG.widthMin) * u;
+    ctx.beginPath();
+    ctx.moveTo(cx + dx * rOf(ut), cy + dy * rOf(ut));
+    ctx.lineTo(cx + dx * rOf(u), cy + dy * rOf(u));
+    ctx.stroke();
+  }
+}
+
+if (q.has('t')) render(+q.get('t'));
+else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+</script>
+</body>
+</html>

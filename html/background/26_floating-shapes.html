@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>B26 Floating Shapes</title>
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; transform-origin:0 0; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<div id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#b794fe',
+  cream: '#f2eae2',                      // 奶油色藥丸與波浪線
+  white: 'rgba(255,255,255,.46)',        // 半透明白藥丸
+  black: '#15161d',
+  smoke: 'rgba(21,22,29,.54)',           // 半透明深色藥丸
+  // 每顆藥丸：[顏色, 全長, 粗細, x 係數, y 係數, 角度係數]
+  // 係數 = [平均, cos1, sin1, cos2, sin2]：值(幀) = 平均 + cos1×cos(2π·幀÷60) + sin1×sin(2π·幀÷60) + …（角度單位為度）
+  pills: [
+    ['white', 74, 24, [107.95, 7.76, -12.09], [53.19, -6.76, 3.21], [6.05, 7.11, -6.78]],
+    ['white', 70, 23, [163.92, -13.71, 7.98], [19.57, 7.18, -3.83], [-2.67, -6.69, 6.66]],
+    ['cream', 78, 19.5, [183.5, -12.11, -8.33, -.73, -.1], [37.55, 4.82, 7.75, -.16, -.1], [24.13, -6.82, -4.56, -.34, .07]],
+    ['smoke', 67, 21, [200.85, -8.26, -16.47], [76.25, 5.62, 7.11], [10.73, -2.43, -7.78]],
+    ['black', 86, 18, [142.2, -14.93, -3.26], [90.72, 7.86, 2.6], [11.98, -8.95, -2.41]],
+    ['black', 91, 24, [243.48, 9.19, -4.63], [88.72, -.78, -5.19], [-17.27, 4.61, -3.6]],
+  ],
+  // 三條波浪線：[長度, 波高, 線寬, x, y, 角度]；x、y、角度各是 [平均, 振幅, 峰值幀]：值 = 平均 + 振幅 × cos(2π(幀 − 峰值幀) ÷ 60)，等於一個橢圓軌道加微擺
+  squiggles: [
+    [50, 3.8, 3.8, [38.7, 13.7, 45], [22.8, 9, 25], [-4.5, 8, 45]],
+    [84, 4.6, 4,   [248, 14, 33],    [18.5, 12.5, 8], [8, 2, 0]],
+    [72, 3.8, 3.8, [95, 12.4, 19],   [84.1, 9.3, 48], [9.2, 7.3, 17]],
+  ],
+  squiggleCycles: 1.5,
+  loopFrames: 60,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const Z = +(q.get('z') || 1);
+const card = document.getElementById('card'), cv = document.getElementById('cv');
+card.style.cssText += `width:${CFG.W*Z}px;height:${CFG.H*Z}px;border-radius:${12*Z}px;background:${CFG.bg}`;
+cv.width = CFG.W * Z; cv.height = CFG.H * Z;
+const ctx = cv.getContext('2d');
+
+const TAU = Math.PI * 2;
+const series = (c, f) => { let v = c[0]; for (let h = 1; 2 * h < c.length + 1 && c[2 * h - 1] !== undefined; h++) v += c[2 * h - 1] * Math.cos(TAU * h * f / 60) + (c[2 * h] || 0) * Math.sin(TAU * h * f / 60); return v; };
+
+function pill(color, L, T, x, y, deg) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(deg * Math.PI / 180);
+  ctx.fillStyle = color; ctx.beginPath(); ctx.roundRect(-L / 2, -T / 2, L, T, T / 2); ctx.fill(); ctx.restore();
+}
+
+function squiggle(L, A, w, x, y, deg) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(deg * Math.PI / 180);
+  ctx.strokeStyle = CFG.cream; ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath();
+  for (let i = 0; i <= 48; i++) { const s = i / 48, px = -L / 2 + L * s, py = A * Math.cos(Math.PI * 2 * CFG.squiggleCycles * s); i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
+  ctx.stroke(); ctx.restore();
+}
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  ctx.setTransform(Z, 0, 0, Z, 0, 0);
+  ctx.fillStyle = CFG.bg; ctx.fillRect(0, 0, CFG.W, CFG.H);
+  for (const [col, L, T, cx, cy, ca] of CFG.pills) pill(CFG[col], L, T, series(cx, f), series(cy, f), series(ca, f));
+  const cs = ([m, a, p]) => m + a * Math.cos(TAU * (f - p) / 60);
+  for (const [L, A, w, x, y, ang] of CFG.squiggles) squiggle(L, A, w, cs(x), cs(y), cs(ang));
+}
+
+if (q.has('t')) render(+q.get('t'));
+else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+</script>
+</body>
+</html>

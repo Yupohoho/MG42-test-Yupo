@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>B07 Halftone Checker</title>
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; transform-origin:0 0; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<div id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#f4efe9',            // 奶油底
+  big: '#ff4d87',           // 粉紅點
+  small: '#14181e',         // 深色點
+  x0: 3.6, px: 13.3,        // 網點格
+  y0: 3.7, py: 12.65,
+  // 每一顆點自己走一輪 60 幀：粉紅點由小長大再縮掉 → 深色點冒出再縮小 → 深色點再小幅鼓起 → 換粉紅。
+  // 相鄰格（沿「欄＋列」方向）的相位差 34.8 幀，所以整片看起來是斜向滾過去的多條波帶。
+  phaseStep: 34.8,          // 每走一格（欄＋列）延遲幾幀
+  phase0: 35,               // 基準格（欄4、列3）粉紅點出現的幀
+  // 一輪 60 格的半徑表（單位 px），第 i 格 = 粉紅點出現後第 i 幀
+  pinkR: [2.53,3.28,3.82,4.17,4.43,4.63,4.86,5.02,5.12,5.21,5.31,5.4,5.46,5.48,5.47,5.45,5.39,5.32,5.23,5.12,5,4.78,4.56,4.33,3.95,3.36,2.71,1.87,1.19,0.36,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.25,0.96,1.7],
+  darkR: [1.19,1.07,1.05,1.01,0.99,0.96,0.96,0.94,0.94,0.92,0.92,0.92,0.92,0.92,0.92,0.92,0.92,0.92,0.92,0.92,0.94,0.94,0.94,0.96,1.01,1.07,1.29,1.88,2.33,2.69,2.8,2.69,2.48,2.28,2.07,1.85,1.68,1.56,1.45,1.36,1.32,1.29,1.26,1.26,1.26,1.27,1.31,1.34,1.39,1.49,1.61,1.75,1.95,2.16,2.34,2.54,2.67,2.62,2.25,1.81],
+  loopFrames: 60,           // 一輪 60 幀
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const Z = +(q.get('z') || 1);
+const card = document.getElementById('card'), cv = document.getElementById('cv');
+card.style.cssText += `width:${CFG.W*Z}px;height:${CFG.H*Z}px;border-radius:${12*Z}px;background:${CFG.bg}`;
+cv.width = CFG.W * Z; cv.height = CFG.H * Z;
+const ctx = cv.getContext('2d');
+
+const tab = (a, th) => {            // 循環折線表內插
+  const n = a.length, i = Math.floor(th), k = th - i;
+  return a[((i % n) + n) % n] * (1 - k) + a[(((i + 1) % n) + n) % n] * k;
+};
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  ctx.setTransform(Z, 0, 0, Z, 0, 0);
+  ctx.fillStyle = CFG.bg; ctx.fillRect(0, 0, CFG.W, CFG.H);
+  for (let r = -1; r < 9; r++) for (let c = -1; c < 26; c++) {
+    const x = CFG.x0 + c * CFG.px, y = CFG.y0 + r * CFG.py;
+    const th = f - CFG.phase0 - CFG.phaseStep * (c + r - 7);
+    const rd = tab(CFG.darkR, th), rp = tab(CFG.pinkR, th);
+    ctx.fillStyle = CFG.small;
+    ctx.beginPath(); ctx.arc(x, y, Math.max(.8, rd), 0, 6.2832); ctx.fill();
+    if (rp > .5) { ctx.fillStyle = CFG.big; ctx.beginPath(); ctx.arc(x, y, rp, 0, 6.2832); ctx.fill(); }
+  }
+}
+
+if (q.has('t')) render(+q.get('t'));
+else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+</script>
+</body>
+</html>

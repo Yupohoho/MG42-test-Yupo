@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><title>N04 ポンポン弾む数字</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700;800;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f16}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Montserrat',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:122px;border-radius:12px;overflow:hidden;background:#131921;box-shadow:inset 0 0 0 1px #1c2330}
+#card::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.06) 1px,transparent 1.2px) 0 0/12px 12px}
+.grp{position:absolute;inset:0}
+.num{position:absolute;left:0;right:0;top:20px;height:70px;line-height:70px;text-align:center;font-size:72px;font-weight:800;letter-spacing:-2px;white-space:nowrap}
+.num small{font-size:26px;font-weight:700;letter-spacing:0;margin-left:2px;opacity:.55}
+.done{position:absolute;left:0;right:0;top:101px;text-align:center;font-size:9px;font-weight:800;letter-spacing:2.5px;color:#5ee6a8}
+#fx{position:absolute;inset:0}
+</style></head><body><div id="card">
+<canvas id="fx" width="648" height="244" style="width:324px;height:122px"></canvas>
+<div class="grp" id="A"><div class="num" id="an"></div><div class="done" id="done">COMPLETE</div></div>
+<div class="grp" id="B"><div class="num" style="color:#f6f2f8;text-shadow:0 0 14px rgba(255,111,176,.35)">90<small>%</small></div></div>
+</div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  from:90,to:100,
+  steps:[2,6,10,14,18,21,25,29,33], // 每個跳數（91→99）的幀；每跳一次放大回彈一下（參考實測）
+  pulse:[1,.57,.42,.28],        // 跳數後逐幀衰減比例（實測 62→59→58→57px / 靜止55px）
+  amp0:.12,amp1:.16,            // 第1跳 / 最後跳的放大量（實測 1.13→1.16）
+  popAt:42,                     // 100 的彈出幀
+  popS:[1.10,1.078,1.052,1.052,1.04,1.04,1.026,1.013], // 100 彈出逐幀倍率（實測，由大回穩）
+  swapAt:93,                    // 直接切回 90%（無入場動態）
+  white:'246,242,248',green:'94,230,168',
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3),ei=x=>x*x*x;
+const A=document.getElementById('A'),B=document.getElementById('B'),an=document.getElementById('an'),done=document.getElementById('done');
+const fx=document.getElementById('fx'),g=fx.getContext('2d');
+let sd=3;const rnd=()=>(sd=(sd*16807)%2147483647)/2147483647;
+const rays=[...Array(18)].map((_,i)=>({a:i/18*Math.PI*2+rnd()*.2,l:6+rnd()*10,d:rnd()*3}));
+function render(f){
+  const n=CFG.steps.filter(k=>f>=k).length,v=f>=CFG.popAt?CFG.to:CFG.from+n;
+  const full=f>=CFG.popAt;
+  let pop=1;
+  if(full){pop=CFG.popS[Math.floor(f-CFG.popAt)]||1}
+  else if(n>0){const d=Math.floor(f-CFG.steps[n-1]);if(d<CFG.pulse.length)pop=1+(CFG.amp0+(CFG.amp1-CFG.amp0)*(n-1)/(CFG.steps.length-1))*CFG.pulse[d]}
+  const gp=full?eo(seg(f,CFG.popAt,CFG.popAt+5)):0;
+  const col=full?CFG.green:CFG.white;
+  an.innerHTML=v+'<small>%</small>';
+  an.style.color='rgb('+col+')';
+  an.style.textShadow=full?'0 0 '+(16+8*gp)+'px rgba('+CFG.green+',.65)':'0 0 14px rgba(255,111,176,.35)';
+  an.style.transform='scale('+pop+')';
+  done.style.opacity=eo(seg(f,CFG.popAt+6,CFG.popAt+14));
+  done.style.transform='translateY('+(1-eo(seg(f,CFG.popAt+6,CFG.popAt+14)))*6+'px)';
+  const ax=0;
+  A.style.display=f>=CFG.swapAt?'none':'block';
+  B.style.display=f>=CFG.swapAt?'block':'none';
+  g.setTransform(2,0,0,2,0,0);g.clearRect(0,0,324,122);
+  if(f>=CFG.popAt&&f<CFG.swapAt){
+    const t=f-CFG.popAt;
+    const r=30+eo(seg(f,CFG.popAt,CFG.popAt+24))*100,al=(1-seg(f,CFG.popAt+14,CFG.popAt+36))*.45;
+    const sx=ax;
+    g.save();g.translate(sx,0);
+    g.strokeStyle='rgba('+CFG.green+','+al+')';g.lineWidth=1;g.beginPath();g.arc(162,60,r,0,7);g.stroke();
+    if(t<16){rays.forEach(p=>{const d=(18+t*3.2+p.d*3),a=1-t/16;g.strokeStyle='rgba('+CFG.green+','+a*.9+')';
+      g.beginPath();g.moveTo(162+Math.cos(p.a)*d,60+Math.sin(p.a)*d*.7);g.lineTo(162+Math.cos(p.a)*(d+p.l),60+Math.sin(p.a)*(d+p.l)*.7);g.stroke()})}
+    g.restore();
+  }
+}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+document.fonts.load('800 72px Montserrat','0123456789%COMPLETE').then(start,start);
+</script></body></html>

@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><title>N19 Line Chart Points</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700;800&family=Noto+Sans+JP:wght@500;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;height:100%;background:#0a0d13}
+body{display:flex;align-items:center;justify-content:center;overflow:hidden}
+body.m{display:block}
+#wrap{width:322px;height:126px;transform-origin:center center}
+body.m #wrap{transform-origin:0 0}
+#card{position:relative;width:322px;height:126px;border-radius:12px;overflow:hidden;background:#131921;font-family:'Montserrat','Noto Sans JP',sans-serif;color:#f3f4f8;-webkit-font-smoothing:antialiased}
+#card::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(244,114,182,.10),transparent 70%),radial-gradient(rgba(255,255,255,.045) 1px,transparent 1.2px) 0 0/14px 14px}
+#card::after{content:'';position:absolute;inset:0;border-radius:12px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);pointer-events:none;z-index:60}
+#card>*{position:absolute}
+svg{overflow:visible}
+#g,#lg,#lbs,#rws,#bks{left:0;top:0;width:322px;height:126px}
+#g>*,#lg>*,#lbs>*,#rws>*,#bks>*{position:absolute}
+
+.lb{width:40px;margin-left:-20px;text-align:center;font:800 12px/14px Montserrat,sans-serif;color:#f3f4f8;transform-origin:50% 100%}
+</style></head>
+<body><div id="wrap"><div id="card"><svg id="sv" width="322" height="126" style="left:0;top:0"></svg><div id="lbs"></div></div></div>
+<script>
+
+const P=new URLSearchParams(location.search);
+const FPS=30;
+const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+const lerp=(a,b,t)=>a+(b-a)*t;
+const eo2=t=>{t=clamp(t);return 1-(1-t)*(1-t)};
+const eo3=t=>{t=clamp(t);return 1-Math.pow(1-t,3)};
+const ei2=t=>{t=clamp(t);return t*t};
+const eio=t=>{t=clamp(t);return t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2};
+const sst=t=>{t=clamp(t);return t*t*(3-2*t)};
+const ebk=t=>{t=clamp(t);const c1=1.70158,c3=c1+1;return 1+c3*Math.pow(t-1,3)+c1*Math.pow(t-1,2)};
+const $=id=>document.getElementById(id);
+function render(t){const c=(((t*FPS)%LOOP)+LOOP)%LOOP;draw(c)}
+function boot(){
+  if(P.get('m')==='1')document.body.classList.add('m');
+  const z=+(P.get('z')||1);$('wrap').style.transform='scale('+z+')';
+  const t0=P.get('t');
+  if(t0!==null){render(+t0)}else{const s=performance.now();(function f(){render((performance.now()-s)/1000);requestAnimationFrame(f)})()}
+}
+
+
+const CFG={pts:[[34.5,94],[84.5,77],[135,85],[186,62],[236,69.5],[287,45.5]],vals:[20,46,34,70,58,96],
+  /* 實測(參考影片逐幀)：折線前端x(自第8幀起每幀1格，末段漸緩)、圓點/數字出現幀、圓點與數字的彈出倍率曲線(每幀1格) */
+  hx0:8,hx:[36,42,43,47,51,52,57,61,67,71,78,85,91,99,109,117,129,139,151,163,174,186,195,206,217,225,233,241,247,252,258,263,267,270,273,275,277,279,281,283,284,285,286,287],
+  A:[-2,20,26,30,36,58],dc:[.7,1.3,1.07,.8,.8,1,1,.92,.92,1],lc:[.75,1.33,1.15,.8,.93,1.05,1.05,1],
+  v0:[.93,.93,.93,.93,.93,0],v5:85,settle:[6,6,6,6,6,2],
+  line:'#fb75b5',green:'#6ee7b7',bottom:108};
+const LOOP=120;
+const NS='http://www.w3.org/2000/svg';
+const sv=$('sv');
+sv.innerHTML='<defs><linearGradient id="gA" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fb75b5" stop-opacity=".34"/><stop offset="1" stop-color="#fb75b5" stop-opacity="0"/></linearGradient></defs>';
+const P0=CFG.pts;
+const area=document.createElementNS(NS,'path');area.setAttribute('fill','url(#gA)');
+let ap='M'+P0[0][0]+','+CFG.bottom;P0.forEach(p=>ap+=' L'+p[0]+','+p[1]);ap+=' L'+P0[5][0]+','+CFG.bottom+' Z';area.setAttribute('d',ap);sv.appendChild(area);
+const line=document.createElementNS(NS,'polyline');line.setAttribute('fill','none');line.setAttribute('stroke',CFG.line);line.setAttribute('stroke-width',2.2);line.setAttribute('stroke-linejoin','round');line.setAttribute('stroke-linecap','round');sv.appendChild(line);
+const dots=P0.map((p,k)=>{const g=document.createElementNS(NS,'g');const r=document.createElementNS(NS,'circle');r.setAttribute('r',6.5);r.setAttribute('fill',k===5?'rgba(110,231,183,.22)':'rgba(251,117,181,.20)');const d=document.createElementNS(NS,'circle');d.setAttribute('r',4.2);d.setAttribute('fill',k===5?CFG.green:'#fff');d.setAttribute('stroke',k===5?CFG.green:CFG.line);d.setAttribute('stroke-width',1);g.append(r,d);sv.appendChild(g);return g});
+const lbs=P0.map((p,k)=>{const d=document.createElement('div');d.className='lb';d.style.left=p[0]+'px';d.style.top=(p[1]-16.5-7)+'px';if(k===5)d.style.color=CFG.green;$('lbs').appendChild(d);return d});
+function curve(arr,t){if(t<0)return 0;const n=arr.length-1;if(t>=n)return arr[n];const i=Math.floor(t);return lerp(arr[i],arr[i+1],t-i)}
+function Lof(c){const H=CFG.hx,t=c-CFG.hx0;if(t<0)return -1;const i=Math.floor(t);const x=t>=H.length-1?H[H.length-1]:lerp(H[i],H[i+1],t-i);
+  for(let k=0;k<5;k++){if(x<=P0[k+1][0])return k+clamp((x-P0[k][0])/(P0[k+1][0]-P0[k][0]))}return 5}
+function draw(c){
+  const e=c>=112?0:clamp((c-92)/16);
+  let L=Lof(c>=112?c-120:c);if(e>0)L=5*(1-ei2(e));
+  const pts=[];if(L>=0){for(let k=0;k<=Math.floor(L)&&k<6;k++)pts.push(P0[k][0]+','+P0[k][1]);
+  const f=Math.floor(L);if(f<5&&L>f){const a=P0[f],b=P0[f+1],u=L-f;pts.push(lerp(a[0],b[0],u)+','+lerp(a[1],b[1],u))}}
+  line.setAttribute('points',pts.join(' '));
+  line.setAttribute('opacity',L<0?0:1);
+  area.setAttribute('opacity',clamp((c-12)/20)*(1-e));
+  const cc=c>=112?c-120:c;
+  P0.forEach((p,k)=>{
+    const t=cc-CFG.A[k];
+    const s=curve(CFG.dc,t)*(1-ei2(e));
+    const ls=curve(CFG.lc,t);
+    dots[k].setAttribute('transform','translate('+p[0]+','+p[1]+') scale('+Math.max(0,s)+')');
+    const fin=CFG.vals[k],st=k===5?CFG.v5:fin*CFG.v0[k];
+    const v=lerp(st,fin,eo2(t/CFG.settle[k]));
+    lbs[k].textContent=Math.round(v);
+    lbs[k].style.opacity=(t>=0?1:0)*(1-clamp(e*1.2));
+    lbs[k].style.transform='scale('+ls*(1-.4*e)+')';
+  });
+}
+
+const FONT_LOADS=[document.fonts.load('800 20px Montserrat','0123456789+%¥.,'),document.fonts.load('700 12px Montserrat','AoiRenMikaSora'),document.fonts.load('500 12px Montserrat','MobileDesktopTablet'),document.fonts.load('700 12px "Noto Sans JP"','1月2月3月4月5月')];
+Promise.race([Promise.all(FONT_LOADS),new Promise(r=>setTimeout(r,2500))]).then(boot,boot);
+
+</script></body></html>

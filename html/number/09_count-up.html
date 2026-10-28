@@ -1,0 +1,87 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>N09 Count Up</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap">
+<style>
+html,body{margin:0;height:100%;background:#090d13}
+body{display:flex;align-items:center;justify-content:center;font-family:"Plus Jakarta Sans",sans-serif}
+body.m{display:block}
+#card{position:relative;width:322px;height:125px;border-radius:12px;overflow:hidden;flex:none;
+ background:radial-gradient(circle,rgba(255,255,255,.055) 1px,transparent 1.3px) 0 0/14px 14px,linear-gradient(180deg,#151b25,#11171f)}
+#card::after{content:"";position:absolute;inset:0;border-radius:12px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);pointer-events:none}
+svg text{font-family:"Plus Jakarta Sans",sans-serif}
+.lab{font-size:9px;font-weight:800;letter-spacing:2.2px;fill:#9aa3b8}
+.big{font-weight:800}
+</style></head><body>
+<div id="card"><svg id="sv" width="322" height="125" viewBox="0 0 322 125" style="position:absolute;left:0;top:0">
+<defs><linearGradient id="g" gradientUnits="userSpaceOnUse" x1="55" x2="268" y1="0" y2="0"><stop offset="0" stop-color="#a78bfa"/><stop offset="1" stop-color="#f472b6"/></linearGradient></defs>
+<text class="lab" x="161" y="24" text-anchor="middle">TOTAL SALES</text>
+<text id="num" class="big" x="161" y="89" text-anchor="middle" font-size="64" fill="#fff" style="letter-spacing:-1.5px">0</text>
+<rect x="55" y="103" width="213" height="3" rx="1.5" fill="rgba(255,255,255,.07)"/>
+<rect id="fill" x="55" y="103" width="0" height="3" rx="1.5" fill="url(#g)"/>
+<g id="spk"></g>
+<g id="badge"><rect x="-35" y="-10.5" width="70" height="21" rx="10.5" fill="#6ee7a0"/><text y="4" text-anchor="middle" font-size="11" font-weight="800" fill="#0b2a1a" id="bt">↑ 24.8%</text></g>
+</svg></div>
+<script>
+const q=new URLSearchParams(location.search);
+const card=document.getElementById('card');
+const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+const lerp=(a,b,t)=>a+(b-a)*t;
+const outC=u=>1-Math.pow(1-clamp(u),3);
+const ss=u=>{u=clamp(u);return u*u*(3-2*u)};
+const rnd=n=>{const x=Math.sin(n*127.1+311.7)*43758.5453;return x-Math.floor(x)};
+const hex=c=>[1,3,5].map(i=>parseInt(c.substr(i,2),16));
+const mix=(a,b,t)=>{const A=hex(a),B=hex(b);return 'rgb('+A.map((v,i)=>Math.round(lerp(v,B[i],t))).join(',')+')'};
+const NS='http://www.w3.org/2000/svg';
+const mk=(tag,attrs,parent)=>{const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e};
+document.body.classList.toggle('m',q.get('m')==='1');
+card.style.zoom=+q.get('z')||1;
+function start(specs){
+ const go=()=>{
+  build();
+  const t=q.get('t');
+  if(t!==null){render(parseFloat(t)*30);document.body.dataset.ready='1';}
+  else{const t0=performance.now();const loop=n=>{render(((n-t0)/1000*30)%LOOP);requestAnimationFrame(loop)};requestAnimationFrame(loop);}
+ };
+ Promise.all(specs.map(s=>document.fonts.load(s[0],s[1]))).then(go,go);
+}
+
+const CFG={target:12480,badge:'↑ 24.8%',pink:'#ff6eb4',pop:[1,1.03,1.055,1.055,1.02,.99,.967,.967,.978,.989,1],popStart:55};
+const LOOP=120;
+let num,fill,spk,badge,lines=[];
+function popAt(f){const k=f-CFG.popStart;if(k<=0||k>=CFG.pop.length-1)return 1;const i=Math.floor(k),u=k-i;return lerp(CFG.pop[i],CFG.pop[i+1],u)}
+function build(){
+ num=document.getElementById('num');fill=document.getElementById('fill');spk=document.getElementById('spk');badge=document.getElementById('badge');
+ document.getElementById('bt').textContent=CFG.badge;
+ for(let i=0;i<22;i++){lines.push(mk('line',{'stroke-width':1.6,'stroke-linecap':'round'},spk));}
+}
+function val(f){
+ if(f<96)return CFG.target*outC((f-1.5)/55.4);
+ return CFG.target*(1-ss((f-97)/13.5));
+}
+function render(f){
+ const v=val(f);
+ num.textContent=Math.round(v).toLocaleString('en-US');
+ let g=f<96?ss((f-42)/18):1-ss((f-96)/4);
+ num.setAttribute('fill',mix('#ffffff','#ffd3ea',g));
+ const ps=popAt(f);
+ num.setAttribute('transform','translate(161 66) scale('+ps.toFixed(4)+') translate(-161 -66)');
+ num.style.filter='drop-shadow(0 0 5px rgba(255,255,255,.3)) drop-shadow(0 0 '+(g*7)+'px rgba(255,105,180,'+(0.55*g)+'))';
+ fill.setAttribute('width',213*v/CFG.target);
+ let s=0;
+ if(f>=60&&f<72){const u=(f-60)/12;s=u<.5?1.3*outC(u/.5):1.3-.3*ss((u-.5)/.5)}
+ else if(f>=72&&f<96)s=1;
+ else if(f>=96&&f<100)s=1-ss((f-96)/4);
+ badge.setAttribute('transform','translate(262 29.5) scale('+s+')');
+ badge.style.opacity=s>0?1:0;
+ const age=(f-57)/24;
+ lines.forEach((l,i)=>{
+  if(age<0||age>1){l.setAttribute('opacity',0);return}
+  const a=i/22*Math.PI*2+rnd(i)*.5,r0=8+rnd(i+5)*26,d=26+rnd(i+9)*34,len=(5+rnd(i+3)*8)*(1-age*.6);
+  const r=r0+d*outC(age*1.1),cx=152+Math.cos(a)*r*1.35,cy=62+Math.sin(a)*r*.8;
+  const ux=Math.cos(a)*1.35,uy=Math.sin(a)*.8,n=Math.hypot(ux,uy);
+  l.setAttribute('x1',cx);l.setAttribute('y1',cy);l.setAttribute('x2',cx+ux/n*len);l.setAttribute('y2',cy+uy/n*len);
+  l.setAttribute('stroke',i%3==0?'#ffffff':(i%3==1?'#ffb3dc':'#ff6eb4'));
+  l.setAttribute('opacity',1-Math.pow(age,1.5));
+ });
+}
+start([['800 68px "Plus Jakarta Sans"','0123456789,']]);
+</script></body></html>

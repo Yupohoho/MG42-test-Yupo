@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>TL02 Double Stroke</title>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; border-radius:12px; transform-origin:0 0; }
+  #word { position:absolute; left:0; top:0; width:0; height:0; transform-origin:0 0; }
+  #word svg { position:absolute; left:0; top:0; width:1px; height:1px; overflow:visible; }
+</style>
+</head>
+<body>
+<div id="card"><div id="word"></div></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  text: '神回確定',
+  W: 324, H: 106,
+  bg: '#fe585f',
+  color: '#0f0e13',        // 字色
+  ring: '#f2e5d9',         // 內層外框（奶油色）
+  edge: '#0f0e13',         // 最外層細黑邊
+  ringW: 5,                // 奶油外框寬（px，往外長）
+  edgeW: 2.2,               // 最外層黑邊寬
+  fontSize: 53,
+  spacing: -1,            // 字距（px），原版字比較寬鬆
+  cx: .5, cy: .510,
+  // 出場彈出：每幀（從第 4 幀起）的縮放，先小、過衝、回穩
+  popS: [.00, .55, .95, 1.07, 1.04, 1.01, 1.0],
+  // 停住後慢慢膨脹再縮回：f19→f33 放大約 4%，f33→f47 縮回
+  swell: { start: 19, peak: 33, end: 47, amt: .04 },
+  fadeFrom: 54, fadeFrames: 5,   // 尾端淡出（硬變淡 5 幀）
+  popAt: 4,
+  loopFrames: 59,          // 一輪 59 幀（約 1.97 秒）
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const card = document.getElementById('card'), word = document.getElementById('word');
+Object.assign(card.style, { width: CFG.W+'px', height: CFG.H+'px', background: CFG.bg, transform: `scale(${+(q.get('z') || 1)})` });
+word.style.left = (CFG.cx*CFG.W)+'px'; word.style.top = CFG.cy*CFG.H+'px';
+// 描邊字用 SVG 文字＋圓角連接（HTML 文字的描邊轉折會長尖刺）
+const NS = 'http://www.w3.org/2000/svg';
+const svg = document.createElementNS(NS, 'svg');
+for (const [col, sw] of [[CFG.edge, (CFG.ringW+CFG.edgeW)*2], [CFG.ring, CFG.ringW*2], [CFG.color, 0]]) {
+  const tx = document.createElementNS(NS, 'text'); tx.textContent = CFG.text;
+  for (const [k, v] of Object.entries({ x: CFG.spacing/2, y: 0, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-family': "'Dela Gothic One',sans-serif",
+    'font-size': CFG.fontSize, 'letter-spacing': CFG.spacing, fill: col, stroke: sw ? col : 'none', 'stroke-width': sw,
+    'stroke-linejoin': 'round', 'stroke-linecap': 'round', 'paint-order': 'stroke fill' })) tx.setAttribute(k, v);
+  svg.appendChild(tx);
+}
+word.appendChild(svg);
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  let s = 1, o = 1;
+  const k = f - CFG.popAt;
+  if (k < 0) o = 0;
+  else if (k < CFG.popS.length) { s = CFG.popS[k]; if (s === 0) o = 0; }
+  const w = CFG.swell;
+  if (f >= w.start && f < w.peak) s *= 1 + w.amt * (f - w.start) / (w.peak - w.start);
+  else if (f >= w.peak && f < w.end) s *= 1 + w.amt * (w.end - f) / (w.end - w.peak);
+  if (f >= CFG.fadeFrom) o = Math.max(0, 1 - (f - CFG.fadeFrom + 1) / CFG.fadeFrames);
+  word.style.opacity = o;
+  word.style.transform = `scale(${s})`;
+}
+
+const start = () => {
+  if (q.has('t')) render(+q.get('t'));
+  else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+};
+document.fonts.load(`${CFG.fontSize}px "Dela Gothic One"`, CFG.text).then(start);
+</script>
+</body>
+</html>

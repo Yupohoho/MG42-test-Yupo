@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>B23 Line Tunnel</title>
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; transform-origin:0 0; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<div id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#f6f2ea',
+  ink: [14, 12, 10], gold: [112, 80, 4],
+  center: [162.8, 53.5],        // 隧道中心
+  aspect: 1.6,                  // 矩形寬 ÷ 高
+  halfW0: 9.0,                  // 第 0 幀、第 0 號矩形的半寬
+  ratio: 1.7455,                // 相鄰兩個矩形的大小比（等比）
+  perUpdate: 1.1024,            // 每次更新整個隧道放大的倍率（影片每 3 幀更新 2 次，約 20 fps）
+  updatesPerLoop: 40,           // 一輪 40 次更新 = 60 幀，剛好多走 7 個矩形
+  colors: ['gold', 'ink', 'gold', 'ink', 'gold', 'ink', 'ink'],   // 第 j 號矩形的顏色（j 對 7 取餘數），每個矩形一生顏色不變
+  lineMax: 3.6, lineK: 40,      // 線寬 = 3.6 × (1 − e^(−半寬 ÷ 40))，越大的矩形線越粗
+  fadeFrom: 4, fadeLen: 14,     // 半寬 4 → 18 px 之間由淡變濃（剛從中心長出來時很淡）
+  loopFrames: 60,
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const Z = +(q.get('z') || 1);
+const card = document.getElementById('card'), cv = document.getElementById('cv');
+card.style.cssText += `width:${CFG.W*Z}px;height:${CFG.H*Z}px;border-radius:${12*Z}px;background:${CFG.bg}`;
+cv.width = CFG.W * Z; cv.height = CFG.H * Z;
+const ctx = cv.getContext('2d');
+
+const mod = (a, n) => ((a % n) + n) % n;
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  const n = Math.floor(2 * f / 3);                       // 影片本身約 20 fps：每 3 幀只更新 2 次
+  ctx.setTransform(Z, 0, 0, Z, 0, 0);
+  ctx.fillStyle = CFG.bg; ctx.fillRect(0, 0, CFG.W, CFG.H);
+  const [cx, cy] = CFG.center, lg = Math.log(CFG.ratio), s = Math.log(CFG.perUpdate) * n;
+  ctx.lineJoin = 'miter';
+  for (let j = -8; j <= 9; j++) {
+    const hw = CFG.halfW0 * Math.exp(lg * j + s);
+    if (hw < 3.5 || hw > 700) continue;
+    const hh = hw / CFG.aspect;
+    const al = Math.min(1, Math.max(0, (hw - CFG.fadeFrom) / CFG.fadeLen));
+    const [r, g, b] = CFG[CFG.colors[mod(j, 7)]];
+    ctx.strokeStyle = `rgba(${r},${g},${b},${al.toFixed(3)})`;
+    ctx.lineWidth = CFG.lineMax * (1 - Math.exp(-hw / CFG.lineK));
+    ctx.strokeRect(cx - hw, cy - hh, 2 * hw, 2 * hh);
+  }
+}
+
+if (q.has('t')) render(+q.get('t'));
+else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+</script>
+</body>
+</html>

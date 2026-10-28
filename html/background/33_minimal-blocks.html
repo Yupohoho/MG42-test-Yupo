@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>B33 Minimal Blocks</title>
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; transform-origin:0 0; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<div id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#14181e',            // 底色（右邊露出來的深色）
+  orange: '#ff883c',        // 左邊大色塊
+  cream: '#f4f0e6',         // 上方奶油色塊
+  ink: '#0e0f16',           // 奶油色塊下面的黑色塊
+  blockW: 124.5,            // 奶油／黑色塊的寬度（兩塊同寬、同一條左邊線）
+  xA: 201, xB: 128,         // 橘色塊右邊線：狀態 A（右邊兩塊靠右）、狀態 B（往左收）
+  creamBotA: 61, creamBotB: 81,   // 奶油塊下緣（也是黑色塊上緣）：A 為 61，B 為 81
+  // 前半段（A → B）的進度表（幀 → 0–1）；後半段（B → A）是它對第 28.5 幀的鏡像
+  ease: [[8,0],[9,.014],[10,.04],[11,.096],[12,.19],[13,.37],[14,.616],[15,.795],[16,.904],[17,.959],[18,.986],[19,1]],
+  loopFrames: 51,           // 一輪：停 9 幀 → 滑 10 幀 → 停 20 幀 → 滑回 10 幀 → 停 2 幀
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const Z = +(q.get('z') || 1);
+const card = document.getElementById('card'), cv = document.getElementById('cv');
+card.style.cssText += `width:${CFG.W*Z}px;height:${CFG.H*Z}px;border-radius:${12*Z}px;background:${CFG.bg}`;
+cv.width = CFG.W * Z; cv.height = CFG.H * Z;
+const ctx = cv.getContext('2d');
+
+const table = (t, f) => {
+  if (f <= t[0][0]) return t[0][1];
+  for (let i = 1; i < t.length; i++) if (f <= t[i][0]) { const [a, b] = [t[i-1], t[i]]; return a[1] + (b[1] - a[1]) * (f - a[0]) / (b[0] - a[0]); }
+  return t[t.length-1][1];
+};
+const fwd = f => table(CFG.ease, f);
+const progress = f => f <= 28.5 ? fwd(f) : fwd(57 - f);   // 0 = A，1 = B
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames, p = progress(f);
+  const xo = CFG.xA + (CFG.xB - CFG.xA) * p, cb = CFG.creamBotA + (CFG.creamBotB - CFG.creamBotA) * p;
+  ctx.setTransform(Z, 0, 0, Z, 0, 0);
+  ctx.fillStyle = CFG.bg; ctx.fillRect(0, 0, CFG.W, CFG.H);
+  ctx.fillStyle = CFG.ink; ctx.fillRect(xo, cb, CFG.blockW, CFG.H - cb);
+  ctx.fillStyle = CFG.cream; ctx.fillRect(xo, 0, CFG.blockW, cb);
+  ctx.fillStyle = CFG.orange; ctx.fillRect(0, 0, xo, CFG.H);
+}
+
+if (q.has('t')) render(+q.get('t'));
+else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+</script>
+</body>
+</html>

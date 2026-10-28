@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>B16 Weave Grid</title>
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; transform-origin:0 0; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<div id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#14181e',
+  weft: '#18d4c4',          // 橫線（緯線）：青綠色橫條，位置不動
+  warp: '#eff6f6',          // 直線（經線）：白色短條，一直往上走
+  barY0: 5, barPitch: 18.5, barH: 8.6,           // 橫條：每 18.5 px 一條、條高 8.6
+  colX0: 4.7, colPitch: 18.65, colW: 8.4,        // 白色直條的欄：每 18.65 px 一欄，條寬 8.4
+  dashLen: 17.6, dashPitch: 37.2,                // 每一欄是一串白色短條：長 17.6、每 37.2 px 一段
+  evenOffset: 19.6, oddOffset: 1,                // 偶數欄與奇數欄第一段的起點（兩者錯開半段）
+  loopFrames: 60,                                // 一輪：白條剛好往上走一個段距
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const Z = +(q.get('z') || 1);
+const card = document.getElementById('card'), cv = document.getElementById('cv');
+card.style.cssText += `width:${CFG.W*Z}px;height:${CFG.H*Z}px;border-radius:${12*Z}px;background:${CFG.bg}`;
+cv.width = CFG.W * Z; cv.height = CFG.H * Z;
+const ctx = cv.getContext('2d');
+
+const mod = (a, n) => ((a % n) + n) % n;
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames;
+  ctx.setTransform(Z, 0, 0, Z, 0, 0);
+  ctx.fillStyle = CFG.bg; ctx.fillRect(0, 0, CFG.W, CFG.H);
+  ctx.fillStyle = CFG.weft;
+  for (let j = -1; j * CFG.barPitch < CFG.H + CFG.barPitch; j++) ctx.fillRect(0, CFG.barY0 + j * CFG.barPitch, CFG.W, CFG.barH);
+  const shift = CFG.dashPitch * f / CFG.loopFrames;
+  for (let k = -1; CFG.colX0 + k * CFG.colPitch < CFG.W + 10; k++) {
+    const cx = CFG.colX0 + k * CFG.colPitch, x = cx - CFG.colW / 2;
+    const off = mod(k, 2) ? CFG.oddOffset : CFG.evenOffset;
+    for (let n = -2; n < 5; n++) {
+      const y = off + n * CFG.dashPitch - shift;
+      if (y > CFG.H || y + CFG.dashLen < 0) continue;
+      ctx.fillStyle = CFG.warp; ctx.fillRect(x, y, CFG.colW, CFG.dashLen);
+    }
+  }
+}
+
+if (q.has('t')) render(+q.get('t'));
+else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+</script>
+</body>
+</html>

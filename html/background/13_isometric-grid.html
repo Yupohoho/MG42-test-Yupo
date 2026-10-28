@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>B13 Isometric Grid</title>
+<style>
+  html,body { margin:0; background:#000; }
+  /* ?z=2 放大觀看；?t=0.5 定格 */
+  #card { position:relative; overflow:hidden; transform-origin:0 0; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<div id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區：換內容只改這裡 =====
+const CFG = {
+  W: 324, H: 106,
+  bg: '#14181e',
+  line: '#18d4c4',          // 格線色
+  node: '#b8fff4',          // 交點亮點色
+  edge: 16,                 // 等角格的邊長（三種方向的格線長度相同：垂直線、左右各 30° 斜線）
+  x0: 6, y0: 10,
+  baseAlpha: .24,           // 平常的格線亮度
+  center: [162, 53],        // 光波擴散的中心
+  waveLen: 72,              // 光波一圈的間距
+  ringPow: 3,               // 光環的銳利度（越大越窄）
+  fadeR: 190,               // 光環在這個半徑外完全消失
+  loopFrames: 60,           // 一輪：格子整體往上走剛好一個邊長，光環剛好外擴一個波長
+};
+// =================================
+
+const q = new URLSearchParams(location.search);
+const Z = +(q.get('z') || 1);
+const card = document.getElementById('card'), cv = document.getElementById('cv');
+card.style.cssText += `width:${CFG.W*Z}px;height:${CFG.H*Z}px;border-radius:${12*Z}px;background:${CFG.bg}`;
+cv.width = CFG.W * Z; cv.height = CFG.H * Z;
+const ctx = cv.getContext('2d');
+
+function render(t) {
+  const f = Math.floor(t * 30 + 1e-6) % CFG.loopFrames, u = f / CFG.loopFrames;
+  ctx.setTransform(Z, 0, 0, Z, 0, 0);
+  ctx.fillStyle = CFG.bg; ctx.fillRect(0, 0, CFG.W, CFG.H);
+  const e = CFG.edge, dx = e * Math.sqrt(3) / 2, drift = e * u, R0 = CFG.waveLen * u;
+  const [cx, cy] = CFG.center;
+  const pos = (k, m) => [CFG.x0 + k * dx, CFG.y0 + m * e + (((k % 2) + 2) % 2 ? e / 2 : 0) - drift];
+  const ring = (x, y) => {
+    const r = Math.hypot(x - cx, y - cy), c = Math.cos(2 * Math.PI * (r - R0) / CFG.waveLen);
+    return Math.pow(Math.max(0, c), CFG.ringPow) * Math.max(0, 1 - r / CFG.fadeR);
+  };
+  ctx.strokeStyle = CFG.line; ctx.lineCap = 'round';
+  const nk = Math.ceil(CFG.W / dx) + 2, nm = Math.ceil(CFG.H / e) + 3;
+  const edge = (a, b) => {
+    const mid = ring((a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+    ctx.globalAlpha = Math.min(1, CFG.baseAlpha + .72 * mid); ctx.lineWidth = 1 + .7 * mid;
+    ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+  };
+  for (let k = -1; k <= nk; k++) for (let m = -2; m <= nm; m++) {
+    const a = pos(k, m);
+    edge(a, pos(k, m + 1));                              // 垂直線
+    const odd = ((k % 2) + 2) % 2;
+    edge(a, pos(k + 1, odd ? m : m - 1));                // 往右上 30° 的斜線
+    edge(a, pos(k + 1, odd ? m + 1 : m));                // 往右下 30° 的斜線
+  }
+  ctx.fillStyle = CFG.node;
+  for (let k = -1; k <= nk; k++) for (let m = -2; m <= nm; m++) {
+    const a = pos(k, m), r = ring(a[0], a[1]);
+    ctx.globalAlpha = .35 + .65 * r;
+    ctx.beginPath(); ctx.arc(a[0], a[1], .7 + 1.9 * r, 0, 6.2832); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+if (q.has('t')) render(+q.get('t'));
+else { const t0 = performance.now(); (function f(now){ render((now - t0) / 1000); requestAnimationFrame(f); })(t0); }
+</script>
+</body>
+</html>
