@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D31 選項比較</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&family=Montserrat:wght@700;800&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#06080c}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#0b0f15}
+#wrap{position:absolute;inset:0}
+#tex{position:absolute;inset:0;background:#151b23}
+#tex::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.07) .8px,transparent 1px) 6px 6px/12px 12px}
+.pc{position:absolute;top:12px;width:95px;height:98px;box-sizing:border-box;border-radius:9px;background:#1a222c;box-shadow:inset 0 0 0 1px #29323f;opacity:0}
+.pc .t{position:absolute;left:0;right:0;top:11px;text-align:center;font-size:11px;line-height:16px;font-weight:700;color:#aab3c2}
+.pc .p{position:absolute;left:0;right:0;top:37px;text-align:center;font:800 15px/20px Montserrat,sans-serif;color:#f3f6fb}
+.pc .ds{position:absolute;left:0;right:0;top:75px;height:8px}
+.pc .ds i{position:absolute;top:0;width:7px;height:7px;border-radius:50%;background:#2c3644}
+.pc .ds i.on{background:#6ee6f9}
+#sel{z-index:2;position:absolute;top:9px;width:97px;height:104px;box-sizing:border-box;border-radius:11px;box-shadow:inset 0 0 0 2.5px #6ee6f9;background:rgba(110,230,249,.03)}
+#ck{z-index:3;position:absolute;left:201px;top:4px;width:20px;height:20px;border-radius:50%;background:#6ee6f9;opacity:0}
+svg{position:absolute;left:0;top:0;overflow:visible}
+</style></head><body><div id="card"><div id="wrap"><div id="tex"></div>
+<div id="scene"><div id="sel"></div><div id="ck"><svg width="20" height="20"><path d="M5.5 10.5 L8.8 13.8 L14.8 6.5" fill="none" stroke="#082a33" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div></div></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  plans:[{n:'方案A',p:'$500',d:1},{n:'方案B',p:'$980',d:2},{n:'方案C',p:'$1,980',d:3}],
+  pick:1,                      // 最後選中的索引（要與下方時序對應：0=A,1=B,2=C 的箱框停留順序見 BOX）
+  S:16,   // 動作起始偏移：讓動作從第 0 幀開始，做完停留到結尾後硬切重播
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const $=id=>document.getElementById(id);
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3);
+const at=(a,r,r0)=>a[cl(r-r0,0,a.length-1)];
+const CX=[14,115.5,217];
+const cards=CFG.plans.map((pl,i)=>{
+  const d=document.createElement('div');d.className='pc';d.style.left=CX[i]+'px';
+  d.innerHTML='<div class="t">'+pl.n+'</div><div class="p">'+pl.p+'</div><div class="ds">'+[0,1,2].map(k=>'<i class="'+(k<pl.d?'on':'')+'" style="left:'+(47.5-3.5+(k-1)*18)+'px"></i>').join('')+'</div>';
+  $('scene').appendChild(d);return d});
+const START=[16,19,22];
+// 實測：選取框左緣 x（r31–57 逐幀），之前停在 A（12），r39–45 停在 C，再回到 B 並過衝
+const BOX=[13,16,25,42,71,114,156,185,215,215,215,215,215,215,215,215,181,156,135,121,112,107,107,107,109,111,113,114];
+const POPK=[.5,.8,1.1,1.2,1.2,1.1,1.1,1.0];                                   // 勾選徽章縮放 r58 起
+function render(f){
+  const r=f+CFG.S;
+  $('sel').style.left=(r<31?12:(r-31>=BOX.length?114:BOX[r-31]))+'px';
+  const pick=r>=57?seg(r,57,61):0;
+  cards.forEach((c,i)=>{
+    const e=eo(seg(r,START[i],START[i]+5));
+    c.style.opacity=e*(i===CFG.pick?1:1-.55*pick);
+    c.style.transform='translateY('+(4*(1-e))+'px)';c.style.filter='blur('+(2.5*(1-e))+'px)';
+    if(i===CFG.pick){c.querySelector('.p').style.color='rgb('+Math.round(243+(110-243)*pick)+','+Math.round(246+(230-246)*pick)+','+Math.round(251+(249-251)*pick)+')';
+      c.querySelector('.t').style.color='rgb('+Math.round(170+(243-170)*pick)+','+Math.round(179+(246-179)*pick)+','+Math.round(194+(251-194)*pick)+')'}
+  });
+  const k=$('ck');if(r<58)k.style.opacity=0;else{k.style.opacity=1;k.style.transform='scale('+at(POPK,r,58)+')'}
+}
+function start(){const T=q.get('t');if(T!==null){render(Math.floor(+T*30+1e-6)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(Math.floor((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+Promise.all([document.fonts.load('700 11px "Noto Sans TC"','方案ABC'),document.fonts.load('800 15px Montserrat','$0123456789,')]).then(start,start);
+</script></body></html>

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D04 全貌→細節</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@700;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f15}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#151b23;box-shadow:inset 0 0 0 1px #1d2530}
+#card::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.05) 1px,transparent 1.2px) 0 0/12px 12px}
+svg{position:absolute;left:0;top:0}
+text{font-family:'Noto Sans TC',sans-serif}
+</style></head><body><div id="card"><svg id="s" width="324" height="126" viewBox="0 0 324 126"></svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  cells:[ // 名稱, 中心x, 上緣y, 寬, 高, 出現幀
+    ['營收',61,8,92,54,14],['會員',161,8,92,54,16],['轉換率',261,8,92,54,18],
+    ['廣告',61,66,92,54,21],['庫存',162,66,100,54,23],['滿意度',261,66,92,54,26]],
+  focus:4, bars:[6,13,10,17],
+  title:'庫存', delta:'+12%', crumb:'全體 > 庫存 > 詳細',
+  /* 縮放（參考第 100–117 幀逐幀量得）：倍率與垂直進度 */
+  Sc:[1,1,1.03,1.10,1.18,1.24,1.38,1.52,1.69,1.81,1.89,1.97,2.08,2.11,2.13,2.13,2.17,2.17],
+  Py:[0,0,0,0,.05,.1,.17,.26,.35,.5,.66,.76,.87,.93,.98,1,1,1],
+  zoomStart:35,       // 對應參考第 100 幀
+  cyan:'#6ee5f8', cellBg:'#202836', cellLine:'#2b3544', barGray:'#313b4b', focusBg:'#103341', white:'#f1f4f9',
+  SH:13,              // 幀偏移：render(0) 對應動作內部第 13 幀（動作從第 0 幀附近起跑）
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3);
+const NS='http://www.w3.org/2000/svg';const S=document.getElementById('s');
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);(p||S).appendChild(e);return e}
+const root=el('g',{});
+const world=el('g',{},root);
+const POP=[.65,.78,.95,1.06,1.02,1];
+const C=CFG.cells.map((c,i)=>{
+  const g=el('g',{},world),foc=i===CFG.focus;
+  const [nm,cx,y,w,h]=c;
+  el('rect',{x:cx-w/2,y,width:w,height:h,rx:7,fill:foc?CFG.focusBg:CFG.cellBg,stroke:foc?CFG.cyan:CFG.cellLine,'stroke-width':foc?1.6:1},g);
+  el('text',{x:cx,y:y+21,'font-size':13,'font-weight':900,fill:CFG.white,'text-anchor':'middle'},g).textContent=nm;
+  CFG.bars.forEach((bh,k)=>el('rect',{x:cx-27+k*14.5,y:y+h-9-bh,width:9,height:bh,rx:1.8,fill:foc?CFG.cyan:CFG.barGray},g));
+  return{g,cx,cy:y+h/2,foc,t0:c[5]}
+});
+/* 放大後才出現的細節（螢幕座標） */
+const plus=el('text',{x:226,y:42,'font-size':16,'font-weight':900,fill:'#d6dde6','text-anchor':'middle'},root);plus.textContent=CFG.delta;
+const div=el('line',{x1:75,y1:59,x2:245,y2:59,stroke:'#6aa3ae','stroke-width':1},root);
+const crumb=el('g',{},root);
+el('rect',{x:-62,y:-10,width:124,height:20,rx:10,fill:'#04122a',stroke:CFG.cyan,'stroke-width':1.5},crumb);
+el('text',{x:0,y:3.8,'font-size':10.5,'font-weight':700,fill:CFG.white,'text-anchor':'middle'},crumb).textContent=CFG.crumb;
+function render(F){
+  F+=CFG.SH;
+  const k=Math.max(0,Math.min(CFG.Sc.length-1,F-CFG.zoomStart));
+  const ki=Math.floor(k),kn=Math.min(CFG.Sc.length-1,ki+1),fr=k-ki;
+  const Sc=CFG.Sc[ki]+(CFG.Sc[kn]-CFG.Sc[ki])*fr,Py=CFG.Py[ki]+(CFG.Py[kn]-CFG.Py[ki])*fr;
+  const cy=93-31*Py;
+  world.setAttribute('transform',`translate(160.5 ${cy}) scale(${Sc}) translate(-161 -93)`);
+  C.forEach(o=>{
+    const t=F-o.t0,s=t<0?0:POP[Math.min(5,Math.floor(t))];
+    o.g.setAttribute('transform',`translate(${o.cx} ${o.cy}) scale(${s}) translate(${-o.cx} ${-o.cy})`);
+    if(!o.foc){const z=seg(Sc,1.05,1.7);o.g.style.filter=z>0?`blur(${(z*3).toFixed(2)}px)`:'none';o.g.setAttribute('opacity',1-seg(Sc,1.5,2))}
+  });
+  plus.setAttribute('opacity',seg(F,49,53));
+  const dl=seg(F,47,55);div.setAttribute('x2',75+170*dl);div.setAttribute('opacity',dl>0?1:0);
+  const ct=F-59,cs=ct<0?0:[.6,.9,1.08,1.03,1][Math.min(4,Math.floor(ct))];
+  crumb.setAttribute('transform',`translate(161 111) scale(${cs})`);
+}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+document.fonts.load('900 13px "Noto Sans TC"','營收會員轉換率廣告庫存滿意度全體詳細').then(start,start);
+</script></body></html>

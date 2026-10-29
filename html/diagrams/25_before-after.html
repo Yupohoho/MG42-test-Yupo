@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D25 變化前後比較</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&family=Montserrat:wght@700;800&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#06080c}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#0b0f15}
+#wrap{position:absolute;inset:0}
+#tex{position:absolute;inset:0;background:#151b23}
+#tex::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.07) .8px,transparent 1px) 6px 6px/12px 12px}
+.pan{position:absolute;top:18px;height:90px;border-radius:10px;box-sizing:border-box;opacity:0}
+#pb{left:14px;width:134px;background:#202836;box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
+#pa{left:175px;width:135px;background:#10333d;box-shadow:inset 0 0 0 2px #6ee6f9}
+.lab{position:absolute;top:6px;left:0;right:0;text-align:center;font-size:10px;line-height:14px;font-weight:700;letter-spacing:2px}
+.num{position:absolute;top:24px;left:0;right:0;text-align:center;font:800 34px/38px Montserrat,sans-serif}
+.trk{position:absolute;top:73px;height:6px;width:100px;border-radius:3px;overflow:hidden}
+.trk i{position:absolute;left:0;top:0;bottom:0;border-radius:3px}
+#pb .lab{color:#9aa4b4}#pb .num{color:#a3adbd}#pb .trk{left:16px;background:rgba(255,255,255,.1)}#pb .trk i{background:#a3adbd}
+#pa .lab{color:#6ee6f9}#pa .num{color:#72ecf8}#pa .trk{left:15px;background:rgba(110,230,249,.16)}#pa .trk i{background:#6ee6f9}
+#chip{position:absolute;left:128px;top:4px;width:67px;height:18px;border-radius:9px;background:#6ee6f9;color:#082a33;font-size:10px;line-height:18px;font-weight:900;text-align:center;opacity:0}
+svg{position:absolute;left:0;top:0;overflow:visible}
+</style></head><body><div id="card"><div id="wrap"><div id="tex"></div>
+<div id="scene">
+<div class="pan" id="pb"><div class="lab" id="bl"></div><div class="num" id="bn"></div><div class="trk"><i id="bf"></i></div></div>
+<svg width="324" height="126"><rect id="shaft" x="150" y="61" height="2" fill="#6ee6f9"/><polygon id="head" points="160,57 168,62 160,67" fill="#6ee6f9" style="display:none"/></svg>
+<div class="pan" id="pa"><div class="lab" id="al"></div><div class="num" id="an"></div><div class="trk"><i id="af"></i></div></div>
+<div id="chip"></div>
+</div></div></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  beforeLabel:'改版前', afterLabel:'改版後',
+  beforeVal:32, afterVal:87,      // 前後數值（%）
+  chip:'提升 +55pt',
+  S:13,   // 動作起始偏移：讓動作從第 0 幀開始，做完停留到結尾後硬切重播
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const $=id=>document.getElementById(id);
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3);
+const at=(a,r,r0)=>a[cl(r-r0,0,a.length-1)];
+$('bl').textContent=CFG.beforeLabel;$('al').textContent=CFG.afterLabel;$('chip').textContent=CFG.chip;
+const FILL=[9,19,27,35,43,49,55,60,65,69,72,75,78,80,82,83,84,85,86,87];      // 實測：之後進度條長度 r37 起
+const POPA=[.55,.78,1.0,1.09,1.135,1.13,1.07,1.01,1.0];                       // 之後面板縮放 r31 起
+const POPC=[.5,.85,1.06,1.15,1.18,1.13,1.06,1.0];                             // 提示膠囊縮放 r58 起
+function render(f){
+  const r=f+CFG.S;
+  // 之前面板
+  const pb=$('pb'),e=eo(seg(r,13,23));
+  pb.style.opacity=e;pb.style.transform='scale('+(.94+.06*e)+')';pb.style.filter='blur('+(2*(1-e))+'px)';
+  const bv=CFG.beforeVal*eo(seg(r,19,28));
+  $('bn').textContent=CFG.beforeVal+'%';$('bf').style.width=bv+'px';
+  // 箭頭
+  const sh=$('shaft');
+  if(r<27){sh.setAttribute('width',0);$('head').style.display='none'}
+  else if(r<31){sh.setAttribute('width',[4,7,9,11][r-27]);$('head').style.display='none'}
+  else{sh.setAttribute('width',10);$('head').style.display='block'}
+  // 之後面板
+  const pa=$('pa');
+  if(r<31){pa.style.opacity=0}else{
+    pa.style.opacity=r<32?.35:r<33?.7:1;
+    pa.style.transform='scale('+at(POPA,r,31)+')';
+    const w=r<37?0:at(FILL,r,37);
+    $('af').style.width=(w/87*CFG.afterVal)+'px';
+    $('an').textContent=Math.round(w/87*CFG.afterVal)+'%';
+  }
+  // 提示膠囊
+  const c=$('chip');
+  if(r<58){c.style.opacity=0}else{c.style.opacity=r<59?.6:1;c.style.transform='scale('+at(POPC,r,58)+')'}
+}
+function start(){const T=q.get('t');if(T!==null){render(Math.floor(+T*30+1e-6)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(Math.floor((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+Promise.all([document.fonts.load('900 20px "Noto Sans TC"','改版前後提升+55pt'),document.fonts.load('800 34px Montserrat','0123456789%')]).then(start,start);
+</script></body></html>

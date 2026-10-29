@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D26 A/B比較卡片</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#06080c}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#0b0f15}
+#wrap{position:absolute;inset:0}
+#tex{position:absolute;inset:0;background:#151b23}
+#tex::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.07) .8px,transparent 1px) 6px 6px/12px 12px}
+.pan{position:absolute;top:9px;height:105px;border-radius:10px;box-sizing:border-box;opacity:0}
+#pA{left:14px;width:140px;background:#202836;box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
+#pB{left:169px;width:139px;background:#10333d;box-shadow:inset 0 0 0 2px #6ee6f9}
+.tt{position:absolute;left:24px;top:8px;font-size:15px;line-height:18px;font-weight:900;opacity:0}
+#pA .tt{color:#f1f4f9}#pB .tt{color:#6ee6f9}
+.rw{position:absolute;left:18px;font-size:11px;line-height:14px;font-weight:700;opacity:0}
+#pA .rw{color:#e6eaf2}#pB .rw{color:#e6eaf2}
+.hl{position:absolute;left:18px;right:16px;height:1px;background:rgba(255,255,255,.07);opacity:0}
+#badge{position:absolute;left:246px;top:3px;width:68px;height:17px;border-radius:9px;background:#6ee6f9;color:#082a33;font-size:10px;line-height:17px;font-weight:900;text-align:center;opacity:0}
+svg{position:absolute;left:0;top:0;overflow:visible}
+path,line{fill:none;stroke-linecap:round;stroke-linejoin:round}
+</style></head><body><div id="card"><div id="wrap"><div id="tex"></div>
+<div id="scene">
+<div class="pan" id="pA"></div><div class="pan" id="pB"></div><div id="badge"></div>
+</div></div></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  titleA:'A案', titleB:'B案',
+  rows:['價格','速度','支援'],
+  markA:['ok','no','ok'],        // A 案各項：ok＝勾、no＝叉
+  markB:['ok','ok','ok'],
+  badge:'推薦',
+  S:16,   // 動作起始偏移：讓動作從第 0 幀開始，做完停留到結尾後硬切重播
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const $=id=>document.getElementById(id);
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3);
+const at=(a,r,r0)=>a[cl(r-r0,0,a.length-1)];
+const SVGNS='http://www.w3.org/2000/svg';
+// 每列時序（r 幀）：d＝標籤淡入、s＝符號開始畫、l＝畫幾幀（實測）
+const TA=[{d:28,s:31,l:8},{d:35,s:37,l:6},{d:42,s:45,l:6}];
+const TB=[{d:32,s:34,l:8},{d:39,s:41,l:8},{d:45,s:47,l:8}];
+const POPB=[.45,.65,.9,1.05,1.11,1.115,1.08,1.036,1.007,1.0];                 // B 面板縮放 r23 起
+const POPG=[.15,.43,.76,.99,1.13,1.13,1.13,1.07,1.01,1.0];                    // 推薦徽章縮放 r57 起
+const RY=[42,65,88];
+function build(id,title,marks,T,cyan){
+  const p=$(id);const tt=document.createElement('div');tt.className='tt';tt.textContent=title;p.appendChild(tt);
+  const svg=document.createElementNS(SVGNS,'svg');p.appendChild(svg);
+  const o={tt,rows:[]};
+  CFG.rows.forEach((name,i)=>{
+    const rw=document.createElement('div');rw.className='rw';rw.textContent=name;rw.style.top=(RY[i]-7)+'px';p.appendChild(rw);
+    const hl=document.createElement('div');hl.className='hl';hl.style.top=(RY[i]+12)+'px';p.appendChild(hl);
+    const okm=marks[i]==='ok';const cx=cyan?108:109,cy=RY[i]-6;let a,b=null,len;
+    if(okm){a=document.createElementNS(SVGNS,'path');a.setAttribute('d','M'+cx+' '+(cy+5.5)+' L'+(cx+5)+' '+(cy+11)+' L'+(cx+(cyan?14:15))+' '+cy);a.setAttribute('stroke','#6ee6f9');a.setAttribute('stroke-width','2.2');len=23}
+    else{a=document.createElementNS(SVGNS,'path');a.setAttribute('d','M'+(cx+1)+' '+(cy+1)+' L'+(cx+11)+' '+(cy+11));b=document.createElementNS(SVGNS,'path');b.setAttribute('d','M'+(cx+11)+' '+(cy+1)+' L'+(cx+1)+' '+(cy+11));
+      [a,b].forEach(x=>{x.setAttribute('stroke','#98a3b5');x.setAttribute('stroke-width','2.2')});len=15}
+    [a,b].forEach(x=>{if(x){x.setAttribute('stroke-dasharray',len+' '+len);x.setAttribute('stroke-dashoffset',len);svg.appendChild(x)}});
+    o.rows.push({rw,hl,a,b,len,okm,t:T[i]});
+  });
+  return o;
+}
+const A=build('pA',CFG.titleA,CFG.markA,TA,false),B=build('pB',CFG.titleB,CFG.markB,TB,true);
+$('badge').textContent=CFG.badge;
+function upd(o,r){
+  o.rows.forEach(w=>{const t=w.t;const lo=r<t.d?0:r<t.s?.38:1;w.rw.style.opacity=lo;w.hl.style.opacity=lo?1:0;
+    const p=seg(r,t.s,t.s+t.l);
+    if(w.okm)w.a.setAttribute('stroke-dashoffset',w.len*(1-p));
+    else{w.a.setAttribute('stroke-dashoffset',w.len*(1-seg(p,0,.5)));w.b.setAttribute('stroke-dashoffset',w.len*(1-seg(p,.5,1)))}});
+}
+function render(f){
+  const r=f+CFG.S;
+  const pA=$('pA'),eA=eo(seg(r,16,21));
+  pA.style.opacity=eA;pA.style.transform='scale('+(.5+.5*eA)+')';pA.style.filter='blur('+(2*(1-eA))+'px)';
+  A.tt.style.opacity=seg(r,16,22);
+  const pB=$('pB');
+  if(r<23)pB.style.opacity=0;else{pB.style.opacity=r<24?.4:1;pB.style.transform='scale('+at(POPB,r,23)+')'}
+  B.tt.style.opacity=seg(r,24,28);
+  upd(A,r);upd(B,r);
+  const g=$('badge');
+  if(r<57)g.style.opacity=0;else{g.style.opacity=1;g.style.transform='scale('+at(POPG,r,57)+')'}
+}
+function start(){const T=q.get('t');if(T!==null){render(Math.floor(+T*30+1e-6)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(Math.floor((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+document.fonts.load('900 20px "Noto Sans TC"','A案B案價格速度支援推薦').then(start,start);
+</script></body></html>

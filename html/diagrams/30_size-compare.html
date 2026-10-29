@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D30 大小比較</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#06080c}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#0b0f15}
+#wrap{position:absolute;inset:0}
+#tex{position:absolute;inset:0;background:#151b23}
+#tex::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.07) .8px,transparent 1px) 6px 6px/12px 12px}
+#base{position:absolute;left:17px;top:106px;height:1px;width:293px;background:#2d3645;transform-origin:0 0;transform:scaleX(0)}
+.cir{position:absolute;border-radius:50%;text-align:center;font-family:Montserrat,sans-serif;opacity:0}
+#c1{left:61.5px;top:65.5px;width:39px;height:39px;background:#384359;color:#f3f6fb;font-weight:800;font-size:15px;line-height:39px}
+#c2{left:181.5px;top:26px;width:79px;height:79px;background:#6ee5fc;color:#0a2630;font-weight:900;font-size:24px;line-height:79px}
+.cl{position:absolute;top:109px;width:60px;margin-left:-30px;text-align:center;font-size:10px;line-height:16px;font-weight:700;opacity:0}
+#l1{left:81px;color:#aab3c2}#l2{left:221px;color:#6ee6f9}
+#x4{position:absolute;left:148.5px;top:20px;width:40px;margin-left:-20px;text-align:center;font:900 20px/20px Montserrat,sans-serif;color:#6ee6f9;opacity:0}
+svg{position:absolute;left:0;top:0;overflow:visible}
+</style></head><body><div id="card"><div id="wrap"><div id="tex"></div>
+<div id="scene"><div id="base"></div>
+<div class="cir" id="c1"></div><div class="cir" id="c2"></div>
+<div class="cl" id="l1"></div><div class="cl" id="l2"></div>
+<svg width="324" height="126"><defs><clipPath id="cp"><rect id="cr" x="100" y="0" width="0" height="126"/></clipPath></defs>
+<path d="M110 68 Q148 22 176 68" stroke="#6ee6f9" stroke-width="1.6" fill="none" stroke-dasharray="3.5 3.5" stroke-linecap="round" clip-path="url(#cp)"/></svg>
+<div id="x4"></div></div></div></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  from:100, to:400,
+  labelFrom:'現在', labelTo:'目標',
+  S:12,   // 動作起始偏移：讓動作從第 0 幀開始，做完停留到結尾後硬切重播
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const $=id=>document.getElementById(id);
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3);
+const at=(a,r,r0)=>a[cl(r-r0,0,a.length-1)];
+$('c1').textContent=CFG.from;$('c2').textContent=CFG.to;$('l1').textContent=CFG.labelFrom;$('l2').textContent=CFG.labelTo;
+$('x4').textContent='×'+(CFG.to/CFG.from);
+// 實測縮放曲線（以高度／寬度換算倍率）
+const POP1=[.28,.51,.85,1.0,1.1,1.1,1.1,1.08,1.05,1.03,1.0];                       // 小圓 r17 起
+const POP2=[.25,.52,.72,.87,.96,1.04,1.06,1.076,1.076,1.05,1.04,1.01,1.0];          // 大圓 r31 起
+const POPX=[.67,.95,1.1,1.14,1.14,1.19,1.1,1.05,1.0];                                // ×4 r55 起
+function render(f){
+  const r=f+CFG.S;
+  $('base').style.transform='scaleX('+eo(seg(r,12,22))+')';
+  const c1=$('c1');if(r<17)c1.style.opacity=0;else{c1.style.opacity=1;c1.style.transform='scale('+at(POP1,r,17)+')';c1.style.color='rgba(243,246,251,'+seg(r,19,22)+')'}
+  const c2=$('c2');if(r<40)c2.style.opacity=0;else{c2.style.opacity=1;c2.style.transform='scale('+at(POP2,r,40)+')';c2.style.color='rgba(10,38,48,'+seg(r,42,45)+')'}
+  $('l1').style.opacity=seg(r,19,22);$('l2').style.opacity=seg(r,42,45);
+  $('cr').setAttribute('width',r<31?0:Math.max(0,Math.min(80,26+8*(r-31))));
+  const x=$('x4');if(r<38)x.style.opacity=0;else{x.style.opacity=1;x.style.transform='scale('+at(POPX,r,38)+')'}
+}
+function start(){const T=q.get('t');if(T!==null){render(Math.floor(+T*30+1e-6)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(Math.floor((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+Promise.all([document.fonts.load('700 10px "Noto Sans TC"','現在目標'),document.fonts.load('900 24px Montserrat','0123456789×')]).then(start,start);
+</script></body></html>

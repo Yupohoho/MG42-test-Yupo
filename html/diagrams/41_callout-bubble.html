@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D41 氣泡說明（吹き出し解説）</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@700;900&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f15}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#151b23;box-shadow:inset 0 0 0 1px #1d242e}
+#card::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(150,170,200,.10) 1px,transparent 1.3px) 4px 4px/12px 12px}
+svg{position:absolute;left:0;top:0;width:324px;height:126px}
+text{font-family:'Noto Sans TC',sans-serif}
+.mono{font-family:'Roboto Mono',monospace}
+</style></head><body><div id="card"><svg id="s" viewBox="0 0 324 126" xmlns="http://www.w3.org/2000/svg">
+<g id="content"></g>
+</svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  bubble:'這裡成長了！',            // 氣泡文字
+  barH:[26,34,30,44,78,49],         // 6 根長條最終高度（第 5 根為青色重點）
+  hi:4,                              // 重點長條索引
+  grey:'#3a485c', cyan:'#6fe6f9', bubbleBg:'#f2f3f8', text:'#1b2230'
+};
+const FONT_TEXT=CFG.bubble;
+/* ================ */
+const LOOP=120;                      // LOOP=120 幀（4 秒）：動作→停留→硬切回第 0 幀重播
+const q=new URLSearchParams(location.search);
+const $=id=>document.getElementById(id);
+const Z=+q.get('z')||1;if(Z!=1)$('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3),eo2=x=>1-(1-x)*(1-x),ei=x=>x*x*x,eio=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const tb=(a,x,x0)=>{const k=x-x0;if(k<=0)return a[0];if(k>=a.length-1)return a[a.length-1];const i=Math.floor(k);return a[i]+(a[i+1]-a[i])*(k-i)};
+const NS='http://www.w3.org/2000/svg',CY='#6fe6f9',CONTENT=$('content');
+const mk=(tag,at,par,txt)=>{const e=document.createElementNS(NS,tag);for(const k in at)e.setAttribute(k,at[k]);if(txt!=null)e.textContent=txt;(par||CONTENT).appendChild(e);return e};
+const xf=(el,tx,ty,s,cx,cy)=>el.setAttribute('transform','translate('+(tx+cx)+' '+(ty+cy)+') scale('+s+') translate('+(-cx)+' '+(-cy)+')');
+const op=(el,v)=>el.setAttribute('opacity',v);
+let bars=[],ring,bub,tail,body,btxt,BW;
+// 各長條「成長曲線」（量測值，索引 0 = 起始幀 s，單位 px）
+const BAR=[
+ {s:2,a:[0,6,10,14,17,20,22,24,25,26]},
+ {s:4,a:[0,4,11,16,21,24,27,30,32,33,34]},
+ {s:6,a:[0,1,7,12,17,20,23,26,27,29,29,30]},
+ {s:9,a:[0,7,15,22,27,32,36,38,40,42,43,43,44]},
+ {s:13,a:[0,36,46,54,62,68,72,75,77,78]},
+ {s:14,a:[0,10,19,26,32,37,41,44,46,47,48,49]}
+];
+const CX=[87,126,165,204,242.5,280];
+const RING=[10,10,10,10,10,9,8.5,8,7,6.5,6,5.5,5,5,5,5,5,5,6,6.5,7,8,9,9.5,10]; // 圓環脈動（週期 24 幀）
+const BOFF=[33,15,3,-4,-7,-7,-6,-3,-1,0];                                       // 氣泡由右滑入（含回彈）
+function init(){
+  mk('line',{x1:70,y1:113.5,x2:308,y2:113.5,stroke:'#313a48','stroke-width':1.5});
+  const defs=mk('defs',{});mk('clipPath',{id:'cb'},defs);mk('rect',{x:0,y:0,width:324,height:112},defs.lastChild);
+  const g=mk('g',{'clip-path':'url(#cb)'});
+  CX.forEach((cx,i)=>bars.push(mk('rect',{x:cx-10.75,width:21.5,rx:4,fill:i==CFG.hi?CFG.cyan:CFG.grey},g)));
+  ring=mk('circle',{cx:242.5,cy:24,fill:'none',stroke:CFG.cyan,'stroke-width':2.4});
+  bub=mk('g',{});
+  tail=mk('path',{fill:CFG.bubbleBg},bub);
+  body=mk('rect',{x:16,y:12,height:39,rx:11,fill:CFG.bubbleBg},bub);
+  btxt=mk('text',{'font-size':17,'font-weight':900,'text-anchor':'middle',fill:CFG.text},bub,CFG.bubble);
+  BW=Math.max(120,Math.round(btxt.getComputedTextLength())+52);
+  body.setAttribute('width',BW);btxt.setAttribute('x',16+BW/2);btxt.setAttribute('y',37.5);
+  tail.setAttribute('d','M'+(16+BW-46)+' 50L'+(16+BW-12)+' 50L231 63Z');
+}
+function draw(u){
+  bars.forEach((b,i)=>{const h=Math.max(0,tb(BAR[i].a,u,BAR[i].s))*CFG.barH[i]/BAR[i].a[BAR[i].a.length-1];
+    if(u<0)b.setAttribute('height',0);else{b.setAttribute('y',112-h);b.setAttribute('height',h>0.2?h+8:0)}});
+  const on=u>=26;
+  op(ring,on?1:0);if(on){const p=(((u-26)%24)+24)%24;ring.setAttribute('r',tb(RING,p,0))}
+  op(bub,on?1:0);if(on)bub.setAttribute('transform','translate('+tb(BOFF,u,26)+' 0)');
+}
+function frame(r){draw(r,r)}
+function start(){
+  init();
+  const T=q.get('t');if(T!==null){frame((+T*30)%LOOP);return}
+  const t0=performance.now();(function tick(){frame(((performance.now()-t0)/1000*30)%LOOP);requestAnimationFrame(tick)})();
+}
+document.fonts.load('900 16px "Noto Sans TC"',FONT_TEXT).then(()=>document.fonts.load('700 16px "Noto Sans TC"',FONT_TEXT)).then(()=>document.fonts.load('700 10px "Roboto Mono"','POINT+%NGOK')).then(start,start);
+</script></body></html>

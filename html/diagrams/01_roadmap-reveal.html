@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D01 路線圖顯示</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@700;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f15}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#151b23;box-shadow:inset 0 0 0 1px #1d2530}
+#card::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.05) 1px,transparent 1.2px) 0 0/12px 12px}
+svg{position:absolute;left:0;top:0}
+text{font-family:'Noto Sans TC',sans-serif;text-anchor:middle}
+</style></head><body><div id="card"><svg id="s" width="324" height="126" viewBox="0 0 324 126"></svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  labels:[['Q1','設計'],['Q2','開發'],['Q3','驗證'],['Q4','上線']], // 四個里程碑文字
+  nodes:[[45,59,1],[122,67,-1],[202,70,1],[283,51,-1]],             // x,y,標籤在下(1)或上(-1)
+  ringStart:[20,29,38,47],   // 各節點出現幀（第一個在入場起點之後）
+  front:{a:13,len:37},       // 進度線前端 ease-out cubic：起點幀 / 幀數
+  flagStart:55,
+  SH:12,                     // 幀偏移：render(0) 對應動作內部第 12 幀（動作從第 0 幀附近起跑）
+  cyan:'#76e9f5', track:'#2b333f', white:'#f1f4f9', dark:'#09111f',
+  LOOP:120
+};
+/* 路徑中心線取樣點（量自參考） */
+const PT=[[20,64],[27,62.5],[33,61.5],[39,59.5],[45,59],[51,54],[57,50],[63,49],[69,49],[75,49],[81,50],[87,51.5],[93,54],[99,56.5],[105,59.5],[111,62.5],[117,65.5],[123,68.5],[129,71.5],[135,74],[141,76.5],[147,78],[153,79.5],[159,80.5],[165,80],[171,80],[177,79],[183,77],[189,75],[195,72],[201,69.5],[207,66.5],[213,63.5],[219,60.5],[225,57.5],[231,54.5],[237,52.5],[243,50.5],[249,50],[255,49],[261,49],[267,49],[273,50],[279,52],[285,54],[291,56.5],[297,59.5],[303,63],[309,64]];
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3),eio=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const NS='http://www.w3.org/2000/svg';
+const S=document.getElementById('s');
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);(p||S).appendChild(e);return e}
+/* 軌道 */
+const trackG=el('g',{});
+const dAll='M'+PT.map(p=>p.join(' ')).join('L');
+el('path',{d:dAll,fill:'none',stroke:CFG.track,'stroke-width':9,'stroke-linecap':'round','stroke-linejoin':'round'},trackG);
+const prog=el('path',{d:'',fill:'none',stroke:CFG.cyan,'stroke-width':3.5,'stroke-linecap':'round','stroke-linejoin':'round'});
+function lineTo(xf){const pts=[];for(let i=0;i<PT.length;i++){if(PT[i][0]<=xf)pts.push(PT[i]);else{if(i>0){const a=PT[i-1],b=PT[i],t=(xf-a[0])/(b[0]-a[0]);pts.push([xf,a[1]+(b[1]-a[1])*t])}break}}return pts.length>1?'M'+pts.map(p=>p[0].toFixed(1)+' '+p[1].toFixed(1)).join('L'):''}
+/* 節點 */
+const N=CFG.nodes.map((n,i)=>{
+  const g=el('g',{});
+  const ring=el('g',{},g);
+  el('circle',{cx:0,cy:0,r:8.5,fill:CFG.dark,stroke:CFG.cyan,'stroke-width':2.6},ring);
+  const lab=el('g',{},g);
+  const [qq,tt]=CFG.labels[i],d=n[2];
+  const qy=d>0?n[1]+25:n[1]-34, ty=d>0?n[1]+43:n[1]-16;
+  el('text',{x:n[0],y:qy,'font-size':8.5,'font-weight':900,'letter-spacing':1.2,fill:CFG.cyan}).textContent=qq;
+  el('text',{x:n[0],y:ty,'font-size':13.5,'font-weight':900,fill:CFG.white}).textContent=tt;
+  lab.querySelectorAll;
+  return{g,ring,lab:[...S.querySelectorAll('text')].slice(-2),n}
+});
+/* 終點旗 */
+const flag=el('g',{});
+el('rect',{x:309,y:36,width:2,height:25,fill:CFG.white},flag);
+el('path',{d:'M311 36L317.5 39.5L311 43Z',fill:CFG.cyan},flag);
+const POP=[.45,.7,.92,1,1.05,1];
+function render(F){
+  F+=CFG.SH;
+  const fr=eo(seg(F,CFG.front.a,CFG.front.a+CFG.front.len));
+  const xf=20+fr*288;
+  prog.setAttribute('d',F<CFG.front.a?'':lineTo(xf));  N.forEach((o,i)=>{
+    const t=F-CFG.ringStart[i];
+    const sc=t<0?0:POP[Math.min(5,Math.floor(t))]*(t<6?1:1);
+    o.ring.setAttribute('transform',`translate(${o.n[0]} ${o.n[1]}) scale(${sc})`);
+    const la=eo(seg(F,CFG.ringStart[i]+4,CFG.ringStart[i]+12));
+    o.lab.forEach(e=>{e.setAttribute('opacity',la);e.setAttribute('transform',`translate(0 ${(1-la)*5})`)});
+  });
+  const fp=t=>eo(seg(F,CFG.flagStart,CFG.flagStart+6));
+  flag.setAttribute('opacity',fp());flag.setAttribute('transform',`translate(0 ${(1-fp())*6})`);
+}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+document.fonts.load('900 13px "Noto Sans TC"','設計開發驗證上線Q1234').then(start,start);
+</script></body></html>

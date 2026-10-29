@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D33 長條圖動畫</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f15}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#151b23;box-shadow:inset 0 0 0 1px #1c2430}
+#card::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.05) 1px,transparent 1.2px) 0 0/12px 12px}
+#stage{position:absolute;inset:0}
+.ttl{position:absolute;left:27px;top:3px;font-size:9px;font-weight:500;color:#7d8798;line-height:12px;white-space:nowrap}
+.mon{position:absolute;top:106px;width:40px;margin-left:-20px;text-align:center;font-size:10px;font-weight:500;color:#8a93a3;line-height:14px}
+.base{position:absolute;left:27px;right:27px;top:99px;height:1px;background:#262f3c}
+.bar{position:absolute;bottom:27px;border-radius:4px 4px 0 0;transform-origin:50% 100%}
+.val{position:absolute;width:50px;margin-left:-25px;text-align:center;font-size:13px;font-weight:900;line-height:14px;transform:translateY(-50%)}
+</style></head><body><div id="card"><div id="stage"></div></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  title:'營收（萬元）',
+  labels:['1月','2月','3月','4月','5月'],
+  values:[120,180,160,260,380],
+  unitPx:0.1925,                 // 每 1 個數值對應的像素高度
+  barLeft:[32,87,142,196,251], barW:31.5, baseY:99,
+  start:[10,16,21,27,33],        // 各長條開始成長的幀
+  dur:[14,14,14,14,16],          // 成長長度（幀）
+  over:[0,.05,0,0,.05],          // 過衝比例（量到：第2根、第5根約 5%）
+  grey:[57,73,95], cyan:[110,230,253], white:[244,246,250], dim:[136,148,168],
+  S:6,   // 動作起始偏移：讓動作從第 0 幀開始，做完停留到結尾後硬切重播
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,2.4);
+const mix=(a,b,t)=>'rgb('+a.map((v,i)=>Math.round(v+(b[i]-v)*t)).join(',')+')';
+const st=document.getElementById('stage');
+const mk=(c,h)=>{const d=document.createElement('div');d.className=c;if(h!=null)d.textContent=h;st.appendChild(d);return d};
+const ttl=mk('ttl',CFG.title);mk('base');
+const bars=CFG.values.map((v,i)=>{
+  const mon=mk('mon',CFG.labels[i]);mon.style.left=(CFG.barLeft[i]+CFG.barW/2)+'px';
+  const b=mk('bar');b.style.left=CFG.barLeft[i]+'px';b.style.width=CFG.barW+'px';
+  const l=mk('val');l.style.left=(CFG.barLeft[i]+CFG.barW/2)+'px';
+  return{mon,b,l,v,i}});
+function growth(t,os){ // 0→1(+過衝)→1
+  if(os==0)return eo(t);
+  const a=eo(cl(t/.8))*(1+os);return t<.8?a:1+os*(1-seg(t,.8,1))}
+function render(f){
+  f+=CFG.S;
+  const fin=seg(f,6,10);
+  ttl.style.opacity=fin;
+  bars.forEach(o=>{
+    const i=o.i,t=seg(f,CFG.start[i],CFG.start[i]+CFG.dur[i]);
+    const g=growth(t,CFG.over[i]);
+    const h=o.v*CFG.unitPx*g;
+    const last=i==CFG.values.length-1;
+    o.mon.style.opacity=fin;
+    o.b.style.height=h+'px';o.b.style.bottom=(126-CFG.baseY)+'px';
+        if(last)o.b.style.background='rgb('+CFG.cyan+')';else o.b.style.background='rgb('+CFG.grey+')';
+    o.b.style.opacity=t>0?1:0;
+    const done=seg(t,.55,.95);
+    o.l.style.opacity=t>0?1:0;
+    o.l.textContent=Math.round(o.v*Math.min(1,g));
+    o.l.style.top=(CFG.baseY-h-10.5)+'px';
+    o.l.style.color=mix(CFG.dim,last?CFG.cyan:CFG.white,done);
+  });
+}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+document.fonts.load('900 13px "Noto Sans TC"','0123456789').then(()=>document.fonts.load('500 10px "Noto Sans TC"','營收（萬元）1234567月')).then(start,start);
+</script></body></html>

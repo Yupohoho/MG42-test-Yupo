@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D12 D12 因果關係線</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@700;900&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f15}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#151b23;box-shadow:inset 0 0 0 1px #1b2029}
+#card::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.07) .8px,transparent 1px) 0 0/12px 12px}
+#svg{position:absolute;left:0;top:0;display:block}
+</style></head><body><div id="card"><svg id="svg" width="324" height="126" viewBox="0 0 324 126"></svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  cause:'睡眠不足', effect:'專注力下降', causeTag:'原因', effectTag:'結果', because:'所以',
+  cyan:'#6fe6f8',
+  fontText:'睡眠不足專注力下降原因結果所以',
+  S:1, LOOP:120   // S：幀偏移，動作從第 0 幀附近起跑
+};
+/* ================ */
+
+const q=new URLSearchParams(location.search);
+const card=document.getElementById('card'),svg=document.getElementById('svg');
+const Z=+q.get('z')||1;if(Z!=1)card.style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const NS='http://www.w3.org/2000/svg';
+function E(tag,a,p){const e=document.createElementNS(NS,tag);for(const k in a)e.setAttribute(k,a[k]);(p||svg).appendChild(e);return e}
+const SANS='"Noto Sans TC",sans-serif',MONO='"Roboto Mono",monospace';
+function T(p,str,x,y,sz,fill,o){o=o||{};const t=E('text',{x:x,y:y,'font-size':sz,fill:fill,'text-anchor':o.a||'middle','dominant-baseline':'central','font-weight':o.w||700,'font-family':o.f||SANS},p);if(o.ls)t.setAttribute('letter-spacing',o.ls);t.textContent=str;return t}
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+const eo=x=>1-Math.pow(1-cl(x),3);
+const POP=[.45,.78,.98,1.09,1.12,1.10,1.05,1.02,1.0];
+const pv=(arr,k)=>k<0?0:(k>=arr.length?1:arr[k]);
+function setT(g,cx,cy,sx,sy,dx,dy){g.setAttribute('transform','translate('+(cx+(dx||0))+' '+(cy+(dy||0))+') scale('+sx+' '+sy+') translate('+(-cx)+' '+(-cy)+')')}
+function show(e,v){e.style.display=v?'':'none'}
+const CY=CFG.cyan,BG='#151b23',PANEL='#0b0f15';
+const gC=E('g');
+const SC=scene();
+function render(f){
+  SC.draw(f+CFG.S);
+}
+function start(){
+  const T0=q.get('t');
+  if(T0!==null){render(Math.floor(+T0*30+1e-6)%CFG.LOOP);return}
+  const t0=performance.now();
+  (function tick(){render(Math.floor((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})();
+}
+const FONTTXT=CFG.fontText||'';
+Promise.all([document.fonts.load('700 14px "Noto Sans TC"',FONTTXT),document.fonts.load('900 14px "Noto Sans TC"',FONTTXT),document.fonts.load('500 8px "Roboto Mono"','0123456789YESNO')]).then(start,start);
+
+
+function scene(){
+  const g=gC;
+  const W=[.64,.86,1.0,1.1,1.1,1.07,1.04,1.02,1.0],H=[.67,.87,1.0,1.11,1.13,1.1,1.06,1.02,1.0];
+  const cb=E('g',{},g);
+  E('rect',{x:16,y:24.5,width:115,height:73.5,rx:8,fill:'#1d2632',stroke:'#8f98a5','stroke-width':1.8},cb);
+  T(cb,CFG.cause,73.5,62,17,'#f2f5f9',{w:900});
+  E('path',{d:'M15.5 34.5 V27.5 Q15.5 22.5 20.5 22.5 H48 Q52 22.5 52 26.5 V34.5 Z',fill:'#9da6b3'},cb);
+  T(cb,CFG.causeTag,33.8,28.6,8,'#10161d',{w:900});
+  const dash=E('line',{x1:137,x2:137,y1:61,y2:61,stroke:CY,'stroke-width':2.4,'stroke-dasharray':'4.5 3'},g);
+  const head=E('polygon',{points:'0,0 -7,-4.2 -7,4.2',fill:CY},g);
+  const bec=T(g,CFG.because,161.5,46,9,'#aeb8c4',{w:700});
+  const rb=E('g',{},g);
+  E('rect',{x:192.5,y:24.5,width:116.5,height:73.5,rx:8,fill:'#1a3a43',stroke:CY,'stroke-width':2},rb);
+  T(rb,CFG.effect,251,62,15,'#f2f5f9',{w:900});
+  E('path',{d:'M192 34.5 V27.5 Q192 22.5 197 22.5 H225 Q229 22.5 229 26.5 V34.5 Z',fill:CY},rb);
+  T(rb,CFG.effectTag,210.5,28.6,8,'#0b1f2a',{w:900});
+  const ring=E('circle',{cx:250.5,cy:61,r:43,fill:'none',stroke:'rgba(255,255,255,.5)','stroke-width':1.5},g);
+  const dP={12:.12,13:.22,14:.4,15:.44,16:.64,17:.68,18:.7,19:.82,20:.88,21:.92,22:.94,23:.96,24:.98};
+  return{draw(s){
+    {const k=s-2;if(k>=0){setT(cb,73.5,61,pv(W,k),pv(H,k));cb.style.opacity=cl(.5+.25*k)}show(cb,k>=0)}
+    {const p=s<12?0:(s>=25?1:dP[s]);show(dash,p>0);show(head,p>=.8);const xe=137+50*p;dash.setAttribute('x2',xe-(p>=.8?5:0));head.setAttribute('transform','translate('+(xe+2)+' 61)');
+     bec.style.opacity=cl((s-16)/4)}
+    {const k=s-26;show(rb,k>=0);if(k>=0){setT(rb,250.5,61,pv(W,k),pv(H,k));rb.style.opacity=cl(.5+.25*k)}}
+    {const k=s-36;show(ring,k>=0&&k<6);if(k>=0&&k<6){ring.setAttribute('r',[43,48,52,56,61,63][k]);ring.style.opacity=1-k*.1}}
+  }}
+}
+
+</script></body></html>

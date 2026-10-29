@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D19 マトリクス整理</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f15}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#0b0f15}
+#stage{position:absolute;inset:0;background:#151b23}
+#stage::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.07) .8px,transparent 1.1px) 0 -2px/10.667px 10.667px}
+#svg{position:absolute;left:0;top:0}
+text{font-family:'Noto Sans TC',sans-serif}
+</style></head><body><div id="card"><div id="stage"><svg id="svg" width="324" height="126" viewBox="0 0 324 126"></svg></div></div>
+<script>
+/* ================ 共用框架（掃光入場／角框＋中心點／掃光退場），各張共通 ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3),eo2=x=>1-Math.pow(1-x,2),ei=x=>x*x*x,eio=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const lerp=(a,b,t)=>a+(b-a)*t;
+function tab(arr,p){const i=Math.floor(p),j=Math.min(arr.length-1,i+1),a=arr[cl(i,0,arr.length-1)];return a+(arr[j]-a)*(p-i)}
+const NS='http://www.w3.org/2000/svg';
+const SVG=document.getElementById('svg');
+function el(tag,attrs,parent){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);(parent||SVG).appendChild(e);return e}
+const CYAN='#6ee7f9';
+const gC=el('g',{},SVG);
+/* 動作從第 0 幀起；SH＝動作第一個可見幀的內部 p 值；做完後停留到 LOOP 結束，硬切重播 */
+const SH=17;
+function render(f){
+  f=Math.floor(f+1e-6)%CFG.LOOP;
+  draw(Math.min(f+SH,84),f);
+}
+/* ===== CFG：D19 矩陣整理（用兩個軸分成四類）===== */
+const CFG={
+  LOOP:120,                                   // 一輪幀數（30fps）
+  axisX:'緊急度 →',axisY:'重要度 →',
+  cells:[['規劃',0,0],['立即做',1,0],['捨棄',0,1],['委派',1,1]], // [文字, 欄(0左1右), 列(0上1下)]
+  start:{'捨棄':26,'規劃':32,'立即做':38,'委派':44.2}, // 各格開始彈出的幀
+  hot:'立即做',hotFillFrame:55,                // 重點格：先只有青色外框，到這一幀整格填青
+  col:{axis:'#8b95a5',label:'#8a93a2',box:'#202836',boxLine:'#2b303d',cyan:'#6ee6fb',text:'#f1f4f8',hotText:'#0e1c26'},
+  fontChars:'緊急度重要規劃立即做捨棄委派→'
+};
+const C=CFG.col;
+const XA=[.12,.327,.5,.64,.75,.84,.9,.946,.977,.99,1],YA=[0,.234,.42,.58,.7,.8,.88,.93,.96,.985,1]; // 軸線畫出比例（逐幀量測）
+const S_BOX=[.27,.62,.875,.996,1.024,1.024,1.024,1.024,1.013,1.004,1.0];                        // 方格彈出倍率（由面積量測）
+const g0=el('g',{},gC);
+const ax=el('line',{x1:43.5,y1:109.5,y2:109.5,stroke:C.axis,'stroke-width':1.6},g0),ay=el('line',{x1:43.5,x2:43.5,y1:109.5,stroke:C.axis,'stroke-width':1.6},g0);
+const ah1=el('path',{fill:'none',stroke:C.axis,'stroke-width':1.6,'stroke-linecap':'round','stroke-linejoin':'round'},g0),ah2=el('path',{fill:'none',stroke:C.axis,'stroke-width':1.6,'stroke-linecap':'round','stroke-linejoin':'round'},g0);
+const lx=el('text',{x:171,y:122,'text-anchor':'middle','font-size':9.5,'font-weight':700,fill:C.label},g0);lx.textContent=CFG.axisX;
+const ly=el('text',{x:0,y:0,'text-anchor':'middle','font-size':9.5,'font-weight':700,fill:C.label,transform:'translate(19.5 50) rotate(-90)'},g0);ly.textContent=CFG.axisY;
+const boxes=CFG.cells.map(c=>{const g=el('g',{},gC),cx=108.1+c[1]*129.3,cy=29.6+c[2]*53.3;
+  const r=el('rect',{x:-52,y:-20,width:104,height:40,rx:8,fill:C.box,stroke:C.boxLine,'stroke-width':1},g);
+  const t=el('text',{x:0,y:5.3,'text-anchor':'middle','font-size':15,'font-weight':700,fill:C.text},g);t.textContent=c[0];
+  return{g,r,t,cx,cy,name:c[0]}});
+function draw(p,f){
+  const xf=p<17?0:tab(XA,p-17),yf=p<18?0:tab(YA,p-18);
+  const xe=43.5+258.5*xf,ye=109.5-106.5*yf;
+  ax.style.display=xf<=0?'none':'';ax.setAttribute('x2',xe);
+  ay.style.display=yf<=0?'none':'';ay.setAttribute('y2',ye);
+  ah1.setAttribute('d','M'+(xe-5)+' 105L'+xe+' 109.5L'+(xe-5)+' 114');ah1.style.display=xf<=0?'none':'';
+  ah2.setAttribute('d','M39 '+(ye+5)+'L43.5 '+ye+'L48 '+(ye+5));ah2.style.display=yf<=0?'none':'';
+  const a=seg(p,24,30);lx.style.opacity=a;ly.style.opacity=a;
+  boxes.forEach(b=>{const t=p-CFG.start[b.name];
+    const s=t<0?0:tab(S_BOX,t);b.g.setAttribute('transform','translate('+b.cx+' '+b.cy+') scale('+s+')');b.g.style.display=s<=.01?'none':'';
+    const hot=b.name===CFG.hot,filled=hot&&p>=CFG.hotFillFrame;
+    b.r.setAttribute('fill',filled?C.cyan:C.box);
+    b.r.setAttribute('stroke',hot&&!filled?C.cyan:(filled?C.cyan:C.boxLine));b.r.setAttribute('stroke-width',hot&&!filled?1.6:1);
+    b.t.setAttribute('fill',filled?C.hotText:C.text)});
+}
+
+function start(){const T=q.get('t');if(T!==null){render(+T*30);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+document.fonts.load('700 14px "Noto Sans TC"',CFG.fontChars||'').then(()=>document.fonts.load('900 14px "Noto Sans TC"',CFG.fontChars||'')).then(start,start);
+</script></body></html>

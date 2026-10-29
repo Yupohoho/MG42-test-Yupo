@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D43 標記強調（マーカー強調）</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@700;900&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f15}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#151b23;box-shadow:inset 0 0 0 1px #1d242e}
+#card::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(150,170,200,.10) 1px,transparent 1.3px) 4px 4px/12px 12px}
+svg{position:absolute;left:0;top:0;width:324px;height:126px}
+text{font-family:'Noto Sans TC',sans-serif}
+.mono{font-family:'Roboto Mono',monospace}
+</style></head><body><div id="card"><svg id="s" viewBox="0 0 324 126" xmlns="http://www.w3.org/2000/svg">
+<g id="content"></g>
+</svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  pre:'營收成長', hl:'3倍', post:'了',   // 主句（hl 是被螢光筆標記的詞）
+  sub:'重點在於持續',                      // 副句（底下畫波浪線）
+  cyan:'#6fe6f9', white:'#f4f6fb', dark:'#0b1520', subColor:'#aab3c3'
+};
+const FONT_TEXT=CFG.pre+CFG.hl+CFG.post+CFG.sub;
+/* ================ */
+const LOOP=120;                      // LOOP=120 幀（4 秒）：動作→停留→硬切回第 0 幀重播
+const q=new URLSearchParams(location.search);
+const $=id=>document.getElementById(id);
+const Z=+q.get('z')||1;if(Z!=1)$('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3),eo2=x=>1-(1-x)*(1-x),ei=x=>x*x*x,eio=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const tb=(a,x,x0)=>{const k=x-x0;if(k<=0)return a[0];if(k>=a.length-1)return a[a.length-1];const i=Math.floor(k);return a[i]+(a[i+1]-a[i])*(k-i)};
+const NS='http://www.w3.org/2000/svg',CY='#6fe6f9',CONTENT=$('content');
+const mk=(tag,at,par,txt)=>{const e=document.createElementNS(NS,tag);for(const k in at)e.setAttribute(k,at[k]);if(txt!=null)e.textContent=txt;(par||CONTENT).appendChild(e);return e};
+const xf=(el,tx,ty,s,cx,cy)=>el.setAttribute('transform','translate('+(tx+cx)+' '+(ty+cy)+') scale('+s+') translate('+(-cx)+' '+(-cy)+')');
+const op=(el,v)=>el.setAttribute('opacity',v);
+let pre,hlt,hlt2,post,sub,hl,hcr,wcr,wave,SX0,SX1;
+const HLR=[166,170,173,177,183,191,202,211,218,223,226,227,229];           // 螢光筆右緣 x（量測，r16 起）
+const WVR=[105,133,155,169,186,194,207,213,223,227,231,233,235];           // 波浪線右緣 x（量測，r33 起）
+function init(){
+  const defs=mk('defs',{});
+  const c1=mk('clipPath',{id:'hc'},defs);hcr=mk('rect',{x:175.5,y:24,width:0,height:35},c1);
+  const c2=mk('clipPath',{id:'wc'},defs);wcr=mk('rect',{x:0,y:90,width:0,height:30},c2);
+  hl=mk('rect',{x:175.5,y:24,width:0,height:35,rx:5,fill:CFG.cyan});
+  const f={'font-size':30,'font-weight':900,y:53.5};
+  pre=mk('text',Object.assign({x:168,'text-anchor':'end',fill:CFG.white},f),null,CFG.pre);
+  hlt=mk('text',Object.assign({x:207,'text-anchor':'middle',fill:CFG.white},f),null,CFG.hl);
+  hlt2=mk('text',Object.assign({x:207,'text-anchor':'middle',fill:CFG.dark,'clip-path':'url(#hc)'},f),null,CFG.hl);
+  post=mk('text',Object.assign({x:245.5,fill:CFG.white},f),null,CFG.post);
+  sub=mk('text',{x:162,y:90,'text-anchor':'middle','font-size':19,'font-weight':700,fill:CFG.subColor},null,CFG.sub);
+  const w=sub.getComputedTextLength();SX0=162-w/2;SX1=162+w/2;
+  let d='';for(let x=SX0;x<=SX1+.01;x+=1){d+=(x==SX0?'M':'L')+x.toFixed(1)+' '+(104+2.4*Math.sin((x-SX0)/24*2*Math.PI)).toFixed(2)}
+  wave=mk('path',{d,fill:'none',stroke:CFG.cyan,'stroke-width':2.2,'stroke-linecap':'round','clip-path':'url(#wc)'});
+}
+function draw(u){
+  // 「3倍」一開始就在底圖；前後文字淡入
+  const a=eo(seg(u,3.5,8.5));op(pre,a);op(post,a);
+  const e=u>=16?tb(HLR,u,16):166;const w=u>=16?e-166:0;
+  // 動態留白：文字先以緊湊字距出現，螢光筆畫出時（進度 w/63）才把前後文字推開到最終間距
+  const kk=eo(Math.min(1,w/63)),cx=207.5-.5*kk;
+  pre.setAttribute('x',178-9.5*kk);post.setAttribute('x',236+9.5*kk);
+  hlt.setAttribute('x',cx);hlt2.setAttribute('x',cx);hl.setAttribute('x',cx-31.5);hcr.setAttribute('x',cx-31.5);
+  hl.setAttribute('width',w);hcr.setAttribute('width',w);
+  op(sub,eo(seg(u,27,31)));
+  const we=u>=33?tb(WVR,u,33):93;const k=(we-93)/(235-93);wcr.setAttribute('width',u>=33?SX0+(SX1-SX0)*k:0);
+}
+function frame(r){draw(r,r)}
+function start(){
+  init();
+  const T=q.get('t');if(T!==null){frame((+T*30)%LOOP);return}
+  const t0=performance.now();(function tick(){frame(((performance.now()-t0)/1000*30)%LOOP);requestAnimationFrame(tick)})();
+}
+document.fonts.load('900 16px "Noto Sans TC"',FONT_TEXT).then(()=>document.fonts.load('700 16px "Noto Sans TC"',FONT_TEXT)).then(()=>document.fonts.load('700 10px "Roboto Mono"','POINT+%NGOK')).then(start,start);
+</script></body></html>

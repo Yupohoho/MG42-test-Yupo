@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D10 D10 三步驟解說</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@700;900&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f15}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#151b23;box-shadow:inset 0 0 0 1px #1b2029}
+#card::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.07) .8px,transparent 1px) 0 0/12px 12px}
+#svg{position:absolute;left:0;top:0;display:block}
+</style></head><body><div id="card"><svg id="svg" width="324" height="126" viewBox="0 0 324 126"></svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  titles:['註冊','設定','完成'],
+  subs:['1 分鐘','一鍵完成','立即可用'],
+  stepLabel:'STEP',
+  cyan:'#6fe6f8',
+  fontText:'註冊設定完成分鐘一鍵立即可用123',
+  S:0, LOOP:120   // S：幀偏移，動作從第 0 幀附近起跑
+};
+/* ================ */
+
+const q=new URLSearchParams(location.search);
+const card=document.getElementById('card'),svg=document.getElementById('svg');
+const Z=+q.get('z')||1;if(Z!=1)card.style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const NS='http://www.w3.org/2000/svg';
+function E(tag,a,p){const e=document.createElementNS(NS,tag);for(const k in a)e.setAttribute(k,a[k]);(p||svg).appendChild(e);return e}
+const SANS='"Noto Sans TC",sans-serif',MONO='"Roboto Mono",monospace';
+function T(p,str,x,y,sz,fill,o){o=o||{};const t=E('text',{x:x,y:y,'font-size':sz,fill:fill,'text-anchor':o.a||'middle','dominant-baseline':'central','font-weight':o.w||700,'font-family':o.f||SANS},p);if(o.ls)t.setAttribute('letter-spacing',o.ls);t.textContent=str;return t}
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+const eo=x=>1-Math.pow(1-cl(x),3);
+const POP=[.45,.78,.98,1.09,1.12,1.10,1.05,1.02,1.0];
+const pv=(arr,k)=>k<0?0:(k>=arr.length?1:arr[k]);
+function setT(g,cx,cy,sx,sy,dx,dy){g.setAttribute('transform','translate('+(cx+(dx||0))+' '+(cy+(dy||0))+') scale('+sx+' '+sy+') translate('+(-cx)+' '+(-cy)+')')}
+function show(e,v){e.style.display=v?'':'none'}
+const CY=CFG.cyan,BG='#151b23',PANEL='#0b0f15';
+const gC=E('g');
+const SC=scene();
+function render(f){
+  SC.draw(f+CFG.S);
+}
+function start(){
+  const T0=q.get('t');
+  if(T0!==null){render(Math.floor(+T0*30+1e-6)%CFG.LOOP);return}
+  const t0=performance.now();
+  (function tick(){render(Math.floor((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})();
+}
+const FONTTXT=CFG.fontText||'';
+Promise.all([document.fonts.load('700 14px "Noto Sans TC"',FONTTXT),document.fonts.load('900 14px "Noto Sans TC"',FONTTXT),document.fonts.load('500 8px "Roboto Mono"','0123456789YESNO')]).then(start,start);
+
+
+function scene(){
+  const CX=[57,163.5,267],CYY=47.5,starts=[1,15,29],titS=[5,18,32],subS=[8,21,34];
+  const mkTrack=p=>E('line',{x1:57,x2:267,y1:CYY,y2:CYY,stroke:'#262d38','stroke-width':3,'stroke-linecap':'round'},p);
+  const g=gC;mkTrack(g);
+  const L1=E('line',{x1:77,x2:77,y1:CYY,y2:CYY,stroke:CY,'stroke-width':3},g);
+  const L2=E('line',{x1:184,x2:184,y1:CYY,y2:CYY,stroke:CY,'stroke-width':3},g);
+  const stepT=T(g,CFG.stepLabel,24,13.5,8,'#58c7d3',{a:'start',f:MONO,w:700,ls:.6});
+  const cs=[];
+  for(let i=0;i<3;i++){
+    const gg=E('g',{},g);
+    const halo=E('circle',{cx:CX[i],cy:CYY,r:23.5,fill:'none',stroke:'rgba(111,230,248,.3)','stroke-width':1.5},gg);
+    const c=E('circle',{cx:CX[i],cy:CYY,r:19.5,fill:BG,stroke:CY,'stroke-width':2.5},gg);
+    const n=T(gg,String(i+1),CX[i],CYY+1,20,'#0b1f2a',{w:900});
+    const tt=T(g,CFG.titles[i],CX[i],81.5,15,'#e8ecf2',{w:700});
+    const ss=T(g,CFG.subs[i],CX[i],100,8,'#8a93a2',{w:700});
+    cs.push({gg,c,n,tt,ss,cx:CX[i]});
+  }
+  return{draw(s){
+    stepT.style.opacity=cl((s-1)/5);
+    cs.forEach((o,i)=>{const k=s-starts[i],sc=pv(POP,k);show(o.gg,sc>0);
+      if(sc>0){setT(o.gg,o.cx,CYY,sc,sc);o.gg.style.opacity=cl(.5+.25*k);const f=k>=3;o.c.setAttribute('fill',f?CY:BG);show(o.n,f)}
+      const a=cl((s-titS[i]+1)/4);o.tt.style.opacity=a;o.tt.setAttribute('transform','translate(0 '+((1-a)*5)+')');
+      o.ss.style.opacity=cl((s-subS[i]+1)/4)});
+    const p1=cl((s-11.8)/3.2),p2=cl((s-25.5)/3.5);
+    show(L1,p1>0);L1.setAttribute('x2',77+66*p1);show(L2,p2>0);L2.setAttribute('x2',184+63*p2);
+  }}
+}
+
+</script></body></html>

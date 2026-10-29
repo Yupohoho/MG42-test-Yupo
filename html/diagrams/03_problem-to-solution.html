@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D03 問題→解決圖解</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@700;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f15}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#151b23;box-shadow:inset 0 0 0 1px #1d2530}
+#card::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.05) 1px,transparent 1.2px) 0 0/12px 12px}
+svg{position:absolute;left:0;top:0}
+text{font-family:'Noto Sans TC',sans-serif}
+</style></head><body><div id="card"><svg id="s" width="324" height="126" viewBox="0 0 324 126"></svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  chip:'課題', pill:'解決策', startT:'起點', goalT:'終點',
+  /* 亂線筆尖頂點（逐幀一點，量自參考，已略向外放大） */
+  tip:[[22,62],[25,61],[62,72],[50,46],[80,80],[99,42],[73,81],[112,41],[142,57],[112,91],[90,61],[105,31],[132,40],[153,60],[164,76],[170,86],[169,90],[163,80],[160,77],[158,72],[157,73]],
+  scribStart:21,             // 亂線開始幀
+  cutF:48, morphA:43,  /* 參考第 108 幀（亂線畫完後停 3 幀）開始變形；內部幀 = 參考幀 − 65 */
+  SX:[1,1.02,1.075,1.15,1.24,1.38,1.5,1.59,1.66,1.71,1.735,1.76],
+  SY:[.87,.87,.77,.67,.55,.42,.28,.18,.1,.06,.03,.01,0], /* 由參考第 108 幀起逐幀 */
+                   // 灰色亂線消失、青色線出現
+  amp:[13,10,7,4.5,3.5,2.5,1.5,0],   // 青線每幀擺動幅度（由亂變直）
+  front:[225,242,256,266,272,277,280,281],
+  pillStart:57, circleStart:58, labelStart:53,
+  gray:'#a8adb8', cyan:'#76e9f5', dark:'#0b1a2a', label:'#7c8693',
+  SH:13,                     // 幀偏移：render(0) 對應動作內部第 13 幀（動作從第 0 幀附近起跑）
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const ss=x=>x*x*(3-2*x),eo=x=>1-Math.pow(1-x,3),eio=x=>x*x*(3-2*x);
+const hx=c=>[1,3,5].map(i=>parseInt(c.substr(i,2),16)),mix=(a,b,t)=>{const A=hx(a),B=hx(b);return 'rgb('+A.map((v,i)=>Math.round(v+(B[i]-v)*t)).join(',')+')'};
+const NS='http://www.w3.org/2000/svg';const S=document.getElementById('s');
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);(p||S).appendChild(e);return e}
+const root=el('g',{});
+/* 左上「課題」膠囊 */
+const chip=el('g',{},root);
+el('rect',{x:11.5,y:3.5,width:52,height:20,rx:10,fill:'none',stroke:'#5a6677','stroke-width':1.2},chip);
+el('text',{x:37.5,y:18,'font-size':11,'font-weight':700,fill:'#9aa3b1','text-anchor':'middle'},chip).textContent=CFG.chip;
+/* 起點點 + 灰色亂線 */
+const scrib=el('path',{d:'',fill:'none',stroke:CFG.gray,'stroke-width':2,'stroke-linejoin':'miter','stroke-linecap':'round'},root);
+/* 亂線依弧長重取樣（含原頂點） */
+const RP=[],RU=[];(function(){const T=CFG.tip,E=[];let L=0;for(let i=0;i<T.length-1;i++){const d=Math.hypot(T[i+1][0]-T[i][0],T[i+1][1]-T[i][1]);E.push(d);L+=d}
+  let acc=0;for(let i=0;i<T.length-1;i++){const n=Math.max(1,Math.ceil(E[i]/8));for(let k=0;k<n;k++){RP.push([T[i][0]+(T[i+1][0]-T[i][0])*k/n,T[i][1]+(T[i+1][1]-T[i][1])*k/n]);RU.push((acc+E[i]*k/n)/L)}acc+=E[i]}RP.push(T[T.length-1].slice());RU.push(1)})();
+const WD=26/526.4;
+const SG=RP.slice(1).map(()=>el('line',{stroke:CFG.gray,'stroke-width':2,'stroke-linecap':'round',opacity:0},root));
+const dot=el('circle',{cx:23,cy:62.5,r:3.5,fill:CFG.gray},root);
+/* 青色線 */
+const line=el('path',{d:'',fill:'none',stroke:CFG.cyan,'stroke-width':4,'stroke-linecap':'round','stroke-linejoin':'round'},root);
+const st=el('text',{x:7,y:96,'font-size':9.5,'font-weight':700,fill:CFG.label},root);st.textContent=CFG.startT;
+const gt=el('text',{x:303,y:96,'font-size':9.5,'font-weight':700,fill:CFG.label,'text-anchor':'end'},root);gt.textContent=CFG.goalT;
+/* 右上「解決策」 */
+const pill=el('g',{},root);
+el('rect',{x:-35.5,y:-10.5,width:71,height:21,rx:10.5,fill:CFG.cyan},pill);
+el('text',{x:0,y:4.5,'font-size':12,'font-weight':900,fill:CFG.dark,'text-anchor':'middle'},pill).textContent=CFG.pill;
+/* 終點勾 */
+const ck=el('g',{},root);
+el('circle',{cx:0,cy:0,r:13.5,fill:CFG.cyan},ck);
+el('path',{d:'M-6 0.5L-1.8 5L6.4 -4.6',fill:'none',stroke:CFG.dark,'stroke-width':3,'stroke-linecap':'round','stroke-linejoin':'round'},ck);
+const PILL=[.75,.97,1.11,1.13,1.11,1.05,1];
+const CIR=[.6,.85,1.1,1.18,1.18,1.18,1.18,1.1,1.07,1.04,1];
+function render(F){
+  F+=CFG.SH;
+  chip.setAttribute('opacity',F>=14?1:0);
+  const T=CFG.tip,k=F-CFG.scribStart;
+  const gray=F>=CFG.scribStart;
+  if(gray&&F<CFG.morphA){
+    const n=Math.min(T.length-1,k+1),pts=T.slice(0,Math.floor(n)+1);
+    const fr=n-Math.floor(n);
+    let d='M'+pts.map(p=>p.join(' ')).join('L');
+    scrib.setAttribute('d',d);
+  }else if(!gray)scrib.setAttribute('d','');
+  dot.setAttribute('opacity',F>=14?1:0);
+  if(F<CFG.morphA)dot.setAttribute('fill',CFG.gray);
+  /* 青線：x 前端 + 衰減波 */
+  /* 整條亂線同時被壓扁（Y）＋拉長（X）的仿射變形；第 cutF 幀硬切成青色粗線，波幅衰減成直線（逐幀表量自參考第 105–120 幀） */
+  if(F>=CFG.morphA){
+    const i=Math.min(CFG.SX.length-1,Math.floor(F-CFG.morphA)),sx=CFG.SX[i],sy=CFG.SY[i];
+    scrib.setAttribute('d','M'+RP.map(p=>(23+(p[0]-23)*sx).toFixed(2)+' '+(62.5+(p[1]-62.5)*sy).toFixed(2)).join('L'));
+    const cy=F>=CFG.cutF;
+    scrib.setAttribute('stroke',cy?CFG.cyan:CFG.gray);scrib.setAttribute('stroke-width',cy?4:2);scrib.setAttribute('stroke-linejoin',cy?'round':'miter');
+    dot.setAttribute('fill',cy?CFG.cyan:CFG.gray);
+  }else{scrib.setAttribute('stroke',CFG.gray);scrib.setAttribute('stroke-width',2);scrib.setAttribute('stroke-linejoin','miter')}
+  line.setAttribute('d','');
+  st.setAttribute('opacity',seg(F,CFG.labelStart,CFG.labelStart+3));
+  gt.setAttribute('opacity',seg(F,CFG.labelStart+6,CFG.labelStart+9));
+  const pt=F-CFG.pillStart,ps=pt<0?0:PILL[Math.min(PILL.length-1,Math.floor(pt))];
+  pill.setAttribute('transform',`translate(264.5 13.5) scale(${ps})`);
+  const ct=F-CFG.circleStart,cs=ct<0?0:CIR[Math.min(CIR.length-1,Math.floor(ct))];
+  ck.setAttribute('transform',`translate(289 62.5) scale(${cs})`);
+}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+document.fonts.load('900 12px "Noto Sans TC"','課題解決策起點終點').then(start,start);
+</script></body></html>

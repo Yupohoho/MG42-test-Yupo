@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D24 フレーム分解</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f15}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#0b0f15}
+#stage{position:absolute;inset:0;background:#151b23}
+#stage::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.07) .8px,transparent 1.1px) 0 -2px/10.667px 10.667px}
+#svg{position:absolute;left:0;top:0}
+text{font-family:'Noto Sans TC',sans-serif}
+</style></head><body><div id="card"><div id="stage"><svg id="svg" width="324" height="126" viewBox="0 0 324 126"></svg></div></div>
+<script>
+/* ================ 共用框架（掃光入場／角框＋中心點／掃光退場），各張共通 ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3),eo2=x=>1-Math.pow(1-x,2),ei=x=>x*x*x,eio=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const lerp=(a,b,t)=>a+(b-a)*t;
+function tab(arr,p){const i=Math.floor(p),j=Math.min(arr.length-1,i+1),a=arr[cl(i,0,arr.length-1)];return a+(arr[j]-a)*(p-i)}
+const NS='http://www.w3.org/2000/svg';
+const SVG=document.getElementById('svg');
+function el(tag,attrs,parent){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);(parent||SVG).appendChild(e);return e}
+const CYAN='#6ee7f9';
+const gC=el('g',{},SVG);
+/* 動作從第 0 幀起；SH＝動作第一個可見幀的內部 p 值；做完後停留到 LOOP 結束，硬切重播 */
+const SH=17;
+function render(f){
+  f=Math.floor(f+1e-6)%CFG.LOOP;
+  draw(Math.min(f+SH,84),f);
+}
+/* ===== CFG：D24 框架分解（把整體拆成要素來展示）===== */
+const CFG={
+  LOOP:120,                                   // 一輪幀數（30fps）
+  whole:'整體',
+  parts:['元素A','元素B','元素C'],
+  col:{pre:['#43919d','#256473','#2c4255'],fin:['#6ee6fb','#288a9d','#3c475c'],ptext:['#0b1a24','#0b1a24','#f1f4f8'],
+       frame:'#5fcad6',label:'#6fc7d6',wtext:'#0b1a24',conn:'#aeb6c0'},
+  fontChars:'整體元素ABC'
+};
+const C=CFG.col;
+const TP=[0,.04,.08,.15,.23,.35,.5,.65,.76,.85,.91,.96,.98,.99,1];                   // p36~50 位移／展開進度（左右緣與上下緣同一條曲線，量測）
+const PRE=[[24,48.5],[49.5,73],[74,96]],FIN=[[11,43],[49,80],[89,119]];                // 三條的上下緣：整體狀態 → 分開狀態
+const L0=23,R0=103.5,L1=181,R1=303;
+const hex=h=>[1,3,5].map(i=>parseInt(h.substr(i,2),16));
+const mixc=(a,b,t)=>{a=hex(a);b=hex(b);return 'rgb('+a.map((v,i)=>Math.round(v+(b[i]-v)*t)).join(',')+')'};
+const frame=el('rect',{x:15,y:16,width:96.5,height:88,rx:11,fill:'none',stroke:C.frame,'stroke-width':1.3,'stroke-dasharray':'4 3'},gC);
+const wt=el('text',{x:63.25,y:66,'text-anchor':'middle','font-size':14,'font-weight':900,fill:C.wtext},gC);wt.textContent=CFG.whole;
+const lab=el('text',{x:63.25,y:121,'text-anchor':'middle','font-size':11,'font-weight':700,fill:C.label},gC);lab.textContent=CFG.whole;
+/* 虛線連接（用遮罩依長度畫出） */
+const defs=el('defs',{},gC);
+const paths=['M114 62C147 62 148 28 181 28','M114 62L181 66.5','M114 62C147 62 148 105 181 105'];
+const conns=paths.map((d,i)=>{const m=el('mask',{id:'cm'+i,maskUnits:'userSpaceOnUse',x:0,y:0,width:324,height:126},defs);
+  const mp=el('path',{d:d,fill:'none',stroke:'#fff','stroke-width':8},m);
+  const pp=el('path',{d:d,fill:'none',stroke:C.conn,'stroke-width':1.8,'stroke-dasharray':'3 3.2',mask:'url(#cm'+i+')'},gC);
+  return{mp,len:mp.getTotalLength()}});
+const odot=el('rect',{x:117.5,y:60,width:4.5,height:4.5,fill:C.conn},gC);
+const bars=[0,1,2].map(i=>{const g=el('g',{},gC);const r=el('rect',{rx:8,fill:C.pre[i]},g);
+  const t=el('text',{'text-anchor':'middle','font-size':13,'font-weight':900,fill:C.ptext[i]},g);t.textContent=CFG.parts[i];return{r,t}});
+gC.appendChild(frame);gC.appendChild(wt);
+function draw(p,f){
+  const show=p>=17;gC.style.display=show?'':'none';
+  const tp=p<36?0:(p>=50?1:tab(TP,p-36));
+  bars.forEach((b,i)=>{
+    const top=lerp(PRE[i][0],FIN[i][0],tp),bot=lerp(PRE[i][1],FIN[i][1],tp),l=lerp(L0,L1,tp),r=lerp(R0,R1,tp);
+    b.r.setAttribute('x',l);b.r.setAttribute('y',top);b.r.setAttribute('width',r-l);b.r.setAttribute('height',bot-top);b.r.setAttribute('fill',mixc(C.pre[i],C.fin[i],tp));
+    b.t.setAttribute('x',(l+r)/2);b.t.setAttribute('y',(top+bot)/2+4.8);b.t.style.opacity=seg(p,46,51)});
+  wt.style.opacity=p<38?1:1-seg(p,38,42);
+  lab.style.opacity=seg(p,42,46);
+  frame.style.opacity=lerp(.9,.45,seg(p,44,55));
+  const cu=eo(seg(p,45.5,54));
+  conns.forEach(c=>c.mp.setAttribute('stroke-dasharray',(c.len*cu)+' '+(c.len*2)));
+  odot.style.opacity=p<45?0:1;
+}
+
+function start(){const T=q.get('t');if(T!==null){render(+T*30);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+document.fonts.load('700 14px "Noto Sans TC"',CFG.fontChars||'').then(()=>document.fonts.load('900 14px "Noto Sans TC"',CFG.fontChars||'')).then(start,start);
+</script></body></html>

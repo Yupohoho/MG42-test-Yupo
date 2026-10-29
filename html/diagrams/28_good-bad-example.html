@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D28 好範例／壞範例</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#06080c}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#0b0f15}
+#wrap{position:absolute;inset:0}
+#tex{position:absolute;inset:0;background:#151b23}
+#tex::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.07) .8px,transparent 1px) 6px 6px/12px 12px}
+.pan{position:absolute;top:5px;height:111px;border-radius:10px;box-sizing:border-box;opacity:0}
+#pB{left:14px;width:141px;background:#202836;box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
+#pG{left:169px;width:139px;background:#10333d;box-shadow:inset 0 0 0 2px #6ee6f9}
+.tt{position:absolute;top:10px;font-size:12px;line-height:16px;font-weight:900;opacity:0}
+#tB{left:30px;color:#aab3c2}#tG{left:185px;color:#6ee6f9}
+.bar{position:absolute;opacity:0;border-radius:3px;transform-origin:0 50%}
+svg{position:absolute;left:0;top:0;overflow:visible}
+path,circle{fill:none;stroke-linecap:round}
+</style></head><body><div id="card"><div id="wrap"><div id="tex"></div>
+<div id="scene">
+<div class="pan" id="pB"></div><div class="pan" id="pG"></div>
+<div class="tt" id="tB"></div><div class="tt" id="tG"></div>
+<svg width="324" height="126"><path id="x1" d="M127.5 12 L138.5 23.5" stroke="#cfd5df" stroke-width="2.2" stroke-dasharray="16 16" stroke-dashoffset="16"/><path id="x2" d="M138.5 12 L127.5 23.5" stroke="#cfd5df" stroke-width="2.2" stroke-dasharray="16 16" stroke-dashoffset="16"/><circle id="ring" cx="292" cy="16" r="5.5" stroke="#6ee6f9" stroke-width="2"/></svg>
+</div></div></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  badTitle:'壞範例', goodTitle:'好範例',
+  S:16,   // 動作起始偏移：讓動作從第 0 幀開始，做完停留到結尾後硬切重播
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const $=id=>document.getElementById(id);
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3);
+const at=(a,r,r0)=>a[cl(r-r0,0,a.length-1)];
+$('tB').textContent=CFG.badTitle;$('tG').textContent=CFG.goodTitle;
+const POPG=[.5,.78,.99,1.09,1.12,1.11,1.065,1.02,1.0];                         // 好範例面板縮放 r25 起（實測）
+// 壞範例：歪斜凌亂的線條（x,y,w,h,角度,色,出現幀）；好範例：整齊的線條
+const BAD=[[58,38,44,5,-3,'#e9edf4',24],[58,52,34,5,-1,'#46546b',27],[46,65,82,2,4,'#3b4860',28],[48,79,46,6,-2,'#46546b',30],[44,92,84,9,-3,'#3d4a62',32]];
+const GOOD=[[187,32,103,7,0,'#6ee6f9',33,37],[187,50,103,4.5,0,'#e6ebf3',38,40],[187,62.5,87,5,0,'#e6ebf3',41,43],[187,76,71,4,0,'#e6ebf3',44,46],[186,87,110,11,0,'#364758',47,49]];
+const bars=[];
+function mk(a,good){const d=document.createElement('div');d.className='bar';d.style.left=a[0]+'px';d.style.top=a[1]+'px';d.style.width=a[2]+'px';d.style.height=a[3]+'px';d.style.background=a[5];
+  d.style.setProperty('--rot',a[4]+'deg');$('scene').appendChild(d);bars.push({d,a,good})}
+BAD.forEach(a=>mk(a,false));GOOD.forEach(a=>mk(a,true));
+function render(f){
+  const r=f+CFG.S;
+  const pB=$('pB'),e=eo(seg(r,16,21));
+  pB.style.opacity=e;pB.style.transform='scale('+(.5+.5*e)+')';pB.style.filter='blur('+(2*(1-e))+'px)';
+  $('tB').style.opacity=seg(r,16,22);
+  const pG=$('pG');
+  if(r<25)pG.style.opacity=0;else{pG.style.opacity=r<26?.4:1;pG.style.transform='scale('+at(POPG,r,25)+')'}
+  $('tG').style.opacity=seg(r,26,30);
+  bars.forEach(b=>{
+    const a=b.a;
+    if(!b.good){const p=seg(r,a[6],a[6]+3);b.d.style.opacity=p;b.d.style.transform='rotate('+a[4]+'deg)';b.d.style.filter='blur('+(1.5*(1-p))+'px)'}
+    else{const p=seg(r,a[6],a[7]);
+      // 第一條先以暗色淡入，之後亮起
+      let o=p;if(a[6]===33)o=r<33?0:r<37?.45:1;
+      b.d.style.opacity=o;b.d.style.transform='scaleX('+(.85+.15*p)+')'}
+  });
+  // X 圖示：兩筆依序畫出
+  const p=seg(r,39,47);
+  $('x1').setAttribute('stroke-dashoffset',16*(1-seg(p,0,.55)));$('x2').setAttribute('stroke-dashoffset',16*(1-seg(p,.55,1)));
+  // 圓圈圖示：放大彈出
+  const c=$('ring'),pr=seg(r,43,48);
+  c.setAttribute('r',5.5*Math.min(1.12,eo(pr)*1.0+(pr>.6?.12*(1-pr):0)));c.style.opacity=pr>0?1:0;
+}
+function start(){const T=q.get('t');if(T!==null){render(Math.floor(+T*30+1e-6)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(Math.floor((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+document.fonts.load('900 20px "Noto Sans TC"','壞範例好範例').then(start,start);
+</script></body></html>

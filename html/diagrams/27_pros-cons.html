@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D27 優點／缺點</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#06080c}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#0b0f15}
+#wrap{position:absolute;inset:0}
+#tex{position:absolute;inset:0;background:#151b23}
+#tex::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.07) .8px,transparent 1px) 6px 6px/12px 12px}
+#div{position:absolute;left:162px;top:16px;width:1px;height:98px;background:#2c3544;opacity:0}
+.ic{position:absolute;top:7.5px;width:18px;height:18px;border-radius:50%;opacity:0}
+#ic1{left:16px;background:#6ee6f9}#ic2{left:166px;background:#8a94a6}
+.ic i{position:absolute;left:4.5px;right:4.5px;top:8px;height:2px;border-radius:1px;background:#0b1620}
+#ic1 i.v{left:8px;right:8px;top:4.5px;bottom:4.5px;height:auto}
+.hd{position:absolute;top:6px;font-size:14px;line-height:21px;font-weight:900;opacity:0}
+#h1{left:42px;color:#e8ecf3}#h2{left:193px;color:#8f9aac}
+.pl{position:absolute;height:20px;box-sizing:border-box;border-radius:10px;font-size:11px;line-height:20px;font-weight:700;padding-left:10px;white-space:nowrap;opacity:0}
+.L{left:14px;width:140px;background:#10333d;box-shadow:inset 0 0 0 1.5px #6ee6f9;color:#f1f4f9}
+.R{left:168px;width:146px;background:#202836;color:#9aa4b4}
+</style></head><body><div id="card"><div id="wrap"><div id="tex"></div>
+<div id="scene"><div id="div"></div>
+<div class="ic" id="ic1"><i></i><i class="v"></i></div><div class="ic" id="ic2"><i></i></div>
+<div class="hd" id="h1"></div><div class="hd" id="h2"></div>
+</div></div></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  proTitle:'優點', conTitle:'缺點',
+  pros:['成本低','速度快','好上手'],
+  cons:['需要花時間','功能有限制','需要適應'],
+  S:14,   // 動作起始偏移：讓動作從第 0 幀開始，做完停留到結尾後硬切重播
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const $=id=>document.getElementById(id);
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3);
+const at=(a,r,r0)=>a[cl(r-r0,0,a.length-1)];
+$('h1').textContent=CFG.proTitle;$('h2').textContent=CFG.conTitle;
+const TOP=[38,63,89],LS=[28,35,42],RS=[31,37,44];
+const POPI=[.39,.78,1.0,1.11,1.11,1.11,1.06,1.0];                  // 圓形圖示縮放（實測）
+const pills=[];
+function mk(txt,cls,i){const d=document.createElement('div');d.className='pl '+cls;d.textContent=txt;d.style.top=TOP[i]+'px';$('scene').appendChild(d);return d}
+CFG.pros.forEach((t,i)=>pills.push({e:mk(t,'L',i),s:LS[i],side:-1}));
+CFG.cons.forEach((t,i)=>pills.push({e:mk(t,'R',i),s:RS[i],side:1}));
+function render(f){
+  const r=f+CFG.S;
+  $('div').style.opacity=seg(r,14,20);
+  const i1=$('ic1'),i2=$('ic2');
+  if(r<15)i1.style.opacity=0;else{i1.style.opacity=1;i1.style.transform='scale('+at(POPI,r,15)+')'}
+  if(r<21)i2.style.opacity=0;else{i2.style.opacity=1;i2.style.transform='scale('+at(POPI,r,21)+')'}
+  $('h1').style.opacity=seg(r,15,21);$('h2').style.opacity=seg(r,20,26);
+  pills.forEach(p=>{
+    if(r<p.s){p.e.style.opacity=0;return}
+    const n=r-p.s;let off;
+    if(p.side<0){off=-68*Math.pow(.65,n);p.e.style.opacity=1}
+    else{off=71*Math.pow(.62,n);p.e.style.opacity=Math.min(1,.55+.15*n)}
+    if(Math.abs(off)<.6)off=0;
+    p.e.style.transform='translateX('+(p.side<0?off:off)+'px)';
+  });
+}
+function start(){const T=q.get('t');if(T!==null){render(Math.floor(+T*30+1e-6)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(Math.floor((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+document.fonts.load('900 20px "Noto Sans TC"','優點缺點成本低速度快好上手需要花時間功能有限制適應').then(start,start);
+</script></body></html>

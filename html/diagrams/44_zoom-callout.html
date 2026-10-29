@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D44 放大注解（拡大ズーム注釈）</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@700;900&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f15}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#151b23;box-shadow:inset 0 0 0 1px #1d242e}
+#card::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(150,170,200,.10) 1px,transparent 1.3px) 4px 4px/12px 12px}
+svg{position:absolute;left:0;top:0;width:324px;height:126px}
+text{font-family:'Noto Sans TC',sans-serif}
+.mono{font-family:'Roboto Mono',monospace}
+</style></head><body><div id="card"><svg id="s" viewBox="0 0 324 126" xmlns="http://www.w3.org/2000/svg">
+<g id="content"></g>
+</svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  pill:'+38%', label:'最高值',        // 放大圈內的標籤
+  cyan:'#6fe6f9', chart:'#5d6e8a', dark:'#0b1118'
+};
+const FONT_TEXT=CFG.pill+CFG.label;
+/* ================ */
+const LOOP=120;                      // LOOP=120 幀（4 秒）：動作→停留→硬切回第 0 幀重播
+const q=new URLSearchParams(location.search);
+const $=id=>document.getElementById(id);
+const Z=+q.get('z')||1;if(Z!=1)$('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3),eo2=x=>1-(1-x)*(1-x),ei=x=>x*x*x,eio=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const tb=(a,x,x0)=>{const k=x-x0;if(k<=0)return a[0];if(k>=a.length-1)return a[a.length-1];const i=Math.floor(k);return a[i]+(a[i+1]-a[i])*(k-i)};
+const NS='http://www.w3.org/2000/svg',CY='#6fe6f9',CONTENT=$('content');
+const mk=(tag,at,par,txt)=>{const e=document.createElementNS(NS,tag);for(const k in at)e.setAttribute(k,at[k]);if(txt!=null)e.textContent=txt;(par||CONTENT).appendChild(e);return e};
+const xf=(el,tx,ty,s,cx,cy)=>el.setAttribute('transform','translate('+(tx+cx)+' '+(ty+cy)+') scale('+s+') translate('+(-cx)+' '+(-cy)+')');
+const op=(el,v)=>el.setAttribute('opacity',v);
+let pcr,sr,big,pillG,labT,dl1,dl2;
+const PTS='17,91 45,79 70,83.5 96,61.5 124,43 143.5,22.5 164,52';
+const DRAWX=[47,77,96,119,127,142,149,154,158,161,163,164];                  // 折線描繪右緣 x（量測，r3 起）
+const RP=[0,.005,.036,.08,.15,.255,.40,.59,.75,.85,.92,.97,.99,1];          // 小圓沿斜線移動進度（量測，r21 起）
+const BS=[.18,.47,.69,.85,.95,1.03,1.07,1.07,1.06,1.04,1.01,1.0];           // 放大圈倍率（量測，r34 起，過衝約 7%）
+const PP=[.85,1.05,1];
+function init(){
+  mk('line',{x1:14,y1:104.5,x2:176,y2:104.5,stroke:'#2c3442','stroke-width':1.2});
+  const defs=mk('defs',{});const c=mk('clipPath',{id:'pc'},defs);pcr=mk('rect',{x:0,y:0,width:0,height:126},c);
+  mk('polyline',{points:PTS,fill:'none',stroke:CFG.chart,'stroke-width':2,'stroke-linejoin':'round','stroke-linecap':'round','clip-path':'url(#pc)'});
+  const ds={stroke:'#9fb0b8','stroke-opacity':.6,'stroke-width':1,'stroke-dasharray':'3 3'};
+  dl1=mk('line',Object.assign({x1:155,y1:20.5,x2:155,y2:20.5},ds));
+  dl2=mk('line',Object.assign({x1:147,y1:31,x2:147,y2:31},ds));
+  sr=mk('circle',{r:12.5,fill:'none',stroke:CFG.cyan,'stroke-width':2});
+  big=mk('g',{});
+  mk('circle',{cx:246.5,cy:61.5,r:52,fill:CFG.dark},big);
+  mk('line',{x1:197.5,y1:44,x2:295.5,y2:44,stroke:'#2c3846','stroke-width':1.5},big);
+  mk('line',{x1:196.5,y1:75,x2:296.5,y2:75,stroke:'#2c3846','stroke-width':1.5},big);
+  mk('polyline',{points:'205.7,92 246,45 284,98',fill:'none',stroke:CFG.cyan,'stroke-width':3.2,'stroke-linecap':'round','stroke-linejoin':'round'},big);
+  mk('circle',{cx:246,cy:45,r:3.6,fill:CFG.cyan},big);
+  labT=mk('text',{x:247,y:102,'text-anchor':'middle','font-size':12.5,'font-weight':900,fill:'#f2f6fb',stroke:'#0b1118','stroke-width':3,'stroke-linejoin':'round','paint-order':'stroke fill'},big,CFG.label);
+  mk('circle',{cx:246.5,cy:61.5,r:52,fill:'none',stroke:CFG.cyan,'stroke-width':2.6},big);
+  pillG=mk('g',{},big);mk('rect',{x:219,y:21,width:55,height:15,rx:7.5,fill:CFG.cyan},pillG);
+  mk('text',{x:246.5,y:32.5,'text-anchor':'middle','font-size':11,'font-weight':900,class:'mono',fill:'#0a2a33'},pillG,CFG.pill);
+}
+function draw(u){
+  pcr.setAttribute('width',u<3?0:tb(DRAWX,u,3));
+  // 小圓：r21 出現，沿斜線由折線左段移到最高點
+  const on=u>=21;op(sr,on?seg(u,20.5,23):0);
+  if(on){const p=tb(RP,u,21);sr.setAttribute('cx',47.5+96*p);sr.setAttribute('cy',80.5-59*p)}
+  // 虛線引線：r33–37 由小圓往外長出
+  const lp=eo2(seg(u,33,37));
+  dl1.setAttribute('x2',155+58*lp);dl1.setAttribute('y2',20.5+1.5*lp);
+  dl2.setAttribute('x2',147+55*lp);dl2.setAttribute('y2',31+55*lp);op(dl1,lp>0?1:0);op(dl2,lp>0?1:0);
+  // 放大圈
+  const on2=u>=34;op(big,on2?1:0);if(on2)xf(big,0,0,tb(BS,u,34),246.5,61.5);
+  const pp=u>=49;op(pillG,pp?1:0);op(labT,pp?1:0);if(pp)xf(pillG,0,0,tb(PP,u,49),246.5,28.5);
+}
+function frame(r){draw(r,r)}
+function start(){
+  init();
+  const T=q.get('t');if(T!==null){frame((+T*30)%LOOP);return}
+  const t0=performance.now();(function tick(){frame(((performance.now()-t0)/1000*30)%LOOP);requestAnimationFrame(tick)})();
+}
+document.fonts.load('900 16px "Noto Sans TC"',FONT_TEXT).then(()=>document.fonts.load('700 16px "Noto Sans TC"',FONT_TEXT)).then(()=>document.fonts.load('700 10px "Roboto Mono"','POINT+%NGOK')).then(start,start);
+</script></body></html>

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D40 增減指標</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f15}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#151b23;box-shadow:inset 0 0 0 1px #1c2430}
+#card::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.05) 1px,transparent 1.2px) 0 0/12px 12px}
+#stage{position:absolute;inset:0}
+.pn{position:absolute;top:7px;width:147px;height:112px;box-sizing:border-box;border-radius:10px;border:1.5px solid}
+.tri{position:absolute;top:15px;width:28px;height:19px}
+.lb{position:absolute;top:14px;width:60px;margin-left:-30px;text-align:center;font-size:16px;font-weight:900;line-height:20px;white-space:nowrap}
+.vl{position:absolute;left:0;right:0;top:35px;text-align:center;font-size:31px;font-weight:900;line-height:38px;white-space:nowrap}
+svg{position:absolute;left:0;top:0}
+</style></head><body><div id="card"><div id="stage"><svg width="324" height="126" id="svg"></svg></div></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  panels:[
+    {x:7,  up:true,  label:'上升', val:'+24%', t0:8,  scale:[.55,.78,.99,1.08,1.1,1.08,1.06,1.02,1],
+     fill:'#0a2d37', border:'rgb(104,226,244)', col:'rgb(110,230,248)', triX:28, lbX:105,
+     pts:[[24,108],[52,103],[64,104],[76,105.5],[82,104.5],[100,98.5],[112,95.5],[124,92.5],[136,90.5]]},
+    {x:170,up:false, label:'下降', val:'−8%',  t0:15, scale:[.2,.7,.9,1.05,1.07,1.04,1.01,1],
+     fill:'#202830', border:'rgb(150,158,172)', col:'rgb(234,240,248)', triX:27, lbX:105,
+     pts:[[187,90],[203,92.5],[227,94.5],[245,94],[257,97.5],[275,102.5],[298,106.5]]}
+  ],
+  valFade:[20,26],            // 數值淡入
+  lineT0:23, lineLen:17,      // 迷你折線描繪（緩出，量到）
+  dotT:40,                    // 終點圓點出現
+  off:6,                                  // 起點偏移：動作從第 0 幀附近開始
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eoP=(x,p)=>1-Math.pow(1-x,p);
+const NS='http://www.w3.org/2000/svg',svg=document.getElementById('svg'),st=document.getElementById('stage');
+const sv=(n,a,p)=>{const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);(p||svg).appendChild(e);return e};
+const P=CFG.panels.map((c,i)=>{
+  const d=document.createElement('div');d.className='pn';d.style.left=c.x+'px';d.style.background=c.fill;d.style.borderColor=c.border;
+  d.innerHTML='<svg class="tri" viewBox="0 0 28 19"><polygon points="'+(c.up?'14,0 28,19 0,19':'0,0 28,0 14,19')+'" fill="'+c.col+'"/></svg><div class="lb"></div><div class="vl"></div>';
+  d.querySelector('.tri').style.left=c.triX+'px';
+  const lb=d.querySelector('.lb');lb.textContent=c.label;lb.style.left=c.lbX+'px';lb.style.color=c.col;
+  const vl=d.querySelector('.vl');vl.textContent=c.val;vl.style.color=c.col;
+  st.insertBefore(d,svg);
+  const id='cp'+i;
+  sv('defs',{}).innerHTML='<clipPath id="'+id+'"><rect id="r'+i+'" x="0" y="0" width="0" height="126"/></clipPath>';
+  const g=sv('g',{'clip-path':'url(#'+id+')'});
+  sv('polyline',{points:c.pts.map(p=>p.join(',')).join(' '),fill:'none',stroke:c.col,'stroke-width':2,'stroke-linejoin':'round','stroke-linecap':'round'},g);
+  const e=c.pts[c.pts.length-1];
+  const dot=sv('circle',{cx:e[0],cy:e[1],r:0,fill:c.col});
+  return{c,d,vl,rect:document.getElementById('r'+i),dot,x0:c.pts[0][0],x1:e[0]}});
+function render(f){
+  P.forEach(o=>{
+    const c=o.c,k=Math.floor(f-c.t0);
+    const s=f<c.t0?0:c.scale[Math.min(c.scale.length-1,k)];
+    o.d.style.transform='scale('+s+')';
+    o.vl.style.opacity=seg(f,...CFG.valFade);
+    const u=eoP(seg(f,CFG.lineT0,CFG.lineT0+CFG.lineLen),2);
+    o.rect.setAttribute('width',f<CFG.lineT0?0:o.x0-4+(o.x1-o.x0+8)*u);
+    const ds=seg(f,CFG.dotT,CFG.dotT+2);
+    o.dot.setAttribute('r',3.5*(ds<.5?ds*2.4:1.2-.2*seg(ds,.5,1)));
+  });
+}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP+CFG.off);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP+CFG.off);requestAnimationFrame(tick)})()}
+document.fonts.load('900 31px "Noto Sans TC"','+−-0123456789%').then(()=>document.fonts.load('900 16px "Noto Sans TC"','上升下降')).then(start,start);
+</script></body></html>

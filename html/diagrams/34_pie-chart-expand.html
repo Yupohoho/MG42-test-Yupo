@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D34 圓餅圖展開</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f15}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#151b23;box-shadow:inset 0 0 0 1px #1c2430}
+#card::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.05) 1px,transparent 1.2px) 0 0/12px 12px}
+#stage{position:absolute;inset:0}
+svg{position:absolute;left:0;top:0}
+.ctr{position:absolute;left:46px;width:80px;text-align:center;line-height:1;white-space:nowrap}
+.c1{top:52px;font-size:13px;font-weight:900;color:#fff}
+.c2{top:68px;font-size:7px;font-weight:500;color:#8a93a3}
+.row{position:absolute;left:176px;width:136px;height:20px}
+.mk{position:absolute;left:7px;top:10px;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:4px}
+.nm{position:absolute;left:21px;top:0;font-size:12px;font-weight:700;line-height:20px;transform:translateY(-1px)}
+.pc{position:absolute;right:6px;top:0;font-size:15px;font-weight:900;line-height:20px;text-align:right;transform:translateY(-1px)}
+</style></head><body><div id="card"><div id="stage">
+<svg width="324" height="126" id="svg"></svg></div></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  cx:86, cy:63, R:37, sw:18,                       // 環中心、半徑、環寬
+  centerTop:'營收', centerSub:'占比',
+  seg:[ // 角度（從 12 點鐘順時針）、起訖幀、顏色、圖例
+    {a0:0,  a1:178, f0:7.5, f1:14.5, pw:1.3, col:[104,226,244], name:'本公司', val:50, row:20, rowY:33,   lab:[110,230,252], pct:[110,230,252]},
+    {a0:182,a1:288, f0:13.5,f1:21,   pw:1.5, col:[42,140,159],  name:'A 公司', val:30, row:29, rowY:61.5, lab:[255,255,255], pct:[255,255,255]},
+    {a0:292,a1:357, f0:21,  f1:36,   pw:2.6, col:[52,68,88],    name:'其他',   val:20, row:38, rowY:90,   lab:[255,255,255], pct:[255,255,255]}
+  ],
+  countLen:15,            // 圖例百分比 0→目標 的幀數（緩出）
+  S:7,   // 動作起始偏移：讓動作從第 0 幀開始，做完停留到結尾後硬切重播
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eoP=(x,p)=>1-Math.pow(1-x,p);
+const NS='http://www.w3.org/2000/svg',svg=document.getElementById('svg'),st=document.getElementById('stage');
+const rgb=c=>'rgb('+c+')';
+function arc(a0,a1){ // 角度 → SVG 路徑（順時針，12 點鐘起算）
+  const p=a=>{const t=a*Math.PI/180;return [CFG.cx+CFG.R*Math.sin(t),CFG.cy-CFG.R*Math.cos(t)]};
+  const [x0,y0]=p(a0),[x1,y1]=p(a1);return 'M'+x0+' '+y0+'A'+CFG.R+' '+CFG.R+' 0 '+((a1-a0)>180?1:0)+' 1 '+x1+' '+y1}
+const track=document.createElementNS(NS,'circle');
+[['cx',CFG.cx],['cy',CFG.cy],['r',CFG.R],['fill','none'],['stroke','#1c2430'],['stroke-width',CFG.sw]].forEach(([k,v])=>track.setAttribute(k,v));
+const rows=CFG.seg.map(s=>{
+  const p=document.createElementNS(NS,'path');p.setAttribute('fill','none');p.setAttribute('stroke',rgb(s.col));p.setAttribute('stroke-width',CFG.sw);svg.appendChild(p);
+  const r=document.createElement('div');r.className='row';r.style.top=(s.rowY-10)+'px';
+  r.innerHTML='<div class="mk"></div><div class="nm"></div><div class="pc"></div>';
+  r.querySelector('.mk').style.background=rgb(s.col);
+  r.querySelector('.nm').textContent=s.name;r.querySelector('.nm').style.color=rgb(s.lab);
+  r.querySelector('.pc').style.color=rgb(s.pct);
+  st.appendChild(r);return{s,p,r,mk:r.querySelector('.mk'),nm:r.querySelector('.nm'),pc:r.querySelector('.pc')}});
+const c1=document.createElement('div');c1.className='ctr c1';c1.textContent=CFG.centerTop;st.appendChild(c1);
+const c2=document.createElement('div');c2.className='ctr c2';c2.textContent=CFG.centerSub;st.appendChild(c2);
+function render(f){
+  f+=CFG.S;
+  rows.forEach(o=>{
+    const s=o.s,t=seg(f,s.f0,s.f1),a=s.a0+(s.a1-s.a0)*eoP(t,s.pw);
+    if(t<=0)o.p.setAttribute('d','M0 0');else o.p.setAttribute('d',arc(s.a0,Math.max(s.a0+.01,a)));
+    o.p.setAttribute('stroke-linecap','butt');
+    const g=seg(f,s.row,s.row+3);       // 圖例出現：圓點 → 方塊
+    const v=eoP(seg(f,s.row,s.row+CFG.countLen),3);
+    o.r.style.opacity=g>0?1:0;
+    o.mk.style.transform='scale('+(.28+.72*g)+')';
+    o.mk.style.borderRadius=(7-3*g)+'px';
+    o.nm.style.opacity=g>0?1:0;o.pc.style.opacity=g>0?1:0;
+    o.pc.textContent=Math.round(s.val*v)+'%';
+  });
+  const c=seg(f,35,38);c1.style.opacity=c;c2.style.opacity=c;
+}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+document.fonts.load('900 15px "Noto Sans TC"','0123456789%').then(()=>document.fonts.load('700 12px "Noto Sans TC"','本公司A其他營收占比')).then(start,start);
+</script></body></html>

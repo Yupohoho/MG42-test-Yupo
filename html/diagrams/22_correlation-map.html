@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D22 相関マップ</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f15}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#0b0f15}
+#stage{position:absolute;inset:0;background:#151b23}
+#stage::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.07) .8px,transparent 1.1px) 0 -2px/10.667px 10.667px}
+#svg{position:absolute;left:0;top:0}
+text{font-family:'Noto Sans TC',sans-serif}
+</style></head><body><div id="card"><div id="stage"><svg id="svg" width="324" height="126" viewBox="0 0 324 126"></svg></div></div>
+<script>
+/* ================ 共用框架（掃光入場／角框＋中心點／掃光退場），各張共通 ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3),eo2=x=>1-Math.pow(1-x,2),ei=x=>x*x*x,eio=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const lerp=(a,b,t)=>a+(b-a)*t;
+function tab(arr,p){const i=Math.floor(p),j=Math.min(arr.length-1,i+1),a=arr[cl(i,0,arr.length-1)];return a+(arr[j]-a)*(p-i)}
+const NS='http://www.w3.org/2000/svg';
+const SVG=document.getElementById('svg');
+function el(tag,attrs,parent){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);(parent||SVG).appendChild(e);return e}
+const CYAN='#6ee7f9';
+const gC=el('g',{},SVG);
+/* 動作從第 0 幀起；SH＝動作第一個可見幀的內部 p 值；做完後停留到 LOOP 結束，硬切重播 */
+const SH=17;
+function render(f){
+  f=Math.floor(f+1e-6)%CFG.LOOP;
+  draw(Math.min(f+SH,84),f);
+}
+/* ===== CFG：D22 相關圖（要素之間關係的強弱）===== */
+const CFG={
+  LOOP:120,                                   // 一輪幀數（30fps）
+  // [文字, x, y, 開始幀, 是否填青（重點）]
+  nodes:[['廣告',53,35,17,0],['認知',132,23.5,20,0],['到店',168,79,23,0],['口碑',61,92,26,0],['營收',265.7,53,29,1]],
+  // 連線 [起點節點, 終點節點, 類型strong/mid/weak, 開始幀, 畫出幀數]
+  edges:[[0,1,'strong',30.5,3],[1,2,'strong',35.2,3],[2,4,'strong',39.5,3],[0,3,'weak',49.5,2.5],[3,2,'mid',44.5,3],[1,4,'weak',52.5,4]],
+  legend:['強相關','弱相關'],legendStart:60,
+  col:{cyan:'#6ee6fa',node:'#1c2530',text:'#f1f4f8',ctext:'#0b1a24',mid:'#7a828e',weak:'#7d8591',grayLine:'#6b7380'},
+  fontChars:'廣告認知到店口碑營收強弱相關'
+};
+const C=CFG.col,R=19;
+const S_N=[.27,.66,.89,1.07,1.12,1.12,1.08,1.05,1.01,1.0];                  // 節點彈出倍率（由面積量測）
+const gE=el('g',{},gC),gN=el('g',{},gC),gG=el('g',{},gC);
+const ST={strong:{c:C.cyan,w:3.2,d:''},mid:{c:C.mid,w:2.4,d:''},weak:{c:C.weak,w:1.3,d:'4 3'}};
+const edges=CFG.edges.map(e=>{const s=ST[e[2]];return el('line',{stroke:s.c,'stroke-width':s.w,'stroke-dasharray':s.d},gE)});
+const nodes=CFG.nodes.map(n=>{const g=el('g',{},gN);
+  el('circle',{r:R,fill:n[4]?C.cyan:C.node,stroke:C.cyan,'stroke-width':1.8},g);
+  const t=el('text',{x:0,y:4.5,'text-anchor':'middle','font-size':12.5,'font-weight':700,fill:n[4]?C.ctext:C.text},g);t.textContent=n[0];return g});
+/* 圖例 */
+el('rect',{x:201,y:97,width:42,height:18,rx:9,fill:C.node,stroke:C.cyan,'stroke-width':1.6},gG);
+let tt=el('text',{x:222,y:109.8,'text-anchor':'middle','font-size':9.5,'font-weight':700,fill:C.cyan},gG);tt.textContent=CFG.legend[0];
+el('line',{x1:248,x2:269,y1:106,y2:106,stroke:C.cyan,'stroke-width':3.2},gG);
+el('rect',{x:274,y:97,width:38,height:18,rx:9,fill:C.node,stroke:C.grayLine,'stroke-width':1.6},gG);
+tt=el('text',{x:293,y:109.8,'text-anchor':'middle','font-size':9.5,'font-weight':700,fill:'#9aa3b0'},gG);tt.textContent=CFG.legend[1];
+function draw(p,f){
+  CFG.nodes.forEach((n,i)=>{const t=p-n[3],s=t<0?0:tab(S_N,t);
+    nodes[i].setAttribute('transform','translate('+n[1]+' '+n[2]+') scale('+s+')');nodes[i].style.display=s<=.01?'none':''});
+  CFG.edges.forEach((e,i)=>{const u=eo(seg(p,e[3],e[3]+e[4])),a=CFG.nodes[e[0]],b=CFG.nodes[e[1]],L=edges[i];
+    if(u<=0)L.style.display='none';else{L.style.display='';
+      L.setAttribute('x1',a[1]);L.setAttribute('y1',a[2]);L.setAttribute('x2',lerp(a[1],b[1],u));L.setAttribute('y2',lerp(a[2],b[2],u))}});
+  const lu=seg(p,CFG.legendStart,CFG.legendStart+5);gG.style.opacity=lu;gG.style.display=lu<=0?'none':'';
+}
+
+function start(){const T=q.get('t');if(T!==null){render(+T*30);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+document.fonts.load('700 14px "Noto Sans TC"',CFG.fontChars||'').then(()=>document.fonts.load('900 14px "Noto Sans TC"',CFG.fontChars||'')).then(start,start);
+</script></body></html>

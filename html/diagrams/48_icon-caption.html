@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D48 圖示＋說明（アイコン＋説明）</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@700;900&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f15}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#151b23;box-shadow:inset 0 0 0 1px #1d242e}
+#card::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(150,170,200,.10) 1px,transparent 1.3px) 4px 4px/12px 12px}
+svg{position:absolute;left:0;top:0;width:324px;height:126px}
+text{font-family:'Noto Sans TC',sans-serif}
+.mono{font-family:'Roboto Mono',monospace}
+</style></head><body><div id="card"><svg id="s" viewBox="0 0 324 126" xmlns="http://www.w3.org/2000/svg">
+<g id="content"></g>
+</svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  items:[['時短','作業減半'],['安全','資料有保障'],['高速','不用等待']],   // [標題, 說明]
+  cyan:'#6fe6f9', cardBg:'#202836', cardStroke:'#2a3342',
+  start:[2.5,11.5,20.5]                                                      // 各卡片出現幀（量測：每 9 幀一張）
+};
+const FONT_TEXT=CFG.items.map(r=>r.join('')).join('');
+/* ================ */
+const LOOP=120;                      // LOOP=120 幀（4 秒）：動作→停留→硬切回第 0 幀重播
+const q=new URLSearchParams(location.search);
+const $=id=>document.getElementById(id);
+const Z=+q.get('z')||1;if(Z!=1)$('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3),eo2=x=>1-(1-x)*(1-x),ei=x=>x*x*x,eio=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const tb=(a,x,x0)=>{const k=x-x0;if(k<=0)return a[0];if(k>=a.length-1)return a[a.length-1];const i=Math.floor(k);return a[i]+(a[i+1]-a[i])*(k-i)};
+const NS='http://www.w3.org/2000/svg',CY='#6fe6f9',CONTENT=$('content');
+const mk=(tag,at,par,txt)=>{const e=document.createElementNS(NS,tag);for(const k in at)e.setAttribute(k,at[k]);if(txt!=null)e.textContent=txt;(par||CONTENT).appendChild(e);return e};
+const xf=(el,tx,ty,s,cx,cy)=>el.setAttribute('transform','translate('+(tx+cx)+' '+(ty+cy)+') scale('+s+') translate('+(-cx)+' '+(-cy)+')');
+const op=(el,v)=>el.setAttribute('opacity',v);
+let C=[];
+const CXS=[61,162,263];
+const CS=[.51,.83,1.07,1.19,1.22,1.21,1.18,1.12,1.07,1.04,1.02,1.0];     // 卡片彈出倍率（以面積換算的量測值，起點後 0.5 幀起）
+function mix(a,b,t){return 'rgb('+a.map((v,i)=>Math.round(v+(b[i]-v)*t)).join(',')+')'}
+function init(){
+  mk('circle',{cx:60,cy:27,r:1.8,fill:'#6fd3e0','fill-opacity':.8});     // 底圖左上的小亮點
+  CFG.items.forEach((it,i)=>{
+    const cx=CXS[i],o={cx};
+    o.g=mk('g',{});
+    mk('rect',{x:cx-45,y:9,width:90,height:107,rx:11,fill:CFG.cardBg,stroke:CFG.cardStroke,'stroke-width':1},o.g);
+    const st={fill:'none',stroke:CFG.cyan,'stroke-width':3,'stroke-linecap':'round','stroke-linejoin':'round',pathLength:100,'stroke-dasharray':'100 100'};
+    let d;
+    if(i==0)d='M'+cx+' 26.5A11.5 11.5 0 1 1 '+(cx-.01)+' 26.5M'+cx+' 32V39L'+(cx+5)+' 42.5';
+    else if(i==1)d='M'+cx+' 26.5L'+(cx+11)+' 30.5V39C'+(cx+11)+' 45 '+(cx+5)+' 49 '+cx+' 51.5C'+(cx-5)+' 49 '+(cx-11)+' 45 '+(cx-11)+' 39V30.5ZM'+(cx-5)+' 39L'+(cx-1.5)+' 42.5L'+(cx+5.5)+' 35';
+    else d='M'+(cx+3)+' 26L'+(cx-8)+' 41H'+(cx-1)+'L'+(cx-3)+' 52L'+(cx+8)+' 36H'+(cx+1)+'Z';
+    o.ic=mk('path',Object.assign({d},st),o.g);
+    o.t=mk('text',{x:cx,y:82,'text-anchor':'middle','font-size':15,'font-weight':900,fill:'#f2f6fb'},o.g,it[0]);
+    o.s=mk('text',{x:cx,y:97.5,'text-anchor':'middle','font-size':8.5,'font-weight':700,fill:'#9aa3b2'},o.g,it[1]);
+    C.push(o);
+  });
+}
+function draw(u){
+  C.forEach((o,i)=>{const s=CFG.start[i];
+    const on=u>=s+.5;op(o.g,on?1:0);xf(o.g,0,0,on?tb(CS,u,s+.5):.01,o.cx,62.5);
+    o.ic.setAttribute('stroke-dashoffset',100*(1-seg(u,s+4,s+11)));
+    const t=seg(u,s+10.5,s+17.5);op(o.t,seg(u,s+10.5,s+14));o.t.setAttribute('fill',mix([107,117,133],[242,246,251],t));
+    const a=seg(u,s+13.5,s+19.5),b=seg(u,s+19,s+25.5);op(o.s,a);o.s.setAttribute('fill',mix([95,104,118],[154,163,178],b));
+  });
+}
+function frame(r){draw(r,r)}
+function start(){
+  init();
+  const T=q.get('t');if(T!==null){frame((+T*30)%LOOP);return}
+  const t0=performance.now();(function tick(){frame(((performance.now()-t0)/1000*30)%LOOP);requestAnimationFrame(tick)})();
+}
+document.fonts.load('900 16px "Noto Sans TC"',FONT_TEXT).then(()=>document.fonts.load('700 16px "Noto Sans TC"',FONT_TEXT)).then(()=>document.fonts.load('700 10px "Roboto Mono"','POINT+%NGOK')).then(start,start);
+</script></body></html>

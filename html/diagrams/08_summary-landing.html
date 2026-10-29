@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D08 總結圖解</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@700;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f15}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#151b23;box-shadow:inset 0 0 0 1px #1d2530}
+#card::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.05) 1px,transparent 1.2px) 0 0/12px 12px}
+svg{position:absolute;left:0;top:0}
+text{font-family:'Noto Sans TC',sans-serif}
+</style></head><body><div id="card"><svg id="s" width="324" height="126" viewBox="0 0 324 126"></svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  title:'總結', items:['快速','便宜','簡單'], goal:'確認',
+  frame:[13.5,7.5,294,110.5],                        // x,y,w,h
+  framePop:[.3,.5,.78,.9,.98,1.04,1.05,1.054,1.034,1.014,1], framePopStart:12,
+  pills:{x:27,w:146,h:20,ys:[56,80,104],start:[24,32,40],
+         slide:[79,43,1,21,31,33,25,9,6,8,1,2,1,0]},   // 由左衝入→回彈→定位（量自參考，相對定位點的位移）
+  ring:{cx:248,cy:66,r:32}, fillStart:54,
+  fillScale:[.23,.51,.75,.93,1.05,1.07,1.08,1.09,1.07,1.06,1.04,1.02,1.01,1],
+  titleStart:14, labelStart:57,
+  cyan:'#76e9f5', pillFill:'#05323c', frameFill:'#162330', white:'#f4f6fa', dark:'#03111c', gray:'#7c8693',
+  SH:12,                                            // 幀偏移：render(0) 對應動作內部第 12 幀（動作從第 0 幀附近起跑）
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3);
+const NS='http://www.w3.org/2000/svg';const S=document.getElementById('s');
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);(p||S).appendChild(e);return e}
+const defs=el('defs',{});
+/* 外框 */
+const root=el('g',{});
+const fr=CFG.frame;
+const frame=el('rect',{x:fr[0],y:fr[1],width:fr[2],height:fr[3],rx:13,fill:'none',stroke:CFG.cyan,'stroke-width':1.6,'vector-effect':'non-scaling-stroke'},root);
+const title=el('text',{x:42,y:28,'font-size':15,'font-weight':900,fill:CFG.cyan},root);title.textContent=CFG.title;
+/* 清單膠囊 */
+const P=CFG.items.map((t,i)=>{
+  const g=el('g',{},root),y=CFG.pills.ys[i],p=CFG.pills;
+  el('rect',{x:p.x,y:y-p.h/2,width:p.w,height:p.h,rx:p.h/2,fill:CFG.pillFill,stroke:CFG.cyan,'stroke-width':1.4},g);
+  el('text',{x:p.x+10,y:y+4,'font-size':11,'font-weight':900,fill:CFG.white},g).textContent=t;
+  const ck=el('path',{d:'M-3.5 0.2L-1 2.8L3.6 -2.6',fill:'none',stroke:CFG.cyan,'stroke-width':1.6,'stroke-linecap':'round','stroke-linejoin':'round',transform:`translate(${p.x+p.w-12} ${y})`},g);
+  return{g,ck,i}
+});
+/* 右側圓 */
+const R=CFG.ring;
+const ringG=el('g',{});
+el('circle',{cx:R.cx,cy:R.cy,r:R.r,fill:'none',stroke:CFG.cyan,'stroke-width':2.2},ringG);
+const ripple=el('circle',{cx:R.cx,cy:R.cy,r:R.r,fill:'none',stroke:CFG.cyan,'stroke-width':1.4},ringG);
+const disk=el('g',{});
+el('circle',{cx:0,cy:0,r:28.5,fill:CFG.cyan},disk);
+el('path',{d:'M-12 1L-3.5 10L13 -9',fill:'none',stroke:CFG.dark,'stroke-width':5,'stroke-linecap':'round','stroke-linejoin':'round'},disk);
+const lab=el('text',{x:R.cx,y:112,'font-size':7,'font-weight':700,fill:CFG.gray,'text-anchor':'middle'},root);lab.textContent=CFG.goal;
+function render(F){
+  F+=CFG.SH;
+  /* 外框彈出 */
+  const k=F-CFG.framePopStart,fp=CFG.framePop;
+  const s=k<0?0:fp[Math.min(fp.length-1,Math.floor(k))];
+  frame.setAttribute('transform',`translate(160.5 63) scale(${s}) translate(-160.5 -63)`);
+  frame.setAttribute('opacity',k<0?0:1);
+  title.setAttribute('opacity',F>=CFG.titleStart?1:0);
+  /* 膠囊衝入 */
+  P.forEach(o=>{
+    const t=F-CFG.pills.start[o.i],sl=CFG.pills.slide;
+    let off=sl[0]+20,a=0;
+    if(t>=0){a=1;if(t>=sl.length-1)off=0;else{const i0=Math.floor(t),f=t-i0;off=sl[i0]+(sl[i0+1]-sl[i0])*f}}
+    o.g.setAttribute('transform',`translate(${-off} 0)`);o.g.setAttribute('opacity',a);
+    const ct=F-(CFG.pills.start[o.i]+8);
+    const cs=ct<0?0:[.4,1.2,1][Math.min(2,Math.floor(ct))];
+    o.ck.setAttribute('opacity',ct<0?0:1);
+    o.ck.setAttribute('transform',`translate(${CFG.pills.x+CFG.pills.w-12} ${CFG.pills.ys[o.i]}) scale(${cs})`);
+  });
+  /* 圓填滿 + 勾 */
+  const fk=F-CFG.fillStart,fs=fk<0?0:CFG.fillScale[Math.min(CFG.fillScale.length-1,Math.floor(fk))];
+  disk.setAttribute('transform',`translate(${R.cx} ${R.cy}) scale(${fs})`);
+  /* 擴散環（原版近似） */
+  const rp=seg(F,CFG.fillStart,CFG.fillStart+13);
+  ripple.setAttribute('r',R.r+eo(rp)*12);ripple.setAttribute('opacity',rp>0&&rp<1?.55*(1-rp):0);
+  lab.setAttribute('opacity',seg(F,CFG.labelStart,CFG.labelStart+4));
+}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+document.fonts.load('900 15px "Noto Sans TC"','總結快速便宜簡單確認').then(start,start);
+</script></body></html>

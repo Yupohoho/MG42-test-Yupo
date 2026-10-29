@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D05 運作原理解說</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@700;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f15}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#151b23;box-shadow:inset 0 0 0 1px #1d2530}
+#card::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.05) 1px,transparent 1.2px) 0 0/12px 12px}
+svg{position:absolute;left:0;top:0}
+text{font-family:'Noto Sans TC',sans-serif}
+</style></head><body><div id="card"><svg id="s" width="324" height="126" viewBox="0 0 324 126"></svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  boxes:[ // 標題, 副標, 中心x, 入場方向(dx,dy), 入場幀, 圖示
+    {t:'輸入',sub:'資料',x:49,dir:[-1,0],f:16,icon:'in'},
+    {t:'處理',sub:'轉換',x:160.5,dir:[0,-1],f:25,icon:'gear',hi:true},
+    {t:'輸出',sub:'結果',x:272,dir:[1,0],f:34,icon:'out'}],
+  subStart:[29,38,47],              // 副標出現幀
+  arrows:[[39,46],[47,53]],         // 兩條箭頭畫線起訖幀
+  bounce:[75,50,17,10,22,27,25,15,1,7,5,2,0],  // 入場位移（量自參考：衝入→回彈→定位）
+  cyan:'#76e9f5', line:'#8ee8f6', fillGray:'#202937', fillHi:'#12323b', white:'#f1f4f9', sub:'#8a94a3',
+  SH:15,                            // 幀偏移：render(0) 對應動作內部第 15 幀（動作從第 0 幀附近起跑）
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const NS='http://www.w3.org/2000/svg';const S=document.getElementById('s');
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);(p||S).appendChild(e);return e}
+const root=el('g',{});
+function gearPath(r1,r2,n){let d='';for(let i=0;i<n*2;i++){const a0=(i/(n*2))*Math.PI*2,a1=((i+1)/(n*2))*Math.PI*2,r=i%2?r1:r2;const aa=a0+Math.PI/n*.0;d+=(i?'L':'M')+(Math.cos(a0)*r).toFixed(2)+' '+(Math.sin(a0)*r).toFixed(2)+'L'+(Math.cos((a0+a1)/2)*r).toFixed(2)+' '+(Math.sin((a0+a1)/2)*r).toFixed(2)}return d+'Z'}
+const B=CFG.boxes.map((b,i)=>{
+  const g=el('g',{},root),inner=el('g',{},g);
+  el('rect',{x:b.x-34,y:36,width:68,height:57,rx:11,fill:b.hi?CFG.fillHi:CFG.fillGray,stroke:CFG.cyan,'stroke-width':b.hi?2.2:1.6},inner);
+  const ic=el('g',{transform:`translate(${b.x} 51)`},inner);
+  if(b.icon==='gear'){
+    el('path',{d:gearPath(8.2,11.5,8),fill:CFG.cyan,stroke:CFG.cyan,'stroke-width':1.5,'stroke-linejoin':'round'},ic);
+    el('circle',{r:3.6,fill:CFG.fillHi},ic);
+  }else{
+    el('rect',{x:-11,y:-7.5,width:22,height:15,rx:3,fill:'none',stroke:CFG.line,'stroke-width':1.8},ic);
+    if(b.icon==='in'){el('path',{d:'M-6 -1.5H6M-6 3H1',stroke:CFG.line,'stroke-width':1.6,'stroke-linecap':'round'},ic)}
+    else{el('path',{d:'M-11 1.5H-4L-2 4H2L4 1.5H11',fill:'none',stroke:CFG.line,'stroke-width':1.6,'stroke-linejoin':'round'},ic)}
+  }
+  el('text',{x:b.x,y:84,'font-size':13,'font-weight':900,fill:CFG.white,'text-anchor':'middle'},inner).textContent=b.t;
+  const sub=el('text',{x:b.x,y:113,'font-size':8.5,'font-weight':700,fill:CFG.sub,'text-anchor':'middle'},root);sub.textContent=b.sub;
+  return{g,inner,sub,b}
+});
+const AR=CFG.arrows.map((a,i)=>{
+  const x0=i?200:90,x1=i?233:123;
+  const g=el('g',{},root);
+  const l=el('line',{x1:x0,y1:64.5,x2:x0,y2:64.5,stroke:CFG.line,'stroke-width':1.6,'stroke-linecap':'round'},g);
+  const h=el('path',{d:'M-5 -4L1 0L-5 4',fill:'none',stroke:CFG.line,'stroke-width':1.6,'stroke-linecap':'round','stroke-linejoin':'round'},g);
+  return{l,h,x0,x1}
+});
+function render(F){
+  F+=CFG.SH;
+  B.forEach((o,i)=>{
+    const k=F-o.b.f;let off,a=1;
+    if(k<0){off=CFG.bounce[0];a=0}else if(k>=CFG.bounce.length-1)off=0;else{const i0=Math.floor(k),fr=k-i0;off=CFG.bounce[i0]+(CFG.bounce[i0+1]-CFG.bounce[i0])*fr}
+    /* 入場方向：由外側（左/上/右）進來 */
+    const dx=-o.b.dir[0]*0+o.b.dir[0]*off*-1,dy=o.b.dir[1]*off*-1;
+    o.inner.setAttribute('transform',`translate(${o.b.dir[0]*-off*-1} ${-o.b.dir[1]*off*-1}) translate(${0} ${0})`);
+    o.inner.setAttribute('transform',`translate(${o.b.dir[0]*off} ${o.b.dir[1]*off})`);
+    o.g.setAttribute('opacity',a);
+    o.sub.setAttribute('opacity',seg(F,CFG.subStart[i],CFG.subStart[i]+3));
+  });
+  AR.forEach((a,i)=>{
+    const [s,e]=CFG.arrows[i],p=seg(F,s,e),x=a.x0+(a.x1-a.x0)*p;
+    a.l.setAttribute('x2',x);a.l.setAttribute('opacity',p>0?1:0);
+    a.h.setAttribute('transform',`translate(${x} 64.5)`);a.h.setAttribute('opacity',p>=1?1:0);
+  });
+}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+document.fonts.load('900 13px "Noto Sans TC"','輸入處理輸出資料轉換結果').then(start,start);
+</script></body></html>

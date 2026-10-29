@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D17 ピラミッド構造</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f15}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#0b0f15}
+#stage{position:absolute;inset:0;background:#151b23}
+#stage::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.07) .8px,transparent 1.1px) 0 -2px/10.667px 10.667px}
+#svg{position:absolute;left:0;top:0}
+text{font-family:'Noto Sans TC',sans-serif}
+</style></head><body><div id="card"><div id="stage"><svg id="svg" width="324" height="126" viewBox="0 0 324 126"></svg></div></div>
+<script>
+/* ================ 共用框架（掃光入場／角框＋中心點／掃光退場），各張共通 ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3),eo2=x=>1-Math.pow(1-x,2),ei=x=>x*x*x,eio=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const lerp=(a,b,t)=>a+(b-a)*t;
+function tab(arr,p){const i=Math.floor(p),j=Math.min(arr.length-1,i+1),a=arr[cl(i,0,arr.length-1)];return a+(arr[j]-a)*(p-i)}
+const NS='http://www.w3.org/2000/svg';
+const SVG=document.getElementById('svg');
+function el(tag,attrs,parent){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);(parent||SVG).appendChild(e);return e}
+const CYAN='#6ee7f9';
+const gC=el('g',{},SVG);
+/* 動作從第 0 幀起；SH＝動作第一個可見幀的內部 p 值；做完後停留到 LOOP 結束，硬切重播 */
+const SH=18;
+function render(f){
+  f=Math.floor(f+1e-6)%CFG.LOOP;
+  draw(Math.min(f+SH,84),f);
+}
+/* ===== CFG：D17 金字塔結構（上位概念與下位概念往上堆疊）===== */
+const CFG={
+  LOOP:120,                                   // 一輪幀數（30fps）
+  levels:[['願景','少數'],['策略','方針'],['戰術','措施'],['執行','多數']], // 由上到下：[主標, 副標]
+  col:{apex:'#6ee5f8',L1:'#225767',L2:'#207080',L3:'#24899e',gap:'#05192b',text:'#e8ecf2',sub:'#8a93a2',top:'#6ee5f8',lineOut:'#3a414b',lineIn:'#0b2230'},
+  labelStart:[48,40,31,23],                   // 各層標籤開始淡入的幀（由上到下）
+  fontChars:'願景策略戰術執行少數方針措施多'
+};
+const CX=101,K=.675;
+const tr=(y0,y1,h0,h1,y0c,y1c)=>{ // 梯形（y0..y1，上下半寬 h0,h1），可再裁成 y0c..y1c
+  y0c=y0c===undefined?y0:y0c;y1c=y1c===undefined?y1:y1c;
+  const hw=y=>lerp(h0,h1,(y-y0)/(y1-y0));
+  return [[CX-hw(y0c),y0c],[CX+hw(y0c),y0c],[CX+hw(y1c),y1c],[CX-hw(y1c),y1c]].map(a=>a[0].toFixed(2)+','+a[1].toFixed(2)).join(' ')};
+const P=(c,a)=>el('polygon',Object.assign({fill:c,stroke:CFG.col.gap,'stroke-width':1.2,'stroke-linejoin':'round'},a||{}),gC);
+/* 疊序：越上面的層越在下面（頂點最底、最底層色塊最上），後出現的層從已出現的層後面長出 */
+const pAp=P(CFG.col.apex),pL1=P(CFG.col.L1),pL1w=P(CFG.col.apex,{stroke:'none'}),pL2=P(CFG.col.L1),pL2w=P(CFG.col.L2,{stroke:'none'}),pL3=P(CFG.col.L3),pL4=P(CFG.col.L3);
+const gL=el('g',{},gC);
+const rows=[103,75.5,48.5,21],lineX=[147,138,132,120],lineY=[104.5,77,49.5,22];
+const labs=CFG.levels.slice().reverse().map((lv,i)=>{ // i=0 最底層
+  const top=i===3;
+  const ln1=el('line',{stroke:CFG.col.lineIn,'stroke-width':1},gL),ln2=el('line',{stroke:CFG.col.lineOut,'stroke-width':1},gL);
+  const t=el('text',{x:185,y:rows[i]+5.3,'font-size':15.5,'font-weight':900,fill:top?CFG.col.top:CFG.col.text},gL);t.textContent=lv[0];
+  const s=el('text',{x:268,y:rows[i]+4.5,'font-size':11.5,'font-weight':700,fill:CFG.col.sub},gL);s.textContent=lv[1];
+  return{t,s,ln1,ln2,i}});
+const YB=[130,122,117,115,115],HB=[68.5,72.5,72.5,70,71.5],CUT2=[88,79,71,64,63],CUT1=[60.5,52,44,39,36.5],TIP=[26,19.5,13.5,9.5,9];
+function draw(p,f){
+  /* 底層：第3、4塊合併並拉到定位 p18~22 */
+  const u3=eo(seg(p,19,22.5)),yb=p<19?114.5:tab(YB,p-19),hb=p<19?K*79.5:tab(HB,p-19);
+  const h3t=lerp(K*55,K*82,u3);
+  pL4.setAttribute('points',tr(117,141,K*82,K*106));pL4.style.display='none'; /* 一開始不存在的整座金字塔拿掉；從底層（pL3）開始出現 */
+  pL3.style.opacity=seg(p,18,21);pL2.style.opacity=seg(p,23,26);pL1.style.opacity=pL1w.style.opacity=seg(p,31,34);
+  pL3.setAttribute('points',tr(lerp(90,91,u3),yb,h3t,hb));
+  /* 第2層：變寬＋由下往上變色 p26~30 */
+  const u2=eo(seg(p,26,30));
+  const t2=u2,y2a=63,y2b=lerp(86.5,87.5,u2),h2a=lerp(K*28,K*54,u2),h2b=lerp(K*51.5,K*78,u2);
+  pL2.setAttribute('points',tr(y2a,y2b,h2a,h2b));
+  const c2=p<26?88:tab(CUT2,p-26);
+  pL2w.setAttribute('points',tr(y2a,y2b,h2a,h2b,Math.min(c2,y2b),y2b));pL2w.style.display=c2>=y2b?'none':'';
+  /* 第1層：三角形長成梯形、亮色由下往上退 p34~38 */
+  const u1=eo(seg(p,34,38)),y1a=lerp(35,36,u1),y1b=lerp(59.5,60.5,u1),h1a=K*0+u1*K*27,h1b=lerp(K*24.5,K*51.5,u1);
+  pL1.setAttribute('points',tr(y1a,y1b,h1a,h1b));
+  const c1=p<34?61:tab(CUT1,p-34);
+  pL1w.setAttribute('points',tr(y1a,y1b,h1a,h1b,y1a,Math.max(y1a,Math.min(c1,y1b))));pL1w.style.display=c1<=y1a+.6?'none':'';
+  /* 新頂點三角形往上長出 p43~47 */
+  if(p<43)pAp.style.display='none';else{const tip=tab(TIP,p-43),b=33.8;pAp.style.display='';
+    pAp.setAttribute('points',CX+','+tip+' '+(CX+K*(b-tip))+','+b+' '+(CX-K*(b-tip))+','+b)}
+  /* 標籤、連線依序淡入 */
+  labs.forEach(L=>{const s=CFG.labelStart[3-L.i],a=seg(p,s,s+6.5),a2=seg(p,s+2,s+8);
+    L.t.style.opacity=a;L.s.style.opacity=a2;
+    const y=lineY[L.i],ex=CX+K*(y-9);
+    L.ln1.setAttribute('x1',lineX[L.i]);L.ln1.setAttribute('x2',ex);L.ln1.setAttribute('y1',y);L.ln1.setAttribute('y2',y);
+    L.ln2.setAttribute('x1',ex);L.ln2.setAttribute('x2',176);L.ln2.setAttribute('y1',y);L.ln2.setAttribute('y2',y);
+    L.ln1.style.opacity=a;L.ln2.style.opacity=a});
+}
+
+function start(){const T=q.get('t');if(T!==null){render(+T*30);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+document.fonts.load('700 14px "Noto Sans TC"',CFG.fontChars||'').then(()=>document.fonts.load('900 14px "Noto Sans TC"',CFG.fontChars||'')).then(start,start);
+</script></body></html>

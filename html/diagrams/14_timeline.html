@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D14 D14 時間軸線</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@700;900&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f15}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#151b23;box-shadow:inset 0 0 0 1px #1b2029}
+#card::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.07) .8px,transparent 1px) 0 0/12px 12px}
+#svg{position:absolute;left:0;top:0;display:block}
+</style></head><body><div id="card"><svg id="svg" width="324" height="126" viewBox="0 0 324 126"></svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  labels:['過去','現在','未來'], years:['2020','2026','2030'],
+  cyan:'#6fe6f8',
+  fontText:'過去現在未來0123456789',
+  A:-2, LOOP:120
+};
+/* ================ */
+
+const q=new URLSearchParams(location.search);
+const card=document.getElementById('card'),svg=document.getElementById('svg');
+const Z=+q.get('z')||1;if(Z!=1)card.style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const NS='http://www.w3.org/2000/svg';
+function E(tag,a,p){const e=document.createElementNS(NS,tag);for(const k in a)e.setAttribute(k,a[k]);(p||svg).appendChild(e);return e}
+const SANS='"Noto Sans TC",sans-serif',MONO='"Roboto Mono",monospace';
+function T(p,str,x,y,sz,fill,o){o=o||{};const t=E('text',{x:x,y:y,'font-size':sz,fill:fill,'text-anchor':o.a||'middle','dominant-baseline':'central','font-weight':o.w||700,'font-family':o.f||SANS},p);if(o.ls)t.setAttribute('letter-spacing',o.ls);t.textContent=str;return t}
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+const eo=x=>1-Math.pow(1-cl(x),3);
+const POP=[.45,.78,.98,1.09,1.12,1.10,1.05,1.02,1.0];
+const pv=(arr,k)=>k<0?0:(k>=arr.length?1:arr[k]);
+function setT(g,cx,cy,sx,sy,dx,dy){g.setAttribute('transform','translate('+(cx+(dx||0))+' '+(cy+(dy||0))+') scale('+sx+' '+sy+') translate('+(-cx)+' '+(-cy)+')')}
+function show(e,v){e.style.display=v?'':'none'}
+const CY=CFG.cyan,BG='#151b23',PANEL='#0b0f15';
+const gC=E('g');
+const SC=scene();
+/* 動作從第 0 幀起（s=f+2，第 0 幀即第一個元素出現）；做完後停留到 LOOP 結束，硬切重播 */
+function render(f){
+  SC.draw(f-CFG.A);
+}
+function start(){
+  const T0=q.get('t');
+  if(T0!==null){render(Math.floor(+T0*30+1e-6)%CFG.LOOP);return}
+  const t0=performance.now();
+  (function tick(){render(Math.floor((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})();
+}
+const FONTTXT=CFG.fontText||'';
+Promise.all([document.fonts.load('700 14px "Noto Sans TC"',FONTTXT),document.fonts.load('900 14px "Noto Sans TC"',FONTTXT),document.fonts.load('500 8px "Roboto Mono"','0123456789YESNO')]).then(start,start);
+
+
+function scene(){
+  const Y=67.5,CXs=[53.5,162,269.5];
+  const mkTrack=p=>E('line',{x1:16,x2:304,y1:Y,y2:Y,stroke:'#262d38','stroke-width':3},p);
+  const g=gC;mkTrack(g);
+  const solid=E('line',{x1:17,x2:17,y1:Y,y2:Y,stroke:CY,'stroke-width':3},g);
+  const dash=E('line',{x1:162,x2:162,y1:Y,y2:Y,stroke:CY,'stroke-width':3,'stroke-dasharray':'5 4'},g);
+  const head=E('polygon',{points:'0,0 -8,-4.6 -8,4.6',fill:CY},g);
+  const SOL=[17,19,43,63,83,99,113,125,133,141,147,153,157,159,159,161];
+  const DSH={18:173,19:200,20:220,21:239,22:247,23:267,24:276,25:285,26:285,27:295,28:295,29:295,30:302,31:303};
+  const TP=[.25,.4,.6,.85,1,1.12,1.12,1.06,1.0],LP=[.25,.65,.88,1.04,1.06,1.04,1.02,1.0];
+  const cs=[],ls=[],ys=[];
+  const halo=E('circle',{cx:CXs[1],cy:Y,r:19,fill:'none',stroke:'rgba(255,255,255,.22)','stroke-width':1.3},g);
+  for(let i=0;i<3;i++){
+    const gg=E('g',{},g);
+    if(i==1)E('circle',{cx:CXs[i],cy:Y,r:10.5,fill:CY},gg);else E('circle',{cx:CXs[i],cy:Y,r:7,fill:BG,stroke:CY,'stroke-width':2.2},gg);
+    cs.push(gg);
+    const lg=E('g',{},g);T(lg,CFG.labels[i],CXs[i],40,i==1?17:16,i==1?CY:'#eef1f6',{w:900});ls.push(lg);
+    ys.push(T(g,CFG.years[i],CXs[i],90.5,9,'#8b94a3',{f:MONO,w:500}));
+  }
+  const cS=[2,17,31],lS=[3,18,33],yS=[10,24,40];
+  return{draw(s){
+    cs.forEach((gg,i)=>{const k=s-cS[i],sc=i==1?pv(POP,k):pv(TP,k);show(gg,sc>0);if(sc>0){setT(gg,CXs[i],Y,sc,sc);gg.style.opacity=cl(.5+.25*k)}});
+    ls.forEach((gg,i)=>{const k=s-lS[i],sc=pv(LP,k);show(gg,sc>0);if(sc>0){setT(gg,CXs[i],i==1?41:40,sc,sc);gg.style.opacity=cl(.5+.25*k)}});
+    ys.forEach((t,i)=>{t.style.opacity=cl((s-yS[i]+1)/4)});
+    show(halo,s>=20);halo.style.opacity=cl((s-20)/4);
+    const si=cl(s,0,SOL.length-1);solid.setAttribute('x2',SOL[Math.floor(si)]);
+    const dx=s<18?0:(s>=32?303:DSH[s]);show(dash,dx>0);if(dx>0)dash.setAttribute('x2',dx);
+    show(head,s>=30);head.setAttribute('transform','translate(306 67.5)');
+  }}
+}
+
+</script></body></html>

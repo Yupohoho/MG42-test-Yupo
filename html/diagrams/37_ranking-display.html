@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D37 排行榜顯示</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f15}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#151b23;box-shadow:inset 0 0 0 1px #1c2430}
+#card::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.05) 1px,transparent 1.2px) 0 0/12px 12px}
+#stage{position:absolute;inset:0}
+.rk{position:absolute;left:12px;width:30px;height:30px;text-align:center;font-size:23px;font-weight:900;line-height:30px}
+.bar{position:absolute;left:48px;height:30px;border-radius:7px;overflow:hidden}
+.in{position:absolute;left:0;top:0;height:30px}
+.nm{position:absolute;left:12px;top:0;font-size:13px;font-weight:900;line-height:30px;white-space:nowrap}
+.pt{position:absolute;right:8px;top:0;font-size:10px;font-weight:900;line-height:30px;letter-spacing:.5px;white-space:nowrap}
+#crown{position:absolute;left:256px;top:16px;overflow:visible}
+</style></head><body><div id="card"><div id="stage"><svg id="crown" width="27" height="18" viewBox="256 16 27 18"><polygon points="256,20 262,26 269,16 276,26 282,20 280,33 258,33" fill="#68e0f8" stroke="#68e0f8" stroke-width="1.5" stroke-linejoin="round"/></svg></div></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  rows:[  // 由上到下：第 1 名 → 第 3 名（登場順序是 3 → 2 → 1）
+    {rank:1, name:'商品A', pt:98, y:13, w:203, t0:32, dur:12, bar:[104,224,248], txt:[14,26,40],   pt2:[14,26,40],    rk:[104,224,248]},
+    {rank:2, name:'商品B', pt:82, y:46.5, w:159, t0:20, dur:12, bar:[56,72,88],  txt:[217,225,237], pt2:[160,172,192], rk:[150,160,178]},
+    {rank:3, name:'商品C', pt:61, y:80, w:122, t0:8,  dur:11, bar:[56,72,88],  txt:[217,225,237], pt2:[160,172,192], rk:[150,160,178]}
+  ],
+  pw:2.2,                                   // 長條增長緩出冪次（量到：每幀增量線性遞減）
+  crownT0:44, crownScale:[.36,.74,.96,1.06,1.17,1.17,1.07,1.05,1.02,1],   // 皇冠彈出逐幀縮放（量到）
+  off:6,                                  // 起點偏移：動作從第 0 幀附近開始
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eoP=(x,p)=>1-Math.pow(1-x,p);
+const st=document.getElementById('stage'),rgb=c=>'rgb('+c+')';
+const R=CFG.rows.map(r=>{
+  const k=document.createElement('div');k.className='rk';k.style.top=r.y+'px';k.textContent=r.rank;k.style.color=rgb(r.rk);st.appendChild(k);
+  const b=document.createElement('div');b.className='bar';b.style.top=r.y+'px';b.style.background=rgb(r.bar);
+  b.innerHTML='<div class="in"><div class="nm"></div><div class="pt"></div></div>';
+  const inn=b.firstChild;inn.style.width=r.w+'px';
+  inn.querySelector('.nm').textContent=r.name;inn.querySelector('.nm').style.color=rgb(r.txt);
+  inn.querySelector('.pt').textContent='PT '+r.pt;inn.querySelector('.pt').style.color=rgb(r.pt2);
+  st.appendChild(b);return{r,k,b}});
+const crown=document.getElementById('crown');crown.style.transformOrigin='13.5px 9px';
+function render(f){
+  R.forEach(o=>{
+    const r=o.r,t=seg(f,r.t0,r.t0+r.dur),w=r.w*eoP(t,CFG.pw);
+    o.k.style.opacity=f>=r.t0?1:0;
+    o.b.style.width=Math.max(0,w)+'px';o.b.style.opacity=f>=r.t0?1:0;
+  });
+  const k=Math.floor(f-CFG.crownT0);
+  const s=f<CFG.crownT0?0:CFG.crownScale[Math.min(CFG.crownScale.length-1,k)];
+  crown.style.transform='scale('+s+')';
+}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP+CFG.off);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP+CFG.off);requestAnimationFrame(tick)})()}
+document.fonts.load('900 13px "Noto Sans TC"','商品ABCPT0123456789').then(()=>document.fonts.load('900 23px "Noto Sans TC"','123')).then(start,start);
+</script></body></html>

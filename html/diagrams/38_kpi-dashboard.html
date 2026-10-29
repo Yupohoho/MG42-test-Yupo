@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D38 KPI 儀表板</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f15}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#151b23;box-shadow:inset 0 0 0 1px #1c2430}
+#card::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.05) 1px,transparent 1.2px) 0 0/12px 12px}
+#stage{position:absolute;inset:0}
+.k{position:absolute;width:148px;height:54px;box-sizing:border-box;border-radius:10px;background:#202830;box-shadow:inset 0 0 0 1px #262f3b}
+.lb{position:absolute;left:12px;top:6px;font-size:9px;font-weight:500;color:#8590a3;line-height:12px}
+.vl{position:absolute;left:12px;top:21px;display:flex;align-items:baseline;line-height:24px;white-space:nowrap}
+.vl b{font-size:20px;font-weight:900;color:#f6f7fb}
+.vl i{font-style:normal;font-size:9px;font-weight:500;color:#8c96a8;margin-left:6px;position:relative;top:1px}
+.dl{position:absolute;right:10px;top:6px;height:13px;padding:0 5px;border-radius:4px;background:#143840;color:#5fe3ee;font-size:8px;font-weight:700;line-height:13px;letter-spacing:.3px}
+.sp{position:absolute;left:106px;bottom:7px;width:38px;height:18px}
+.sp u{position:absolute;bottom:0;width:6.7px;border-radius:1.5px;background:#3c465a;text-decoration:none}
+</style></head><body><div id="card"><div id="stage"></div></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  cards:[ // x,y 為小卡左上角；t0 為出現幀；v 為目標值、dec 為小數位
+    {x:10,   y:3.5,  t0:8,  label:'營收',   v:1280, dec:0, unit:'萬元', d:'▲+12%', bars:[7,10,10.5]},
+    {x:166.5,y:3.5,  t0:14, label:'會員數', v:3480, dec:0, unit:'人',   d:'▲+8%',  bars:[7,10,10.5]},
+    {x:10,   y:63.5, t0:20, label:'轉換率', v:4.2,  dec:1, unit:'%',    d:'▲+0.6', bars:[7,10,10.5]},
+    {x:166.5,y:63.5, t0:25, label:'滿意度', v:98,   dec:0, unit:'分',   d:'▲+3',   bars:[7,10,10.5]}
+  ],
+  slide:[16,7,0],               // 小卡出現時由下往上滑入，逐幀位移（量到：3 幀）
+  cLen:27, pw:2.6,              // 數字 0→目標：緩出
+  cyanH:15.7,                   // 最後一根青色長條最終高度（隨數字增長）
+  barDelay:9, barLen:8,         // 灰色長條在小卡出現後多久開始長
+  off:6,                                  // 起點偏移：動作從第 0 幀附近開始
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eoP=(x,p)=>1-Math.pow(1-x,p);
+const st=document.getElementById('stage');
+const K=CFG.cards.map(c=>{
+  const e=document.createElement('div');e.className='k';e.style.left=c.x+'px';e.style.top=c.y+'px';
+  e.innerHTML='<div class="lb"></div><div class="vl"><b></b><i></i></div><div class="dl"></div><div class="sp"></div>';
+  e.querySelector('.lb').textContent=c.label;e.querySelector('i').textContent=c.unit;e.querySelector('.dl').textContent=c.d;
+  const sp=e.querySelector('.sp');const xs=[0,9.3,18.6,27.9];
+  const us=xs.map((x,i)=>{const u=document.createElement('u');u.style.left=x+'px';if(i==3)u.style.background='#5fe3ee';sp.appendChild(u);return u});
+  st.appendChild(e);return{c,e,num:e.querySelector('b'),us}});
+function render(f){
+  K.forEach(o=>{
+    const c=o.c,k=Math.floor(f-c.t0);
+    const vis=f>=c.t0;
+    const dy=vis?(k<CFG.slide.length?CFG.slide[k]:0):0;
+    o.e.style.opacity=vis?(k<3?[.5,.85,1][Math.max(0,k)]:1):0;
+    o.e.style.transform='translateY('+dy+'px)';
+    const p=eoP(seg(f,c.t0+1.5,c.t0+1.5+CFG.cLen),CFG.pw);
+    const val=c.v*p;
+    o.num.textContent=c.dec?val.toFixed(c.dec):Math.round(val).toLocaleString('en-US');
+    o.us.forEach((u,i)=>{
+      if(i<3){u.style.height=c.bars[i]*eoP(seg(f,c.t0+CFG.barDelay+i*1.5,c.t0+CFG.barDelay+i*1.5+CFG.barLen),2)+'px'}
+      else u.style.height=CFG.cyanH*p+'px'});
+  });
+}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP+CFG.off);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP+CFG.off);requestAnimationFrame(tick)})()}
+document.fonts.load('900 23px "Noto Sans TC"','0123456789,.').then(()=>document.fonts.load('500 10px "Noto Sans TC"','營收會員數轉換率滿意度萬元人分%')).then(()=>document.fonts.load('700 8px "Noto Sans TC"','▲+0123456789%.')).then(start,start);
+</script></body></html>

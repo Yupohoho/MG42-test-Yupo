@@ -90,6 +90,7 @@ const CATS = [
   { key: 'N',  name: '數字動畫' },
   { key: 'S',  name: '轉場' },
   { key: 'S2', name: '轉場2' },
+  { key: 'D',  name: '圖表動畫' },
   { key: 'B',  name: '背景動畫' },
   { key: 'SH', name: '圖形動畫' },
 ];
@@ -106,7 +107,7 @@ const io = new IntersectionObserver(es => es.forEach(e => {
   else f.setAttribute('src', 'about:blank');
 }), { rootMargin: '150px' });
 // 動態頁面預設是 324×106；尺寸不同的分頁寫在這裡（預覽框照該尺寸的比例，不會出現捲軸），依格子寬度等比縮放
-const SIZE = { T3: [284, 158], N: [324, 124] };
+const SIZE = { T3: [284, 158], N: [324, 124], D: [324, 126] };
 const sizeOf = key => SIZE[key] || [324, 106];
 const ro = new ResizeObserver(es => es.forEach(e => {
   const f = e.target.querySelector('iframe'); if (f) f.style.transform = `scale(${e.contentRect.width / (+f.dataset.w || 324)})`;

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D21 中心放射図</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f15}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#0b0f15}
+#stage{position:absolute;inset:0;background:#151b23}
+#stage::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.07) .8px,transparent 1.1px) 0 -2px/10.667px 10.667px}
+#svg{position:absolute;left:0;top:0}
+text{font-family:'Noto Sans TC',sans-serif}
+</style></head><body><div id="card"><div id="stage"><svg id="svg" width="324" height="126" viewBox="0 0 324 126"></svg></div></div>
+<script>
+/* ================ 共用框架（掃光入場／角框＋中心點／掃光退場），各張共通 ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3),eo2=x=>1-Math.pow(1-x,2),ei=x=>x*x*x,eio=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const lerp=(a,b,t)=>a+(b-a)*t;
+function tab(arr,p){const i=Math.floor(p),j=Math.min(arr.length-1,i+1),a=arr[cl(i,0,arr.length-1)];return a+(arr[j]-a)*(p-i)}
+const NS='http://www.w3.org/2000/svg';
+const SVG=document.getElementById('svg');
+function el(tag,attrs,parent){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);(parent||SVG).appendChild(e);return e}
+const CYAN='#6ee7f9';
+const gC=el('g',{},SVG);
+/* 動作從第 0 幀起；SH＝動作第一個可見幀的內部 p 值；做完後停留到 LOOP 結束，硬切重播 */
+const SH=17;
+function render(f){
+  f=Math.floor(f+1e-6)%CFG.LOOP;
+  draw(Math.min(f+SH,84),f);
+}
+/* ===== CFG：D21 中心放射圖（從中心向外擴散要素）===== */
+const CFG={
+  LOOP:120,                                   // 一輪幀數（30fps）
+  center:'目標',
+  // 順時針：[文字, 線起點, 線終點(=方塊彈出支點), 方塊中心, 線開始幀]
+  items:[['集客',[180,49.5],[200.5,33.5],[219,22.5],27],
+         ['商品',[184,62],[250.5,62],[275,62],31.5],
+         ['價格',[180,74.5],[200.5,90.5],[219,99.5],36],
+         ['體驗',[144.5,74.5],[124,90.5],[105,99.5],41],
+         ['廣告',[140.5,62],[72,62],[48,62],45],
+         ['口碑',[144.5,49.5],[126,33.5],[105,22.5],50]],
+  col:{cyan:'#6ee6fa',line:'#3ea9b8',pill:'#1c2530',text:'#f1f4f8',ctext:'#0b1a24',ring:'#6ee6fa'},
+  fontChars:'目標集客商品價格體驗廣告口碑'
+};
+const C=CFG.col,CC=[162.3,62];
+const S_CIR=[.1,.55,.77,.93,1.05,1.09,1.09,1.09,1.05,1.0];                          // p17~26 中心圓彈出倍率（量測）
+const S_PILL=[.06,.22,.31,.37,.57,.78,.96,1.1,1.12,1.12,1.08,1.04,1.02,1.0];        // 方塊彈出倍率（以線尖端為支點，量測）
+const ring2=el('circle',{cx:CC[0],cy:CC[1],r:26,fill:'none',stroke:C.ring,'stroke-width':1},gC);
+const lines=CFG.items.map(it=>el('line',{stroke:C.line,'stroke-width':2},gC));
+const cir=el('g',{},gC);
+el('circle',{r:21.8,fill:C.cyan},cir);
+const ct=el('text',{x:0,y:5.5,'text-anchor':'middle','font-size':15.5,'font-weight':900,fill:C.ctext},cir);ct.textContent=CFG.center;
+const pills=CFG.items.map(it=>{const g=el('g',{},gC);
+  el('rect',{x:-25,y:-11,width:50,height:22,rx:11,fill:C.pill,stroke:C.cyan,'stroke-width':1.6},g);
+  const t=el('text',{x:0,y:4.8,'text-anchor':'middle','font-size':13.5,'font-weight':700,fill:C.text},g);t.textContent=it[0];return g});
+function draw(p,f){
+  const s=p<17?0:tab(S_CIR,p-17);
+  cir.setAttribute('transform','translate('+CC[0]+' '+CC[1]+') scale('+s+')');cir.style.display=s<=.01?'none':'';
+  /* 光環：先小圈，後段有一次向外擴散，最後停在較大的淡圈 */
+  let r=26,a=.28;
+  if(p<22)a=0;else if(p>=58){const u=seg(p,58,74);r=lerp(26,30.5,eo(u));a=lerp(.28,.22,u)}
+  ring2.setAttribute('r',r);ring2.style.opacity=a;
+  CFG.items.forEach((it,i)=>{
+    const u=eo(seg(p,it[4],it[4]+3));
+    if(u<=0)lines[i].style.display='none';else{lines[i].style.display='';
+      lines[i].setAttribute('x1',it[1][0]);lines[i].setAttribute('y1',it[1][1]);
+      lines[i].setAttribute('x2',lerp(it[1][0],it[2][0],u));lines[i].setAttribute('y2',lerp(it[1][1],it[2][1],u))}
+    const t=p-(it[4]+2.3),sc=t<0?0:tab(S_PILL,t),O=it[2],Cp=it[3];
+    pills[i].setAttribute('transform','translate('+(O[0]+sc*(Cp[0]-O[0]))+' '+(O[1]+sc*(Cp[1]-O[1]))+') scale('+sc+')');
+    pills[i].style.display=sc<=.01?'none':''});
+}
+
+function start(){const T=q.get('t');if(T!==null){render(+T*30);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+document.fonts.load('700 14px "Noto Sans TC"',CFG.fontChars||'').then(()=>document.fonts.load('900 14px "Noto Sans TC"',CFG.fontChars||'')).then(start,start);
+</script></body></html>

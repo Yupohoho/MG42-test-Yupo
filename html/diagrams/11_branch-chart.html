@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D11 D11 分歧流程圖</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@700;900&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f15}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#151b23;box-shadow:inset 0 0 0 1px #1b2029}
+#card::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.07) .8px,transparent 1px) 0 0/12px 12px}
+#svg{position:absolute;left:0;top:0;display:block}
+</style></head><body><div id="card"><svg id="svg" width="324" height="126" viewBox="0 0 324 126"></svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  cond:'條件', yes:'執行', no:'再檢討', yesLabel:'YES', noLabel:'NO',
+  cyan:'#6fe6f8',
+  fontText:'條件執行再檢討YESNO',
+  S:1, LOOP:120   // S：幀偏移，動作從第 0 幀附近起跑
+};
+/* ================ */
+
+const q=new URLSearchParams(location.search);
+const card=document.getElementById('card'),svg=document.getElementById('svg');
+const Z=+q.get('z')||1;if(Z!=1)card.style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const NS='http://www.w3.org/2000/svg';
+function E(tag,a,p){const e=document.createElementNS(NS,tag);for(const k in a)e.setAttribute(k,a[k]);(p||svg).appendChild(e);return e}
+const SANS='"Noto Sans TC",sans-serif',MONO='"Roboto Mono",monospace';
+function T(p,str,x,y,sz,fill,o){o=o||{};const t=E('text',{x:x,y:y,'font-size':sz,fill:fill,'text-anchor':o.a||'middle','dominant-baseline':'central','font-weight':o.w||700,'font-family':o.f||SANS},p);if(o.ls)t.setAttribute('letter-spacing',o.ls);t.textContent=str;return t}
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+const eo=x=>1-Math.pow(1-cl(x),3);
+const POP=[.45,.78,.98,1.09,1.12,1.10,1.05,1.02,1.0];
+const pv=(arr,k)=>k<0?0:(k>=arr.length?1:arr[k]);
+function setT(g,cx,cy,sx,sy,dx,dy){g.setAttribute('transform','translate('+(cx+(dx||0))+' '+(cy+(dy||0))+') scale('+sx+' '+sy+') translate('+(-cx)+' '+(-cy)+')')}
+function show(e,v){e.style.display=v?'':'none'}
+const CY=CFG.cyan,BG='#151b23',PANEL='#0b0f15';
+const gC=E('g');
+const SC=scene();
+function render(f){
+  SC.draw(f+CFG.S);
+}
+function start(){
+  const T0=q.get('t');
+  if(T0!==null){render(Math.floor(+T0*30+1e-6)%CFG.LOOP);return}
+  const t0=performance.now();
+  (function tick(){render(Math.floor((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})();
+}
+const FONTTXT=CFG.fontText||'';
+Promise.all([document.fonts.load('700 14px "Noto Sans TC"',FONTTXT),document.fonts.load('900 14px "Noto Sans TC"',FONTTXT),document.fonts.load('500 8px "Roboto Mono"','0123456789YESNO')]).then(start,start);
+
+
+function scene(){
+  const g=gC,GRAY='#7f8896';
+  const dia=E('g',{},g);
+  E('polygon',{points:'63.5,32 96.5,61 63.5,90 30.5,61',fill:'#232c3a',stroke:CY,'stroke-width':2,'stroke-linejoin':'round'},dia);
+  T(dia,CFG.cond,63.5,61.5,13,'#f2f5f9');
+  const stem=E('line',{x1:97,y1:61,x2:97,y2:61,stroke:CY,'stroke-width':2},g);
+  const vu=E('line',{x1:130.5,x2:130.5,y1:61,y2:61,stroke:CY,'stroke-width':2},g);
+  const vd=E('line',{x1:130.5,x2:130.5,y1:61,y2:61,stroke:GRAY,'stroke-width':2},g);
+  const bu=E('line',{x1:130.5,x2:130.5,y1:28.5,y2:28.5,stroke:CY,'stroke-width':2},g);
+  const bd=E('line',{x1:130.5,x2:130.5,y1:93.5,y2:93.5,stroke:GRAY,'stroke-width':2},g);
+  const hu=E('polygon',{points:'0,0 -6,-3.6 -6,3.6',fill:CY},g),hd=E('polygon',{points:'0,0 -6,-3.6 -6,3.6',fill:GRAY},g);
+  const yl=T(g,CFG.yesLabel,155,16.5,8,'#b4bcc8',{f:MONO,w:700}),nl=T(g,CFG.noLabel,155,81,8,GRAY,{f:MONO,w:700});
+  const yb=E('g',{},g),nb=E('g',{},g);
+  const yr=E('rect',{x:178.5,y:10.5,width:131,height:36,rx:8,fill:'#232c3a',stroke:CY,'stroke-width':1.8},yb);
+  const yt=T(yb,CFG.yes,244,29,15,'#f2f5f9',{w:900});
+  E('rect',{x:178.5,y:76.5,width:131,height:34,rx:8,fill:'#1b222c',stroke:'#566070','stroke-width':1.6},nb);
+  T(nb,CFG.no,244,94,15,'#8d96a5',{w:900});
+  const stemP=[0,.45,.72,.93,1],vP=[.29,.52,.71,.86,.94,.97,1],brP=[.38,.65,.82,.93,1];
+  const yW=[.74,.9,.99,1.04,1.04,1.04,1.03,1.01,1.0],yH=[.47,.79,.97,1.08,1.1,1.08,1.05,1.0,1.0];
+  const nW=[.19,.64,.89,1.03,1.05,1.05,1.02,1.01,1.0],nH=[.28,.67,.94,1.06,1.15,1.15,1.1,1.05,1.0];
+  return{draw(s){
+    {const k=s-2,sc=pv(POP,k);show(dia,sc>0);if(sc>0){setT(dia,63.5,61,sc,sc);dia.style.opacity=cl(.5+.25*k)}}
+    {const k=s-11,p=k<0?0:stemP[Math.min(k,4)];show(stem,p>0);stem.setAttribute('x2',97+31.5*p)}
+    {const k=s-18,p=k<0?0:(k>=vP.length?1:vP[k]);show(vu,p>0);show(vd,p>0);vu.setAttribute('y2',61-33.5*p);vd.setAttribute('y2',61+32.5*p)}
+    {const k=s-26,p=k<0?0:(k>=brP.length?1:brP[k]);show(bu,p>0);show(bd,p>0);show(hu,p>.3);show(hd,p>.3);
+     const xe=130.5+45.5*p;bu.setAttribute('x2',xe-3);bd.setAttribute('x2',xe-3);hu.setAttribute('transform','translate('+xe+' 28.5)');hd.setAttribute('transform','translate('+xe+' 93.5)');
+     yl.style.opacity=cl((s-25)/4);nl.style.opacity=cl((s-25)/4)}
+    {const k=s-32;show(yb,k>=0);if(k>=0){setT(yb,244,28.5,pv(yW,k),pv(yH,k));yb.style.opacity=cl(.5+.25*k);
+      const f=s>=42;yr.setAttribute('fill',f?CY:'#232c3a');yt.setAttribute('fill',f?'#0b1f2a':'#f2f5f9')}}
+    {const k=s-36;show(nb,k>=0);if(k>=0){setT(nb,244,93.5,pv(nW,k),pv(nH,k));nb.style.opacity=cl(.5+.25*k)}}
+  }}
+}
+
+</script></body></html>

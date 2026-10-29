@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D29 數值比較長條</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&family=Montserrat:wght@700;800&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#06080c}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#0b0f15}
+#wrap{position:absolute;inset:0}
+#tex{position:absolute;inset:0;background:#151b23}
+#tex::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.07) .8px,transparent 1px) 6px 6px/12px 12px}
+#axis{position:absolute;left:56px;top:10px;width:1px;height:104px;background:#2d3645;opacity:0}
+.lb{position:absolute;left:17px;width:40px;font-size:11px;line-height:16px;font-weight:900;color:#f3f6fb;opacity:0}
+.bar{position:absolute;left:62px;height:20px;border-radius:6px;background:#394a5f;opacity:0}
+.nm{position:absolute;font:800 16px/20px Montserrat,sans-serif;color:#f3f6fb;opacity:0;white-space:nowrap}
+.me .lb{color:#6ee6f9}.me .bar{background:#6ee5fc}.me .nm{color:#6ee6f9}
+</style></head><body><div id="card"><div id="wrap"><div id="tex"></div>
+<div id="scene"><div id="axis"></div></div></div></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  names:['A社','B社','自社'],
+  vals:[45,72,98],          // 數值（長條長度＝數值 × PX）
+  PX:1.94,
+  S:13,   // 動作起始偏移：讓動作從第 0 幀開始，做完停留到結尾後硬切重播
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const $=id=>document.getElementById(id);
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+// 實測：各長條逐幀長度（A 從 r18、B 從 r25、自社從 r32 起）
+const GA=[10,20,29,37,44,50,56,61,65,69,72,75,77,79,81,82,83,84,84,84,85].map(v=>v/85);
+const GB=[12,28,42,55,67,78,88,96,104,110,116,121,125,128,131,133,135,136,137,138,138,139].map(v=>v/139);
+const GC=[7,29,50,68,86,101,115,127,138,148,156,163,169,174,179,182,185,187,188,190,190,191].map(v=>v/191);
+const ROWS=[{y:23,s:18,g:GA},{y:58,s:25,g:GB},{y:92,s:32,g:GC}];
+const items=ROWS.map((R,i)=>{
+  const c=document.createElement('div');if(i===2)c.className='me';
+  const lb=document.createElement('div');lb.className='lb';lb.textContent=CFG.names[i];lb.style.top=(R.y+2)+'px';
+  const bar=document.createElement('div');bar.className='bar';bar.style.top=R.y+'px';
+  const nm=document.createElement('div');nm.className='nm';nm.style.top=R.y+'px';
+  c.appendChild(lb);c.appendChild(bar);c.appendChild(nm);$('scene').appendChild(c);return{R,lb,bar,nm,v:CFG.vals[i]}});
+function render(f){
+  const r=f+CFG.S;
+  $('axis').style.opacity=seg(r,13,18);
+  items.forEach(it=>{
+    const R=it.R,k=r-R.s;
+    it.lb.style.opacity=seg(r,R.s-1,R.s+2);
+    if(k<0){it.bar.style.opacity=0;it.nm.style.opacity=0;return}
+    const g=R.g[Math.min(k,R.g.length-1)];
+    const w=Math.max(0,g*it.v*CFG.PX);
+    it.bar.style.opacity=1;it.bar.style.width=w+'px';
+    it.nm.style.opacity=seg(r,R.s+1,R.s+4);it.nm.style.left=(62+w+8)+'px';it.nm.textContent=Math.round(g*it.v);
+  });
+}
+function start(){const T=q.get('t');if(T!==null){render(Math.floor(+T*30+1e-6)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(Math.floor((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+Promise.all([document.fonts.load('900 12px "Noto Sans TC"','A社B社自社'),document.fonts.load('800 16px Montserrat','0123456789')]).then(start,start);
+</script></body></html>

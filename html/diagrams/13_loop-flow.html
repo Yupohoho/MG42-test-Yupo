@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D13 D13 循環流程</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@700;900&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f15}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#151b23;box-shadow:inset 0 0 0 1px #1b2029}
+#card::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.07) .8px,transparent 1px) 0 0/12px 12px}
+#svg{position:absolute;left:0;top:0;display:block}
+</style></head><body><div id="card"><svg id="svg" width="324" height="126" viewBox="0 0 324 126"></svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  plan:'計畫', doit:'執行', check:'評估', center:'改善', sub:'持續循環',
+  cyan:'#6fe6f8',
+  fontText:'計畫執行評估改善持續循環',
+  A:-2, LOOP:120
+};
+/* ================ */
+
+const q=new URLSearchParams(location.search);
+const card=document.getElementById('card'),svg=document.getElementById('svg');
+const Z=+q.get('z')||1;if(Z!=1)card.style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const NS='http://www.w3.org/2000/svg';
+function E(tag,a,p){const e=document.createElementNS(NS,tag);for(const k in a)e.setAttribute(k,a[k]);(p||svg).appendChild(e);return e}
+const SANS='"Noto Sans TC",sans-serif',MONO='"Roboto Mono",monospace';
+function T(p,str,x,y,sz,fill,o){o=o||{};const t=E('text',{x:x,y:y,'font-size':sz,fill:fill,'text-anchor':o.a||'middle','dominant-baseline':'central','font-weight':o.w||700,'font-family':o.f||SANS},p);if(o.ls)t.setAttribute('letter-spacing',o.ls);t.textContent=str;return t}
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+const eo=x=>1-Math.pow(1-cl(x),3);
+const POP=[.45,.78,.98,1.09,1.12,1.10,1.05,1.02,1.0];
+const pv=(arr,k)=>k<0?0:(k>=arr.length?1:arr[k]);
+function setT(g,cx,cy,sx,sy,dx,dy){g.setAttribute('transform','translate('+(cx+(dx||0))+' '+(cy+(dy||0))+') scale('+sx+' '+sy+') translate('+(-cx)+' '+(-cy)+')')}
+function show(e,v){e.style.display=v?'':'none'}
+const CY=CFG.cyan,BG='#151b23',PANEL='#0b0f15';
+const gC=E('g');
+const SC=scene();
+/* 動作從第 0 幀起（s=f+2，第 0 幀即第一個元素出現）；做完後停留到 LOOP 結束，硬切重播 */
+function render(f){
+  SC.draw(f-CFG.A);
+}
+function start(){
+  const T0=q.get('t');
+  if(T0!==null){render(Math.floor(+T0*30+1e-6)%CFG.LOOP);return}
+  const t0=performance.now();
+  (function tick(){render(Math.floor((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})();
+}
+const FONTTXT=CFG.fontText||'';
+Promise.all([document.fonts.load('700 14px "Noto Sans TC"',FONTTXT),document.fonts.load('900 14px "Noto Sans TC"',FONTTXT),document.fonts.load('500 8px "Roboto Mono"','0123456789YESNO')]).then(start,start);
+
+
+function scene(){
+  const g=gC;
+  const A1='M196.9 23.9 A98.8 38.5 0 0 1 258.6 69',A2='M202.7 95.2 A98.8 38.5 0 0 1 122.3 95.2',A3='M66.4 69 A98.8 38.5 0 0 1 128.1 23.9';
+  function arc(d){return E('path',{d:d,pathLength:1,fill:'none',stroke:CY,'stroke-width':2.2,'stroke-linecap':'round','stroke-dasharray':'1 1'},g)}
+  const a1=arc(A1),a2=arc(A2),a3=arc(A3);
+  const hd=()=>E('polygon',{points:'0,0 -8,-4.4 -8,4.4',fill:CY},g);
+  const h1=hd(),h2=hd(),h3=hd();
+  h1.setAttribute('transform','translate(258.6 69) rotate(121.6)');h2.setAttribute('transform','translate(122.3 95.2) rotate(-170.2)');h3.setAttribute('transform','translate(128.1 23.9) rotate(-8.2)');
+  function pill(cx,cy,txt){const gg=E('g',{},g);E('rect',{x:cx-30,y:cy-12.5,width:60,height:25,rx:12.5,fill:BG,stroke:CY,'stroke-width':1.8},gg);T(gg,txt,cx,cy+.5,13,'#f2f5f9',{w:900});return{gg,cx,cy}}
+  const p1=pill(162.5,21.5,CFG.plan),p2=pill(236.5,85.5,CFG.doit),p3=pill(88,85.5,CFG.check);
+  const ct=T(g,CFG.center,162,60.5,18,'#58c4c8',{w:900}),cs=T(g,CFG.sub,162,76,8,'#7f8a98',{w:700,ls:.5});
+  const P1=[.28,.55,.72,.85,.92,.97,1],P2=[.1,.32,.53,.7,.86,.94,1],P3=[.1,.2,.35,.5,.65,.8,.92,1];
+  const pk=(a,k)=>k<0?0:(k>=a.length?1:a[k]);
+  /* 單一小球沿整圈橢圓持續流動：每 LOOP(120 幀) 剛好一圈、等角速；只沿三段弧線走、經過區塊時短淡出並直接接到下一段起點（不穿過區塊），且只出現在已畫出的部分 */
+  const LEG_P=[P1,P2,P3],LEG_S=[9,18,26],ARCS=[a1,a2,a3],LENS=ARCS.map(a=>a.getTotalLength());
+  const RNG=[[-69.6,13.5],[66,114],[166.5,249.6]],EX=159.5/180*0+98.8,EY=38.5,ECX=162.5,ECY=60,TH0=-69.6,FADE=6;
+  const orb=E('g',{},g);E('circle',{r:5,fill:'rgba(15,20,28,.7)',stroke:'rgba(255,255,255,.55)','stroke-width':1},orb);E('circle',{r:2.3,fill:'#bff6ff'},orb);
+  return{draw(s){
+    [[p1,2],[p2,11],[p3,20]].forEach(a=>{const k=s-a[1],sc=pv(POP,k);show(a[0].gg,sc>0);if(sc>0){setT(a[0].gg,a[0].cx,a[0].cy,sc,sc);a[0].gg.style.opacity=cl(.5+.25*k)}});
+    [[a1,h1,P1,9],[a2,h2,P2,18],[a3,h3,P3,26]].forEach(a=>{const p=pk(a[2],s-a[3]);show(a[0],p>0);a[0].setAttribute('stroke-dashoffset',1-p);show(a[1],p>=.9)});
+    ct.style.opacity=cl((s-31)/5);cs.style.opacity=cl((s-32)/6);
+    const ph=s+CFG.A,u=((ph/CFG.LOOP)%1+1)%1,TOT=RNG.reduce((t,r)=>t+r[1]-r[0],0),w=u*TOT;let ok=false,op=0,p=null,cum=0;
+    for(let j=0;j<3;j++){const a=RNG[j][0],L=RNG[j][1]-a;
+      if(w>=cum&&w<cum+L){const drawn=pk(LEG_P[j],s-LEG_S[j]);
+        if((w-cum)/L<=drawn){ok=true;op=Math.min((w-cum)/FADE,(cum+L-w)/FADE,1);const r=(a+w-cum)*Math.PI/180;p=[ECX+EX*Math.cos(r),ECY+EY*Math.sin(r)]}}
+      cum+=L}
+    show(orb,ok);if(ok){orb.setAttribute('transform','translate('+p[0]+' '+p[1]+')');orb.style.opacity=cl(op)}
+  }}
+}
+
+</script></body></html>

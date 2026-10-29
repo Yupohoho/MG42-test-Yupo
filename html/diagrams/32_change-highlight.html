@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D32 變化量強調</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#06080c}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#0b0f15}
+#wrap{position:absolute;inset:0}
+#tex{position:absolute;inset:0;background:#151b23}
+#tex::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.07) .8px,transparent 1px) 6px 6px/12px 12px}
+#scene{position:absolute;inset:0}
+.bar{position:absolute;width:27px;border-radius:4px 4px 1px 1px;background:#293544;bottom:21px}
+#tt{position:absolute;left:25px;top:4px;font-size:9px;line-height:12px;font-weight:700;color:#9aa4b4;white-space:nowrap;opacity:0}
+.lbl{position:absolute;width:44px;margin-left:-22px;text-align:center;font:900 12px/14px Montserrat,sans-serif;color:#6ee6f9;opacity:0}
+svg{position:absolute;left:0;top:0;overflow:visible}
+rect.d{fill:none;stroke:rgba(205,212,224,.85);stroke-width:1;stroke-dasharray:3 2.5;display:none}
+</style></head><body><div id="card"><div id="wrap"><div id="tex"><div id="base"></div></div>
+<div id="scene"><div id="tt"></div>
+<svg width="324" height="126"><rect class="d" id="d3" x="116.5" y="66.5" width="26" height="38"/><rect class="d" id="d5" x="210.5" y="60.5" width="26" height="44"/></svg>
+<div class="lbl" id="lp"></div><div class="lbl" id="lm"></div>
+</div></div></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  title:'只強調有變化的地方',
+  heights:[34,47,38,62,44,54],   // 起始高度（px）
+  up:2, down:4,                   // 變高的是第 3 根（索引 2），變矮的是第 5 根（索引 4）
+  upText:'+32', downText:'−32',
+  S:16,   // 動作起始偏移：讓動作從第 0 幀開始，做完停留到結尾後硬切重播
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const $=id=>document.getElementById(id);
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const at=(a,r,r0)=>a[cl(r-r0,0,a.length-1)];
+$('tt').textContent=CFG.title;$('lp').textContent=CFG.upText;$('lm').textContent=CFG.downText;
+// 實測：各長條長高曲線（逐幀高度 px，各自起始幀）
+const G=[{s:16,a:[7,12,17,21,24,26,29,30,32,32,33,33,34]},{s:17,a:[2,10,18,24,30,34,38,40,42,44,45,46,47]},
+  {s:19,a:[4,10,16,20,25,28,31,33,35,36,37,38]},{s:21,a:[7,18,27,35,41,46,51,54,57,60,60,61,62]},
+  {s:23,a:[7,15,21,26,31,34,37,40,41,43,44]},{s:25,a:[10,19,26,32,38,42,46,48,50,52,53,53,54]}];
+const UP=[40,40,40,42,42,44,48,52,56,58,58,59,60];     // 變高的那根，r43 起
+const DN=[46,46,46,46,46,40,36,32,30,26,26,25,24];     // 變矮的那根，r43 起
+const X0=[22,69,116,163,210,257];
+const bars=X0.map((x,i)=>{const d=document.createElement('div');d.className='bar';d.style.left=x+'px';$('scene').appendChild(d);return d});
+const POP1=[.65,.77,.93,1.0],POP2=[.4,.79,1.05,1.0];                            // 標籤縮放 r59／r63 起
+function render(f){
+  const r=f+CFG.S;
+  $('tt').style.opacity=seg(r,24,28);
+  bars.forEach((b,i)=>{
+    const g=G[i];let h;
+    if(r<g.s)h=0;else{const k=r-g.s;h=k>=g.a.length?CFG.heights[i]:g.a[k]*CFG.heights[i]/g.a[g.a.length-1]}
+    let col='#293544';
+    if(i===CFG.up||i===CFG.down){
+      const t=seg(r,27,33);const m=(a,b)=>Math.round(a+(b-a)*t);col='rgb('+m(41,58)+','+m(53,71)+','+m(68,94)+')';
+      if(r>=43){col='#6ee5fc';h=(i===CFG.up?at(UP,r,43):at(DN,r,43))}
+    }
+    b.style.height=(h>0?h+1:0)+'px';b.style.background=col;
+  });
+  $('d3').style.display=$('d5').style.display=r>=43?'block':'none';
+  const lp=$('lp'),lm=$('lm');
+  const hu=bars[CFG.up].offsetHeight;
+  lp.style.left=(X0[CFG.up]+13.5)+'px';lp.style.top=(104-Math.max(hu,60)-6-14)+'px';
+  lm.style.left=(X0[CFG.down]+13.5)+'px';lm.style.top=(104-CFG.heights[CFG.down]-7-14)+'px';
+  if(r<59){lp.style.opacity=0}else{lp.style.opacity=1;lp.style.transform='scale('+at(POP1,r,59)+')'}
+  if(r<63){lm.style.opacity=0}else{lm.style.opacity=1;lm.style.transform='scale('+at(POP2,r,63)+')'}
+}
+function start(){const T=q.get('t');if(T!==null){render(Math.floor(+T*30+1e-6)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(Math.floor((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+Promise.all([document.fonts.load('700 9px "Noto Sans TC"',CFG.title),document.fonts.load('900 12px Montserrat','+−32')]).then(start,start);
+</script></body></html>

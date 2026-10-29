@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D42 強調框（ハイライトボックス）</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@700;900&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f15}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#151b23;box-shadow:inset 0 0 0 1px #1d242e}
+#card::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(150,170,200,.10) 1px,transparent 1.3px) 4px 4px/12px 12px}
+svg{position:absolute;left:0;top:0;width:324px;height:126px}
+text{font-family:'Noto Sans TC',sans-serif}
+.mono{font-family:'Roboto Mono',monospace}
+</style></head><body><div id="card"><svg id="s" viewBox="0 0 324 126" xmlns="http://www.w3.org/2000/svg">
+<g id="content"></g>
+</svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  text:'營收比去年成長3倍',   // 被框起來的重點句
+  tag:'重點',                  // 右上角小標籤
+  cyan:'#6fe6f9', line:'#27303d', boxFill:'#0b2f39', textColor:'#eef7ff'
+};
+const FONT_TEXT=CFG.text+CFG.tag;
+/* ================ */
+const LOOP=120;                      // LOOP=120 幀（4 秒）：動作→停留→硬切回第 0 幀重播
+const q=new URLSearchParams(location.search);
+const $=id=>document.getElementById(id);
+const Z=+q.get('z')||1;if(Z!=1)$('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3),eo2=x=>1-(1-x)*(1-x),ei=x=>x*x*x,eio=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const tb=(a,x,x0)=>{const k=x-x0;if(k<=0)return a[0];if(k>=a.length-1)return a[a.length-1];const i=Math.floor(k);return a[i]+(a[i+1]-a[i])*(k-i)};
+const NS='http://www.w3.org/2000/svg',CY='#6fe6f9',CONTENT=$('content');
+const mk=(tag,at,par,txt)=>{const e=document.createElementNS(NS,tag);for(const k in at)e.setAttribute(k,at[k]);if(txt!=null)e.textContent=txt;(par||CONTENT).appendChild(e);return e};
+const xf=(el,tx,ty,s,cx,cy)=>el.setAttribute('transform','translate('+(tx+cx)+' '+(ty+cy)+') scale('+s+') translate('+(-cx)+' '+(-cy)+')');
+const op=(el,v)=>el.setAttribute('opacity',v);
+let L=[],mt,bf,bs,tg,tgt;
+// 灰色線條成長寬度（量測值，索引 0 = 起始幀）
+const LW1=[0,64,118,160,192,216,232,243,249,252];
+const LW3=[0,47,97,136,167,190,205,216,223,225,226];
+const TAGS=[.44,.77,.98,1.12,1.12,1.12,1.06,.98,1.0];                     // 標籤彈出倍率（量測）
+function init(){
+  const lc=CFG.line;
+  L=[mk('rect',{x:28,y:15,height:8,rx:4,fill:lc}),mk('rect',{x:28,y:29,height:6,rx:3,fill:lc}),
+     mk('rect',{x:28,y:83,height:8,rx:4,fill:lc}),mk('rect',{x:28,y:106,height:7,rx:3.5,fill:lc})];
+  bf=mk('rect',{x:18,y:42,width:288,height:31,rx:9,fill:CFG.boxFill});
+  mt=mk('text',{x:35,y:64,'font-size':18,'font-weight':900,fill:CFG.textColor},null,CFG.text);
+  bs=mk('rect',{x:18,y:42,width:288,height:31,rx:9,fill:'none',stroke:CFG.cyan,'stroke-width':2.2,pathLength:100,'stroke-dasharray':'100 100'});
+  tg=mk('g',{});mk('rect',{x:255,y:33,width:52,height:18,rx:9,fill:CFG.cyan},tg);
+  tgt=mk('text',{x:281,y:46,'text-anchor':'middle','font-size':10.5,'font-weight':900,fill:'#0a2a33'},tg,CFG.tag);
+}
+function draw(u){
+  const w=[tb(LW1,u,2)/252*252,tb(LW1,u,3)/252*66,tb(LW3,u,9)/226*226,tb(LW3,u,11)/226*164];
+  L.forEach((e,i)=>{e.setAttribute('width',Math.max(0,w[i]))});
+  op(mt,eo(seg(u,8,14)));mt.setAttribute('y',64+3*(1-eo(seg(u,8,14))));
+  // 外框：由左上順時針描繪（上緣→右緣→下緣→左緣），量測：約 r13 起、r25.5 畫完，前快後慢
+  const p=eo2(seg(u,13,25.5));
+  bs.setAttribute('stroke-dashoffset',100*(1-p));op(bs,u>=13?1:0);
+  op(bf,seg(u,20,30));
+  const s=u>=32.9?tb(TAGS,u,33):0;op(tg,s>0?1:0);xf(tg,0,0,Math.max(s,.01),281,42);
+}
+function frame(r){draw(r,r)}
+function start(){
+  init();
+  const T=q.get('t');if(T!==null){frame((+T*30)%LOOP);return}
+  const t0=performance.now();(function tick(){frame(((performance.now()-t0)/1000*30)%LOOP);requestAnimationFrame(tick)})();
+}
+document.fonts.load('900 16px "Noto Sans TC"',FONT_TEXT).then(()=>document.fonts.load('700 16px "Noto Sans TC"',FONT_TEXT)).then(()=>document.fonts.load('700 10px "Roboto Mono"','POINT+%NGOK')).then(start,start);
+</script></body></html>

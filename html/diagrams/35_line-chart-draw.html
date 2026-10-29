@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D35 折線圖描繪</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f15}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#151b23;box-shadow:inset 0 0 0 1px #1c2430}
+#card::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.05) 1px,transparent 1.2px) 0 0/12px 12px}
+#stage{position:absolute;inset:0}
+svg{position:absolute;left:0;top:0;overflow:visible}
+.ttl{position:absolute;left:16px;top:4px;font-size:8px;font-weight:500;color:#7d8798;line-height:10px}
+</style></head><body><div id="card"><div id="stage"><div class="ttl" id="ttl"></div>
+<svg width="324" height="126" id="svg"></svg></div></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  title:'趨勢',
+  pts:[[30,82.5],[74,76.5],[118,79.5],[162,61.5],[206,50],[250,37],[294,17]],  // 折線頂點（量到的像素位置）
+  baseY:101,
+  line:[96,224,240], bg:'#151b23',
+  drawStart:8.5, drawEnd:39, pw:2.7,        // 線條描繪（緩出，pw 為冪次）
+  badge:'+38%', pillL:237, pillT:13.5, pillW:50, pillH:20,
+  pillT0:48,                                 // 氣泡彈出起始幀
+  pillScale:[.55,.8,1.1,1.05,1.02,1.0],      // 氣泡縮放逐幀（量到：過衝約 10%）
+  dotAt:45,                                  // 終點變實心圓的幀
+  S:3,   // 動作起始偏移：讓動作從第 0 幀開始，做完停留到結尾後硬切重播
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eoP=(x,p)=>1-Math.pow(1-x,p);
+const NS='http://www.w3.org/2000/svg',svg=document.getElementById('svg'),st=document.getElementById('stage');
+const el=(n,a,p)=>{const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);(p||svg).appendChild(e);return e};
+document.getElementById('ttl').textContent=CFG.title;
+const P=CFG.pts,x0=P[0][0],xN=P[P.length-1][0],L=CFG.line,col='rgb('+L+')';
+el('defs',{}).innerHTML='<linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="'+col+'" stop-opacity=".16"/><stop offset="1" stop-color="'+col+'" stop-opacity="0"/></linearGradient><clipPath id="cp"><rect id="cr" x="0" y="0" width="0" height="126"/></clipPath>';
+el('line',{x1:14,x2:310,y1:CFG.baseY,y2:CFG.baseY,stroke:'rgb(31,37,45)','stroke-width':1});
+const poly=P.map(p=>p.join(',')).join(' ');
+const g=el('g',{'clip-path':'url(#cp)'});
+el('polygon',{points:P[0][0]+','+CFG.baseY+' '+poly+' '+xN+','+CFG.baseY,fill:'url(#g)'},g);
+el('polyline',{points:poly,fill:'none',stroke:col,'stroke-width':2.4,'stroke-linejoin':'round','stroke-linecap':'round'},g);
+const cr=document.getElementById('cr');
+const nodes=P.map(([x,y],i)=>{
+  const c=el('circle',{cx:x,cy:y,r:3.6,fill:CFG.bg,stroke:col,'stroke-width':2});
+  return{c,x,y,i}});
+const dot=el('circle',{cx:xN,cy:P[P.length-1][1],r:6,fill:'rgb(130,238,250)'});
+const pill=document.createElement('div');
+Object.assign(pill.style,{position:'absolute',left:CFG.pillL+'px',top:CFG.pillT+'px',width:CFG.pillW+'px',height:CFG.pillH+'px',borderRadius:'10px',background:'rgb(116,228,248)',color:'#0a1428',font:'900 12px/20px "Noto Sans TC"',textAlign:'center',transformOrigin:'100% 50%',boxShadow:'0 0 0 1px rgba(150,240,252,.5)'});
+pill.textContent=CFG.badge;st.appendChild(pill);
+function render(f){
+  f+=CFG.S;
+  document.getElementById('ttl').style.opacity=seg(f,5,9);
+  const t=seg(f,CFG.drawStart,CFG.drawEnd),u=eoP(t,CFG.pw);
+  const dx=x0+(xN-x0)*u;cr.setAttribute('width',f<CFG.drawStart?0:dx+2);
+  nodes.forEach(n=>{
+    let s;
+    if(n.i==0)s=seg(f,3,5);
+    else{const need=(n.x-x0)/(xN-x0);const tr=CFG.drawStart+(CFG.drawEnd-CFG.drawStart)*(1-Math.pow(1-Math.min(.9999,need),1/CFG.pw));s=seg(f,tr-.5,tr+1.5)}
+    // 彈出：0 → 1.2 → 1
+    const k=s<=0?0:(s<.6?s/.6*1.2:1.2-.2*seg(s,.6,1));
+    n.c.setAttribute('r',3.6*k);
+    if(n.i==P.length-1)n.c.setAttribute('opacity',f>=CFG.dotAt?0:1);
+  });
+  const ds=f>=CFG.dotAt;dot.setAttribute('opacity',ds?1:0);
+  const k=Math.floor(f-CFG.pillT0);
+  const sc=f<CFG.pillT0?0:CFG.pillScale[Math.min(CFG.pillScale.length-1,k)];
+  pill.style.transform='scale('+sc+')';
+}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+document.fonts.load('900 12px "Noto Sans TC"','+38%').then(()=>document.fonts.load('500 8px "Noto Sans TC"','趨勢')).then(start,start);
+</script></body></html>

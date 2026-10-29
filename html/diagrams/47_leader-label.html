@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D47 引出標籤（引き出しラベル）</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@700;900&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f15}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#151b23;box-shadow:inset 0 0 0 1px #1d242e}
+#card::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(150,170,200,.10) 1px,transparent 1.3px) 4px 4px/12px 12px}
+svg{position:absolute;left:0;top:0;width:324px;height:126px}
+text{font-family:'Noto Sans TC',sans-serif}
+.mono{font-family:'Roboto Mono',monospace}
+</style></head><body><div id="card"><svg id="s" viewBox="0 0 324 126" xmlns="http://www.w3.org/2000/svg">
+<g id="content"></g>
+</svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  labels:['螢幕','電池','鏡頭','按鈕'],         // 左上、左下、右上、右下
+  cyan:'#6fe6f9', start:[15,22.5,30,37.5]      // 各標籤起點幀（量測：每 7.5 幀一個）
+};
+const FONT_TEXT=CFG.labels.join('');
+/* ================ */
+const LOOP=120;                      // LOOP=120 幀（4 秒）：動作→停留→硬切回第 0 幀重播
+const q=new URLSearchParams(location.search);
+const $=id=>document.getElementById(id);
+const Z=+q.get('z')||1;if(Z!=1)$('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3),eo2=x=>1-(1-x)*(1-x),ei=x=>x*x*x,eio=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const tb=(a,x,x0)=>{const k=x-x0;if(k<=0)return a[0];if(k>=a.length-1)return a[a.length-1];const i=Math.floor(k);return a[i]+(a[i+1]-a[i])*(k-i)};
+const NS='http://www.w3.org/2000/svg',CY='#6fe6f9',CONTENT=$('content');
+const mk=(tag,at,par,txt)=>{const e=document.createElementNS(NS,tag);for(const k in at)e.setAttribute(k,at[k]);if(txt!=null)e.textContent=txt;(par||CONTENT).appendChild(e);return e};
+const xf=(el,tx,ty,s,cx,cy)=>el.setAttribute('transform','translate('+(tx+cx)+' '+(ty+cy)+') scale('+s+') translate('+(-cx)+' '+(-cy)+')');
+const op=(el,v)=>el.setAttribute('opacity',v);
+let ph,dots=[],lines=[],pills=[];
+const AN=[[152,39],[152,92],[171,21],[189,68]];                 // 手機上的錨點
+const PS=[.25,.78,.92,1.0,1.06,1.07,1.06,1.04,1.01,1.0];       // 手機彈出倍率（量測，r2 起，過衝約 7%）
+const PP=[.5,.85,1.1,1.1,1.04,1.0];                              // 標籤彈出倍率（r 起點後 8 幀起）
+const DP=[.4,1.25,1.1,1];
+function init(){
+  // 預留的小亮點（底圖就在）
+  const base=AN.map(a=>mk('circle',{cx:a[0],cy:a[1],r:1.4,fill:'#4a8a94'}));
+  ph=mk('g',{});
+  mk('rect',{x:133,y:9,width:57,height:107,rx:14,fill:'#112b32',stroke:'#f4f6fb','stroke-width':2.2},ph);
+  mk('circle',{cx:162,cy:14,r:2.4,fill:'#8a93a0'},ph);
+  mk('rect',{x:152.5,y:101.5,width:19,height:7,rx:3.5,fill:'#2a3340'},ph);
+  mk('rect',{x:191,y:66,width:2.6,height:14,rx:1.2,fill:'#6b7686'},ph);
+  CFG.labels.forEach((t,i)=>{
+    const left=i<2,w=Math.max(48,t.length*13+24),h=23;
+    const cy=[28.5,93,29,93][i];
+    const x=left?17:307-w;
+    const pg=mk('g',{});mk('rect',{x:x,y:cy-h/2,width:w,height:h,rx:h/2,fill:'#0f2128',stroke:CFG.cyan,'stroke-width':2},pg);
+    mk('text',{x:x+w/2,y:cy+4.6,'text-anchor':'middle','font-size':13,'font-weight':900,fill:'#f2f6fb'},pg,t);
+    const ex=left?x+w:x;                                   // 引線接到標籤的一側
+    const A=AN[i];
+    const d=[ 'M'+A[0]+' '+A[1]+'L80 28L'+ex+' 28',
+              'M'+A[0]+' '+A[1]+'L'+ex+' 93',
+              'M'+A[0]+' '+A[1]+'L247 29L'+ex+' 29',
+              'M'+A[0]+' '+A[1]+'L243 93L'+ex+' 93'][i];
+    lines.push(mk('path',{d,fill:'none',stroke:CFG.cyan,'stroke-width':1.7,'stroke-linecap':'round','stroke-linejoin':'round',pathLength:100,'stroke-dasharray':'100 100'}));
+    pills.push({g:pg,cx:x+w/2,cy});
+    dots.push({base:base[i],c:mk('circle',{cx:A[0],cy:A[1],r:3.5,fill:CFG.cyan})});
+  });
+}
+function draw(u){
+  const p=u>=2;op(ph,p?1:0);if(p)xf(ph,0,0,tb(PS,u,2),161.5,62.5);
+  CFG.start.forEach((s,i)=>{
+    const d=dots[i];const on=u>=s;op(d.c,on?1:0);if(on)xf(d.c,0,0,tb(DP,u,s),AN[i][0],AN[i][1]);
+    const lp=eo2(seg(u,s,s+6));lines[i].setAttribute('stroke-dashoffset',100*(1-lp));op(lines[i],lp>0?1:0);
+    const pg=pills[i],pk=u>=s+8;op(pg.g,pk?1:0);if(pk)xf(pg.g,0,0,tb(PP,u,s+8),pg.cx,pg.cy);
+  });
+}
+function frame(r){draw(r,r)}
+function start(){
+  init();
+  const T=q.get('t');if(T!==null){frame((+T*30)%LOOP);return}
+  const t0=performance.now();(function tick(){frame(((performance.now()-t0)/1000*30)%LOOP);requestAnimationFrame(tick)})();
+}
+document.fonts.load('900 16px "Noto Sans TC"',FONT_TEXT).then(()=>document.fonts.load('700 16px "Noto Sans TC"',FONT_TEXT)).then(()=>document.fonts.load('700 10px "Roboto Mono"','POINT+%NGOK')).then(start,start);
+</script></body></html>

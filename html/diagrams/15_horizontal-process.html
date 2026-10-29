@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D15 D15 橫向展開流程</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@700;900&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f15}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#151b23;box-shadow:inset 0 0 0 1px #1b2029}
+#card::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.07) .8px,transparent 1px) 0 0/12px 12px}
+#svg{position:absolute;left:0;top:0;display:block}
+</style></head><body><div id="card"><svg id="svg" width="324" height="126" viewBox="0 0 324 126"></svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  steps:['調查','設計','開發','驗證','上線'],
+  nums:['01','02','03','04','05'],
+  colors:['#245765','#3e7a86','#489aaa','#5abfc8','#6ee7f0'],
+  lineColor:'#9fdfea',
+  cyan:'#6fe6f8',
+  fontText:'調查設計開發驗證上線0123456789',
+  A:-2, LOOP:120
+};
+/* ================ */
+
+const q=new URLSearchParams(location.search);
+const card=document.getElementById('card'),svg=document.getElementById('svg');
+const Z=+q.get('z')||1;if(Z!=1)card.style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const NS='http://www.w3.org/2000/svg';
+function E(tag,a,p){const e=document.createElementNS(NS,tag);for(const k in a)e.setAttribute(k,a[k]);(p||svg).appendChild(e);return e}
+const SANS='"Noto Sans TC",sans-serif',MONO='"Roboto Mono",monospace';
+function T(p,str,x,y,sz,fill,o){o=o||{};const t=E('text',{x:x,y:y,'font-size':sz,fill:fill,'text-anchor':o.a||'middle','dominant-baseline':'central','font-weight':o.w||700,'font-family':o.f||SANS},p);if(o.ls)t.setAttribute('letter-spacing',o.ls);t.textContent=str;return t}
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+const eo=x=>1-Math.pow(1-cl(x),3);
+const POP=[.45,.78,.98,1.09,1.12,1.10,1.05,1.02,1.0];
+const pv=(arr,k)=>k<0?0:(k>=arr.length?1:arr[k]);
+function setT(g,cx,cy,sx,sy,dx,dy){g.setAttribute('transform','translate('+(cx+(dx||0))+' '+(cy+(dy||0))+') scale('+sx+' '+sy+') translate('+(-cx)+' '+(-cy)+')')}
+function show(e,v){e.style.display=v?'':'none'}
+const CY=CFG.cyan,BG='#151b23',PANEL='#0b0f15';
+const gC=E('g');
+const SC=scene();
+/* 動作從第 0 幀起（s=f+2，第 0 幀即第一個元素出現）；做完後停留到 LOOP 結束，硬切重播 */
+function render(f){
+  SC.draw(f-CFG.A);
+}
+function start(){
+  const T0=q.get('t');
+  if(T0!==null){render(Math.floor(+T0*30+1e-6)%CFG.LOOP);return}
+  const t0=performance.now();
+  (function tick(){render(Math.floor((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})();
+}
+const FONTTXT=CFG.fontText||'';
+Promise.all([document.fonts.load('700 14px "Noto Sans TC"',FONTTXT),document.fonts.load('900 14px "Noto Sans TC"',FONTTXT),document.fonts.load('500 8px "Roboto Mono"','0123456789YESNO')]).then(start,start);
+
+
+function scene(){
+  const PITCH=59.5,WID=66.5,D=9,Y1=41,Y2=85,YM=63;
+  const mkBase=p=>E('line',{x1:12,x2:311,y1:99.5,y2:99.5,stroke:'#262c34','stroke-width':1},p);
+  const g=gC;mkBase(g);
+  const line=E('line',{x1:18,x2:18,y1:99.5,y2:99.5,stroke:CFG.lineColor,'stroke-width':2},g);
+  const cS=[2,10,19,27,35],nS=[8,16,25,33,42];
+  const OFF=[-30,-20,-13,-8,-4.5,-2,0];
+  const cv=[],nu=[];
+  for(let i=0;i<5;i++){
+    const xl=11+PITCH*i,xr=xl+WID,gg=E('g',{},g);
+    const d=(i==0)?('M'+xl+' '+Y1+' L'+(xr-D)+' '+Y1+' L'+xr+' '+YM+' L'+(xr-D)+' '+Y2+' L'+xl+' '+Y2+' Z')
+      :('M'+xl+' '+Y1+' L'+(xr-D)+' '+Y1+' L'+xr+' '+YM+' L'+(xr-D)+' '+Y2+' L'+xl+' '+Y2+' L'+(xl+D)+' '+YM+' Z');
+    E('path',{d:d,fill:CFG.colors[i],stroke:CFG.colors[i],'stroke-width':3,'stroke-linejoin':'round'},gg);
+    T(gg,CFG.steps[i],xl+(i==0?(WID-D)/2:WID/2+1),YM+.5,14,i==4?'#0b2a33':'#f2f5f9',{w:900});
+    cv.push(gg);
+    nu.push(T(g,CFG.nums[i],xl+33.2,30,8,'#58c7d3',{f:MONO,w:500}));
+  }
+  return{draw(s){
+    cv.forEach((gg,i)=>{const k=s-cS[i];show(gg,k>=0);if(k>=0){gg.setAttribute('transform','translate('+pv2(OFF,k)+' 0)');gg.style.opacity=cl(.4+.3*k)}
+      nu[i].style.opacity=cl((s-nS[i]+1)/3)});
+    const p=eo((s-5)/32);show(line,s>=5);line.setAttribute('x2',18+291*p);
+  }};
+  function pv2(a,k){return k>=a.length?0:a[k]}
+}
+
+</script></body></html>

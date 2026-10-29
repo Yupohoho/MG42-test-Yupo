@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D06 資訊卡片連結</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@700;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f15}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#151b23;box-shadow:inset 0 0 0 1px #1d2530}
+#card::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.05) 1px,transparent 1.2px) 0 0/12px 12px}
+svg{position:absolute;left:0;top:0}
+text{font-family:'Noto Sans TC',sans-serif}
+</style></head><body><div id="card"><svg id="s" width="324" height="126" viewBox="0 0 324 126"></svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  nodes:[ // 標題, 副標, 框左x, 框上y, 寬, 高, 出現幀
+    ['認知','社群・廣告',12,10,87,45,15],
+    ['考慮','比較・口碑',117,66,86,46,21],
+    ['購買','下單・結帳',222,10,87,45,28]],
+  links:[ // 路徑, 起訖幀
+    {d:'M99 32.5C110 32.5 106 89 117 89',a:39,b:51},
+    {d:'M203 89C214 89 211 32.5 222 32.5',a:47,b:52}],
+  caption:'顧客流程', capStart:59,
+  cyan:'#76e9f5', box:'#131b29', white:'#f4f6fa', sub:'#8a94a3', cap:'#868c94',
+  SH:14,                       // 幀偏移：render(0) 對應動作內部第 14 幀（動作從第 0 幀附近起跑）
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3);
+const NS='http://www.w3.org/2000/svg';const S=document.getElementById('s');
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);(p||S).appendChild(e);return e}
+const root=el('g',{});
+const L=CFG.links.map(l=>el('path',{d:l.d,pathLength:1,fill:'none',stroke:CFG.cyan,'stroke-width':2.4,'stroke-linecap':'round','stroke-dasharray':'1 1','stroke-dashoffset':1},root));
+const RD=CFG.links.map((l,i)=>{const g=el('g',{},root),p=L[i];
+  el('circle',{r:5.5,fill:CFG.cyan,opacity:.3},g);el('circle',{r:2.8,fill:'#fff'},g);return{g,p,len:p.getTotalLength()}});
+const N=CFG.nodes.map(n=>{
+  const [t,s,x,y,w,h]=n,cx=x+w/2,cy=y+h/2;
+  const g=el('g',{},root),dots=el('g',{},g),box=el('g',{},g);
+  el('circle',{cx:x,cy,r:3,fill:CFG.cyan},dots);el('circle',{cx:x+w,cy,r:3,fill:CFG.cyan},dots);
+  el('rect',{x,y,width:w,height:h,rx:8,fill:CFG.box,stroke:CFG.cyan,'stroke-width':1.6},box);
+  el('text',{x:cx,y:cy+1,'font-size':16,'font-weight':900,fill:CFG.white,'text-anchor':'middle'},box).textContent=t;
+  el('text',{x:cx,y:cy+14,'font-size':7.5,'font-weight':700,fill:CFG.sub,'text-anchor':'middle'},box).textContent=s;
+  return{g,dots,box,cx,cy,t0:n[6]}
+});
+const cap=el('text',{x:60,y:102.5,'font-size':10.4,'font-weight':700,fill:CFG.cap,'text-anchor':'middle'},root);cap.textContent=CFG.caption;
+const POP=[.75,.9,1,1.06,1.02,1];
+function render(F){
+  F+=CFG.SH;
+  N.forEach(o=>{
+    const t=F-o.t0;
+    o.dots.setAttribute('opacity',t>=0?1:0);
+    const s=t<0?0:POP[Math.min(5,Math.floor(t))];
+    o.box.setAttribute('transform',`translate(${o.cx} ${o.cy}) scale(${s}) translate(${-o.cx} ${-o.cy})`);
+  });
+  L.forEach((p,i)=>{const l=CFG.links[i],v=eo(seg(F,l.a,l.b));p.setAttribute('stroke-dashoffset',1-v);p.setAttribute('opacity',v>0?1:0)});
+  RD.forEach((o,i)=>{const l=CFG.links[i],v=eo(seg(F,l.a,l.b));
+    /* 線一出現小圓就以恆定速度沿已畫出的部分流動，畫完無縫延續（週期 20 幀跑完全長，頭尾淡入淡出） */
+    if(v<=0){o.g.setAttribute('opacity',0);return}
+    const u=Math.min(v,((F-l.a)/20)%1);
+    const op=Math.min(1,u*8,(1-u)*8);
+    const pt=o.p.getPointAtLength(u*o.len);o.g.setAttribute('opacity',Math.max(0,op));o.g.setAttribute('transform',`translate(${pt.x} ${pt.y})`)});
+  const ct=F-CFG.capStart,cs=ct<0?0:[.9,1.1,1.05,1][Math.min(3,Math.floor(ct))];
+  cap.setAttribute('opacity',ct<0?0:1);
+  cap.setAttribute('transform',`translate(60 99) scale(${cs}) translate(-60 -99)`);
+}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+document.fonts.load('900 16px "Noto Sans TC"','認知考慮購買社群廣告比較口碑下單結帳顧客流程').then(start,start);
+</script></body></html>

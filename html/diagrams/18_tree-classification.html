@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D18 ツリー分類</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f15}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#0b0f15}
+#stage{position:absolute;inset:0;background:#151b23}
+#stage::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.07) .8px,transparent 1.1px) 0 -2px/10.667px 10.667px}
+#svg{position:absolute;left:0;top:0}
+text{font-family:'Noto Sans TC',sans-serif}
+</style></head><body><div id="card"><div id="stage"><svg id="svg" width="324" height="126" viewBox="0 0 324 126"></svg></div></div>
+<script>
+/* ================ 共用框架（掃光入場／角框＋中心點／掃光退場），各張共通 ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3),eo2=x=>1-Math.pow(1-x,2),ei=x=>x*x*x,eio=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const lerp=(a,b,t)=>a+(b-a)*t;
+function tab(arr,p){const i=Math.floor(p),j=Math.min(arr.length-1,i+1),a=arr[cl(i,0,arr.length-1)];return a+(arr[j]-a)*(p-i)}
+const NS='http://www.w3.org/2000/svg';
+const SVG=document.getElementById('svg');
+function el(tag,attrs,parent){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);(parent||SVG).appendChild(e);return e}
+const CYAN='#6ee7f9';
+const gC=el('g',{},SVG);
+/* 動作從第 0 幀起；SH＝動作第一個可見幀的內部 p 值；做完後停留到 LOOP 結束，硬切重播 */
+const SH=17;
+function render(f){
+  f=Math.floor(f+1e-6)%CFG.LOOP;
+  draw(Math.min(f+SH,84),f);
+}
+/* ===== CFG：D18 樹狀分類（類別以分枝整理）===== */
+const CFG={
+  LOOP:120,                                   // 一輪幀數（30fps）
+  root:'商品',
+  kids:['食品','服飾','家電'],                 // 第二層（由左到右）
+  leaves:['水果','肉類','上衣','鞋子','電視','電腦'], // 第三層（每個第二層帶兩個）
+  col:{cyan:'#6ee7f5',rootFill:'#70e7fa',rootText:'#0b1a24',pill:'#1c2530',text:'#f1f4f8',chip:'#212b38',chipText:'#d5dbe3',diag:'#6c7581'},
+  fontChars:'商品食服飾家電水果肉類上衣鞋子視腦'
+};
+const C=CFG.col,KX=[58.5,162,265.5];
+const S_ROOT=[.21,.63,.91,1.05,1.12,1.12,1.09,1.05,1.02,1.0];          // p17~26 根節點彈出倍率（量測）
+const LT=[0,.17,.43,.63,.77,.875,.94,.98,.99,1],RT=[0,.11,.38,.59,.74,.86,.93,.97,.99,1]; // 橫線左／右延伸比例
+const S_KID=[.4,.87,1.0,1.09,1.09,1.06,1.02,1.0],S_CHIP=[.24,.73,.93,1.034,1.032,1.027,1.01,1.0];
+const KS=[33,39.7,46.7],CS=[49,51,53,54.6,56.6,58];
+const gTree=el('g',{},gC);
+const ln=(c,w)=>el('line',{stroke:c,'stroke-width':w,'stroke-linecap':'butt'},gTree);
+const stem=ln(C.cyan,2),hl=ln(C.cyan,2),drops=[0,1,2].map(()=>ln(C.cyan,2));
+const diags=[0,1,2,3,4,5].map(()=>ln(C.diag,1.2));
+const mk=(cx,cy,w,h,rx,fill,stroke,sw,txt,fs,tc,fw)=>{const g=el('g',{},gTree);
+  el('rect',{x:-w/2,y:-h/2,width:w,height:h,rx:rx,fill:fill,stroke:stroke||'none','stroke-width':sw||0},g);
+  const t=el('text',{x:0,y:fs*.36,'text-anchor':'middle','font-size':fs,'font-weight':fw||700,fill:tc},g);t.textContent=txt;
+  g.__c=[cx,cy];return g};
+const root=mk(162,16.5,57,25,8,C.rootFill,0,0,CFG.root,15.5,C.rootText,900);
+const kids=CFG.kids.map((s,i)=>mk(KX[i],61.5,54.5,23,8,C.pill,C.cyan,1.6,s,14,C.text));
+const chips=CFG.leaves.map((s,i)=>mk(KX[i>>1]+(i&1?26.5:-26.5),99.5,44,21,7,C.chip,0,0,s,12,C.chipText));
+const place=(g,s)=>{g.setAttribute('transform','translate('+g.__c[0]+' '+g.__c[1]+') scale('+s+')');g.style.display=s<=0.01?'none':''};
+const seti=(l,x1,y1,x2,y2)=>{l.setAttribute('x1',x1);l.setAttribute('y1',y1);l.setAttribute('x2',x2);l.setAttribute('y2',y2)};
+function draw(p,f){
+  /* 根與短莖 */
+  place(root,p<17?0:tab(S_ROOT,p-17));
+  const ye=35+4.5*eo(seg(p,17,22));seti(stem,162,29,162,ye);
+  /* 橫線：先往左、再往右 */
+  const lf=p<26?0:tab(LT,p-25),rt=p<39?0:tab(RT,p-38);
+  if(lf+rt<=0)hl.style.display='none';else{hl.style.display='';seti(hl,161.5-104.5*lf,39.5,161.5+104.5*rt,39.5)}
+  /* 第二層：垂線先到、方塊彈出 */
+  kids.forEach((g,i)=>{const t=p-KS[i];place(g,t<0?0:tab(S_KID,t));
+    const d=eo(seg(p,KS[i]-2.5,KS[i]));if(d<=0)drops[i].style.display='none';else{drops[i].style.display='';seti(drops[i],KX[i],39.5,KX[i],39.5+10.5*d)}});
+  /* 第三層：斜線畫到才彈出小方塊 */
+  chips.forEach((g,i)=>{const t=p-CS[i];place(g,t<0?0:tab(S_CHIP,t));
+    const d=eo(seg(p,CS[i]-3,CS[i])),px=KX[i>>1],tx=g.__c[0];
+    if(d<=0)diags[i].style.display='none';else{diags[i].style.display='';seti(diags[i],px,74,lerp(px,tx,d),lerp(74,89,d))}});
+}
+
+function start(){const T=q.get('t');if(T!==null){render(+T*30);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+document.fonts.load('700 14px "Noto Sans TC"',CFG.fontChars||'').then(()=>document.fonts.load('900 14px "Noto Sans TC"',CFG.fontChars||'')).then(start,start);
+</script></body></html>

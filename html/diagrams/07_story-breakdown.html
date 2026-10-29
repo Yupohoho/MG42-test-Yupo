@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D07 故事拆解</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@700;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f15}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#151b23;box-shadow:inset 0 0 0 1px #1d2530}
+#card::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.05) 1px,transparent 1.2px) 0 0/12px 12px}
+svg{position:absolute;left:0;top:0}
+text{font-family:'Noto Sans TC',sans-serif}
+</style></head><body><div id="card"><svg id="s" width="324" height="126" viewBox="0 0 324 126"></svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  steps:[['起','導入'],['承','發展'],['轉','轉折'],['結','結論']],
+  x0:11, pitch:79, w:71, y:8, h:85,
+  start:[14,23,32,41],          // 各卡片由左向右展開的起始幀
+  len:9,                        // 展開幀數（ease-out cubic）
+  line:{a:16,len:34,pow:2.4,x0:13,x1:308,y:110},   // 下方時間軸線
+  dotDelay:5,                   // 圓點在該卡片展開完成後幾幀出現
+  hiFrame:56, tagFrame:47, tag:'STORY',
+  cyan:'#76e9f5', fill:'#25293a', fillHi:'#75e4ff', textHi:'#030c18', sub:'#d8dee8', num:'#7d8796',
+  SH:13,                        // 幀偏移：render(0) 對應動作內部第 13 幀（動作從第 0 幀附近起跑）
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3);
+const NS='http://www.w3.org/2000/svg';const S=document.getElementById('s');
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);(p||S).appendChild(e);return e}
+const defs=el('defs',{});
+const root=el('g',{});
+const line=el('rect',{x:CFG.line.x0,y:CFG.line.y-1,width:0,height:2,fill:CFG.cyan},root);
+const C=CFG.steps.map((s,i)=>{
+  const x=CFG.x0+i*CFG.pitch,cx=x+CFG.w/2;
+  const clip=el('clipPath',{id:'cp'+i},defs),cr=el('rect',{x,y:CFG.y-2,width:0,height:CFG.h+4},clip);
+  const g=el('g',{'clip-path':`url(#cp${i})`},root);
+  const bg=el('rect',{x,y:CFG.y,width:CFG.w,height:CFG.h,rx:8,fill:CFG.fill,stroke:CFG.cyan,'stroke-width':1.4},g);
+  el('text',{x:x+6,y:CFG.y+16,'font-size':6.5,'font-weight':700,fill:CFG.num},g).textContent='0'+(i+1);
+  const big=el('text',{x:cx,y:CFG.y+50,'font-size':38,'font-weight':900,fill:CFG.cyan,'text-anchor':'middle'},g);big.textContent=s[0];
+  const sub=el('text',{x:cx,y:CFG.y+78,'font-size':11,'font-weight':700,fill:CFG.sub,'text-anchor':'middle'},g);sub.textContent=s[1];
+  const dot=el('circle',{cx,cy:CFG.line.y,r:3.2,fill:CFG.cyan},root);
+  return{cr,x,bg,big,sub,dot,i}
+});
+const tag=el('text',{x:307,y:122.5,'font-size':5.8,'font-weight':900,fill:'#838993','text-anchor':'end','letter-spacing':.8},root);tag.textContent=CFG.tag;
+function render(F){
+  F+=CFG.SH;
+  C.forEach(o=>{
+    const p=eo(seg(F,CFG.start[o.i],CFG.start[o.i]+CFG.len));
+    o.cr.setAttribute('width',(CFG.w+2)*p);
+    const hi=o.i===3&&F>=CFG.hiFrame;
+    o.bg.setAttribute('fill',hi?CFG.fillHi:CFG.fill);
+    o.big.setAttribute('fill',hi?CFG.textHi:CFG.cyan);o.sub.setAttribute('fill',hi?CFG.textHi:CFG.sub);
+    const dt=F-(CFG.start[o.i]+CFG.len+CFG.dotDelay);
+    o.dot.setAttribute('opacity',dt>=0?1:0);o.dot.setAttribute('r',dt<0?0:[1.5,3.8,3.2][Math.min(2,Math.floor(dt))]);
+  });
+  const L=CFG.line,lp=1-Math.pow(1-seg(F,L.a,L.a+L.len),L.pow);
+  line.setAttribute('width',(L.x1-L.x0)*lp);
+  tag.setAttribute('opacity',seg(F,CFG.tagFrame,CFG.tagFrame+4));
+}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+document.fonts.load('900 38px "Noto Sans TC"','起承轉結導入發展轉折結論').then(start,start);
+</script></body></html>

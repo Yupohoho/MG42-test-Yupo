@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>D46 注意事項顯示（注意ポイント表示）</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@700;900&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0f15}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:324px;height:126px;border-radius:12px;overflow:hidden;background:#151b23;box-shadow:inset 0 0 0 1px #1d242e}
+#card::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(150,170,200,.10) 1px,transparent 1.3px) 4px 4px/12px 12px}
+svg{position:absolute;left:0;top:0;width:324px;height:126px}
+text{font-family:'Noto Sans TC',sans-serif}
+.mono{font-family:'Roboto Mono',monospace}
+</style></head><body><div id="card"><svg id="s" viewBox="0 0 324 126" xmlns="http://www.w3.org/2000/svg">
+<g id="content"></g>
+</svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  title:'注意', ng:'未確認就執行', ok:'先確認再執行',
+  cyan:'#6fe6f9', ngFill:'#202836', ngStroke:'#8a95a6', okFill:'#0f313c'
+};
+const FONT_TEXT=CFG.title+CFG.ng+CFG.ok;
+/* ================ */
+const LOOP=120;                      // LOOP=120 幀（4 秒）：動作→停留→硬切回第 0 幀重播
+const q=new URLSearchParams(location.search);
+const $=id=>document.getElementById(id);
+const Z=+q.get('z')||1;if(Z!=1)$('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3),eo2=x=>1-(1-x)*(1-x),ei=x=>x*x*x,eio=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const tb=(a,x,x0)=>{const k=x-x0;if(k<=0)return a[0];if(k>=a.length-1)return a[a.length-1];const i=Math.floor(k);return a[i]+(a[i+1]-a[i])*(k-i)};
+const NS='http://www.w3.org/2000/svg',CY='#6fe6f9',CONTENT=$('content');
+const mk=(tag,at,par,txt)=>{const e=document.createElementNS(NS,tag);for(const k in at)e.setAttribute(k,at[k]);if(txt!=null)e.textContent=txt;(par||CONTENT).appendChild(e);return e};
+const xf=(el,tx,ty,s,cx,cy)=>el.setAttribute('transform','translate('+(tx+cx)+' '+(ty+cy)+') scale('+s+') translate('+(-cx)+' '+(-cy)+')');
+const op=(el,v)=>el.setAttribute('opacity',v);
+let tri,rngs,ttl,ngG,okG,ngX,okC;
+const TS=[.34,.62,.85,.99,1.08,1.12,1.13,1.09,1.07,1.03,.99,.99,1.0];          // 三角形彈出倍率（量測，r3 起，過衝約 13%）
+const WAVE={t0:4,per:40,r0:24,r1:52,a:.4,cx:59,cy:62};      // 持續擴張的波：週期 40 幀（整除 LOOP），兩道錯開半週期；設計值
+const SH={t0:12,len:14,amp:3,per:2.5};                          // 彈出到位後的手機震動：只做水平位移 ±3px、每約 1.25 幀換向、14 幀線性衰減；設計值
+const RS=[.82,.85,1,1.07,1.12,1.12,1.1,1.07,1.04,1];                             // 外圈倍率（量測，r4 起）
+function init(){
+  rngs=[0,1].map(()=>mk('circle',{cx:WAVE.cx,cy:WAVE.cy,r:WAVE.r0,fill:'none',stroke:CFG.cyan,'stroke-width':1.5,opacity:0}));
+  tri=mk('g',{});
+  mk('polygon',{points:'59,27 98,95 20,95',fill:'none',stroke:CFG.cyan,'stroke-width':5.5,'stroke-linejoin':'round'},tri);
+  mk('line',{x1:59,y1:52,x2:59,y2:74,stroke:CFG.cyan,'stroke-width':6,'stroke-linecap':'round'},tri);
+  mk('circle',{cx:59,cy:84.5,r:3.4,fill:CFG.cyan},tri);
+  ttl=mk('text',{x:176,y:16.5,'text-anchor':'middle','font-size':14,'font-weight':900,fill:CFG.cyan},null,CFG.title);
+  // NG 晶片（灰）
+  ngG=mk('g',{});
+  mk('rect',{x:112,y:24,width:197,height:37,rx:9,fill:CFG.ngFill,stroke:CFG.ngStroke,'stroke-width':1.6},ngG);
+  ngX=mk('path',{d:'M121.5 37L132.5 48M132.5 37L121.5 48',fill:'none',stroke:'#aab3c1','stroke-width':2.3,'stroke-linecap':'round',pathLength:100,'stroke-dasharray':'100 100'},ngG);
+  mk('text',{x:143,y:47,'font-size':12,'font-weight':900,fill:'#c9d0dc'},ngG,CFG.ng);
+  mk('text',{x:299,y:46.5,'text-anchor':'end','font-size':7,'font-weight':700,class:'mono',fill:'#6f7a8c'},ngG,'NG');
+  // OK 晶片（青）
+  okG=mk('g',{});
+  mk('rect',{x:112,y:66,width:197,height:37,rx:9,fill:CFG.okFill,stroke:CFG.cyan,'stroke-width':2},okG);
+  okC=mk('path',{d:'M121 85L126.5 90.5L134 79.5',fill:'none',stroke:CFG.cyan,'stroke-width':2.6,'stroke-linecap':'round','stroke-linejoin':'round',pathLength:100,'stroke-dasharray':'100 100'},okG);
+  mk('text',{x:143,y:89,'font-size':12,'font-weight':900,fill:'#f2f6fb'},okG,CFG.ok);
+  mk('text',{x:299,y:88.5,'text-anchor':'end','font-size':7,'font-weight':700,class:'mono',fill:CFG.cyan},okG,'OK');
+}
+function draw(u){
+  const t=u>=3;op(tri,t?1:0);if(t){const d=u-SH.t0,a=d>0&&d<SH.len?SH.amp*(1-d/SH.len)*Math.sin(2*Math.PI*d/SH.per+.6):0;xf(tri,0,0,tb(TS,u,3),59,60.5);tri.setAttribute('transform','translate('+a+' 0) '+tri.getAttribute('transform'))}
+  rngs.forEach((c,i)=>{const s0=WAVE.t0+i*WAVE.per/2,on=u>=s0;const p=on?(((u-s0)%WAVE.per)/WAVE.per):0;const e=1-Math.pow(1-p,1.6);c.setAttribute('r',WAVE.r0+(WAVE.r1-WAVE.r0)*e);op(c,on?WAVE.a*(1-p)*Math.min(1,(u-s0)/2+.01):0)});
+  op(ttl,seg(u,19,22));
+  // 兩枚晶片由右滑入（指數減速，每幀約 ×0.73，量測：NG r18 偏移 51px、OK 比 NG 晚約 12.5 幀）
+  const ng=u>=14,ok=u>=27;
+  op(ngG,ng?1:0);op(okG,ok?1:0);
+  if(ng){const o=u>=26.5?0:51*Math.pow(.73,u-18);ngG.setAttribute('transform','translate('+o+' 0)')}
+  if(ok){const o=u>=39.5?0:39*Math.pow(.72,u-31);okG.setAttribute('transform','translate('+o+' 0)')}
+  ngX.setAttribute('stroke-dashoffset',100*(1-seg(u,21,31)));
+  okC.setAttribute('stroke-dashoffset',100*(1-seg(u,36,46)));
+}
+function frame(r){draw(r,r)}
+function start(){
+  init();
+  const T=q.get('t');if(T!==null){frame((+T*30)%LOOP);return}
+  const t0=performance.now();(function tick(){frame(((performance.now()-t0)/1000*30)%LOOP);requestAnimationFrame(tick)})();
+}
+document.fonts.load('900 16px "Noto Sans TC"',FONT_TEXT).then(()=>document.fonts.load('700 16px "Noto Sans TC"',FONT_TEXT)).then(()=>document.fonts.load('700 10px "Roboto Mono"','POINT+%NGOK')).then(start,start);
+</script></body></html>
