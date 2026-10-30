@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>OP45 緞帶揭示</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@900&family=Noto+Sans+TC:wght@700;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0c11}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:322px;height:127px;border-radius:12px;overflow:hidden;background:#16171e}
+svg,canvas{position:absolute;left:0;top:0}
+text{font-family:'Noto Sans TC',sans-serif;text-anchor:middle}
+</style></head><body><div id="card"><svg id="s" width="322" height="127" viewBox="0 0 322 127"></svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  text:'華麗',size:80,cream:'#f4ede6',red:'#ff4954',dark:'#8d1f2c',
+  amp:23,lam:96,baseY:64,
+  tail:[[0,-60],[12,-60],[20,70],[28,150],[38,230],[50,310],[62,420]], // 緞帶尾端 x（幀,x）
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3),eio=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const back=(x,s=1.6)=>{const c=s+1;return 1+c*Math.pow(x-1,3)+s*Math.pow(x-1,2)};
+const lerp=(a,b,t)=>a+(b-a)*t;
+const rng=s=>()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
+const hex=c=>[1,3,5].map(i=>parseInt(c.substr(i,2),16));
+const mix=(a,b,t)=>{const A=hex(a),B=hex(b);return'rgb('+A.map((v,i)=>Math.round(lerp(v,B[i],t))).join(',')+')'};
+const NS='http://www.w3.org/2000/svg';
+const S=document.getElementById('s');
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);(p||S).appendChild(e);return e}
+function start(){const T=q.get('t');if(T!==null){render(Math.round(+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(Math.floor((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+
+const defs=el('defs',{});
+const cp=el('clipPath',{id:'rv'},defs);
+const rr=el('rect',{x:0,y:0,width:0,height:127},cp);
+const tg=el('g',{'clip-path':'url(#rv)'});
+const tx=el('text',{x:161,y:64,'font-size':CFG.size,'font-weight':900,'dominant-baseline':'central',fill:CFG.cream,style:'font-family:"Noto Serif TC",serif'},tg);
+tx.textContent=CFG.text;
+const ul=el('rect',{x:161,y:109.5,width:0,height:2.5,fill:CFG.red});
+const pa=el('path',{fill:CFG.red}),pb=el('path',{fill:CFG.dark});
+function tailX(F){return -60+500*seg(F,12,62)}   // 尾端等速離開（不漸緩）
+// 緞帶像波浪一樣入場：每條緞帶的中心線是行進波，頭部（波的前緣）振幅為 0，往後逐漸長到全幅，像波一路湧進來；
+// 三條錯開幾幀進場、相位不同，會互相交疊起伏；寬度隨扭轉微變，頭尾收尖
+function ribbon(F,head,tail,o){
+  const ph=F*o.sp,x0=Math.max(tail,-12),x1=Math.min(head,334);let da='',db='';
+  const k=6.2832/o.lam;
+  const yy=x=>{const env=Math.min(1,Math.max(0,(head-x)/80));const e=env*env*(3-2*env);
+    return CFG.baseY+o.dy-(x-161)*.08+7*Math.sin(F*.22+o.p)+o.A*e*Math.sin((x-ph)*k+o.p)+9*e*Math.sin((x-ph*.6)/260*6.2832+1)};
+  const th=x=>(x-ph*.8)*k*.9+o.p+.8;
+  const ww=x=>{const tp=Math.min(1,Math.min(x-tail,head-x)/30);return (3+22*Math.pow(Math.abs(Math.cos(th(x))),.8))*o.w*Math.max(.1,tp)};
+  for(let x=x0;x<x1;x+=3){const xb=Math.min(x+3,x1);
+    const q='M'+x.toFixed(1)+' '+(yy(x)-ww(x)/2).toFixed(1)+'L'+xb.toFixed(1)+' '+(yy(xb)-ww(xb)/2).toFixed(1)+'L'+xb.toFixed(1)+' '+(yy(xb)+ww(xb)/2).toFixed(1)+'L'+x.toFixed(1)+' '+(yy(x)+ww(x)/2).toFixed(1)+'Z';
+    if(Math.cos(th(x+1.5))>0)da+=q;else db+=q}
+  return [da,db]}
+const headX=f=>{const hp=cl(f/34);return -20+390*(1-Math.pow(1-hp,2.1))};   // 較緩的推進、尾段漸緩
+const ST=[{d:0,o:{sp:21,lam:150,A:26,p:0,dy:-2,w:1},E:[pa,pb]}];   // 只有一條緞帶：長波上下飄動＋明顯扭轉變寬
+function render(F){
+  ST.forEach(S=>{const f=F-S.d,r=ribbon(F,headX(f),tailX(f),S.o);S.E[0].setAttribute('d',r[0]);S.E[1].setAttribute('d',r[1])});
+  const head=headX(F);
+  rr.setAttribute('width',Math.max(0,Math.min(322,head-8)));
+  const u=eo(seg(F,56,66));
+  ul.setAttribute('x',lerp(155,122,u));ul.setAttribute('width',u*66);
+}
+document.fonts.load('900 80px "Noto Serif TC"','華麗').then(start,start);
+
+</script></body></html>

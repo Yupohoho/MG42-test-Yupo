@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>OP06 速度隧道</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@900&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0c11}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh}
+body.m{display:block;min-height:0}
+#card{position:relative;width:322px;height:127px;border-radius:12px;overflow:hidden;background:#16171e}
+canvas{position:absolute;left:0;top:0;width:322px;height:127px}
+</style></head><body><div id="card"><canvas id="c" width="644" height="254"></canvas></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  word:'加速', sub:'SPEED UP',
+  font:'900 78px "Noto Sans TC"',
+  cx:161, cy:63,
+  bg:'#16171e', cream:'#f6f1ec', red:'#ff4757', gray:'#c7c9d1',
+  s0:.9, r:.69,          // 最外層框的倍率、相鄰框的縮小比
+  vTunnel:.2667, fastF:28, stopF:47,  // 隧道前進速度（框/幀，恆速到第 fastF 幀，之後線性漸緩到第 stopF 幀停住；總距離 10 框）
+  fadeInner:[21,30],     // 內層小框淡出
+  textF:[18,27], blurF:[21,36],         // 文字從畫面外衝入中間：放大＋模糊 → 正常大小＋清晰
+  textS0:3.4, textBlur:16,
+  subF:[35,43],
+  rays:44,
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const g=document.getElementById('c').getContext('2d');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a)),eo=x=>1-Math.pow(1-x,3);
+function rr(x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath()}
+function render(F){
+  g.setTransform(2,0,0,2,0,0);g.filter='none';
+  g.fillStyle=CFG.bg;g.fillRect(0,0,322,127);
+  const {cx,cy}=CFG;
+  const dec=cl((F-CFG.fastF)/(CFG.stopF-CFG.fastF)),P=CFG.vTunnel*(Math.min(F,CFG.fastF)+(CFG.stopF-CFG.fastF)*(dec-dec*dec/2));   // 前進量：恆速→漸緩到停
+  const fin=seg(F,CFG.fadeInner[0],CFG.fadeInner[1]);
+  /* 放射速度線 */
+  const rayA=.28*(1-seg(F,CFG.fastF,CFG.stopF));
+  if(rayA>0){g.strokeStyle='rgba(215,217,225,'+rayA+')';g.lineWidth=.7;
+    for(let i=0;i<CFG.rays;i++){const a=i/CFG.rays*Math.PI*2+.03,c=Math.cos(a),s=Math.sin(a),k=(((i*37)%11)/11);
+      const r1=30+((P*60+k*100)%140),r2=r1+25+k*55;
+      g.beginPath();g.moveTo(cx+c*r1*1.5,cy+s*r1*.75);g.lineTo(cx+c*r2*1.5,cy+s*r2*.75);g.stroke()}}
+  /* 隧道框 */
+  for(let j=Math.floor(P)-2;j<Math.floor(P)+11;j++){
+    const k=j-P;if(k<-1.6)continue;
+    const s=CFG.s0*Math.pow(CFG.r,k);
+    let a=1-seg(-k,0,1.2);if(k>1.4)a*=1-fin;
+    if(k>0.5&&k<=1.4)a*=1;
+    if(a<=0)continue;
+    const w=322*s,h=127*s;
+    g.globalAlpha=a;g.strokeStyle=((j%2+2)%2==0)?CFG.red:CFG.gray;g.lineWidth=Math.max(.8,2.4*Math.pow(s,.5));
+    rr(cx-w/2,cy-h/2,w,h,Math.max(2,9*s));g.stroke();g.globalAlpha=1;
+  }
+  /* 文字 */
+  const t=seg(F,CFG.textF[0],CFG.textF[1]);
+  if(t>0){
+    const tb=seg(F,CFG.blurF[0],CFG.blurF[1]),sc=1+(CFG.textS0-1)*Math.pow(1-t,2.2),bl=CFG.textBlur*Math.pow(1-tb,1.6);
+    g.save();g.translate(cx-1,cy);g.scale(sc,sc);g.globalAlpha=Math.min(1,t*4);if(bl>.2)g.filter='blur('+bl.toFixed(1)+'px)';
+    g.font=CFG.font;g.textAlign='center';g.textBaseline='middle';g.lineJoin='round';
+    g.fillStyle=CFG.cream;g.strokeStyle=CFG.cream;g.lineWidth=1.2;g.strokeText(CFG.word,0,0);g.fillText(CFG.word,0,0);g.restore();g.filter='none';g.globalAlpha=1;
+  }
+  const sa=seg(F,CFG.subF[0],CFG.subF[1]);
+  if(sa>0){g.globalAlpha=sa;g.fillStyle=CFG.red;g.font='500 7px "Roboto Mono"';g.textBaseline='alphabetic';g.textAlign='left';
+    let x=cx-CFG.sub.length*7.8/2;for(const c of CFG.sub){g.fillText(c,x,114);x+=7.8}g.globalAlpha=1}
+}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+Promise.all([document.fonts.load(CFG.font,CFG.word),document.fonts.load('500 7px "Roboto Mono"','SPEED UP')]).then(start,start);
+</script></body></html>

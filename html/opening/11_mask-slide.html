@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OP11 mask-slide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;900&family=Noto+Serif+JP:wght@600;900&family=Montserrat:wght@800&family=Playfair+Display:wght@400&family=Roboto+Mono:wght@500&display=swap">
+<style>
+html,body{margin:0;background:#0b0c11}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh}
+body.m{display:block;min-height:0}
+#card{position:relative;width:322px;height:127px;border-radius:12px;overflow:hidden;background:#16171e}
+
+</style></head><body><div id="wrap"><div id="card"></div></div>
+<script>
+const q=new URLSearchParams(location.search),Z=+q.get('z')||1;
+document.getElementById('wrap').style.zoom=Z;if(q.get('m')==='1')document.body.className='m';
+const card=document.getElementById('card');
+const cl=(v,a=0,b=1)=>Math.min(b,Math.max(a,v)),pr=(f,a,b)=>cl((f-a)/(b-a));
+const eo=p=>1-Math.pow(1-p,3),eio=p=>p<.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2,lerp=(a,b,p)=>a+(b-a)*p;
+function kf(f,a){if(f<=a[0][0])return a[0][1];for(let i=1;i<a.length;i++){if(f<=a[i][0]){const p=(f-a[i-1][0])/(a[i][0]-a[i-1][0]);return lerp(a[i-1][1],a[i][1],p)}}return a[a.length-1][1]}
+function el(css,txt,parent){const e=document.createElement('div');e.style.cssText='position:absolute;'+css;if(txt!=null)e.textContent=txt;(parent||card).appendChild(e);return e}
+function fit(e,target,cx){e.style.letterSpacing='0px';const w0=e.offsetWidth,n=[...e.textContent].length;const ls=(target-w0)/(n-1);e.style.letterSpacing=ls+'px';e.style.left=(cx-target/2)+'px';return w0}
+
+const CFG={l1:'静かな',l2:'革命',tag:'— No.11'};
+const LOOP=120,FPS=30;
+const FONTS=['900 40px "Noto Sans JP"','500 8px "Roboto Mono"'],SAMPLE=CFG.l1+CFG.l2;
+let t1,t2,b1,b2,dv,tg;
+const L1=[[0,29],[2,37],[4,73],[6,171],[8,259],[10,288],[11,293]];
+const R2=[[0,70],[2,175],[4,263],[6,293]];
+const L2=[[8,29],[10,58],[12,135],[14,239],[16,285],[17,293]];
+function init(){
+ card.style.background='#16171e';
+ const st='left:0;width:322px;text-align:center;font:900 40px/40px "Noto Sans JP",sans-serif;color:#f6f2ea;white-space:nowrap;';
+ t1=el('top:19px;'+st,CFG.l1);t2=el('top:73px;'+st,CFG.l2);
+ dv=el('left:28px;top:63px;width:266px;height:1px;background:#5c5d66;');
+ b1=el('top:15px;height:43px;background:#ff4954;');b2=el('top:72px;height:40px;background:#ff4954;');
+ tg=el('left:250px;top:112px;font:500 8px/10px "Roboto Mono",monospace;color:#ff4757;white-space:nowrap;',CFG.tag);
+}
+function render(f){
+ const l1=kf(f,L1);b1.style.left=l1+'px';b1.style.width=Math.max(0,293-l1)+'px';
+ t1.style.clipPath='inset(0 '+Math.max(0,322-l1)+'px 0 0)';
+ const l2=f<8?29:kf(f,L2),r2=f<8?kf(f,R2):293;
+ b2.style.left=l2+'px';b2.style.width=Math.max(0,r2-l2)+'px';
+ if(f<9){t2.style.visibility='hidden'}else{t2.style.visibility='visible';t2.style.clipPath='inset(0 '+Math.max(0,322-l2)+'px 0 0)'}
+ dv.style.width=266*pr(f,14,21)+'px';
+ tg.style.opacity=eo(pr(f,24,34));
+}
+function start(){init();const tp=q.get('t');if(tp!==null){render(Math.round(+tp*FPS+1e-6)%LOOP);return}
+const t0=performance.now();let last=-1;(function tick(){const f=Math.floor((performance.now()-t0)/1000*FPS)%LOOP;if(f!==last){last=f;render(f)}requestAnimationFrame(tick)})()}
+Promise.all(FONTS.map(f=>document.fonts.load(f,SAMPLE))).catch(()=>{}).then(start);
+</script></body></html>

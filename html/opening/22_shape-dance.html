@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>OP22 圖形舞動</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0c11}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:322px;height:127px;border-radius:12px;overflow:hidden;background:#16171e}
+svg{position:absolute;left:0;top:0}
+text{font-family:'Noto Sans TC',sans-serif;font-weight:900;text-anchor:middle}
+</style></head><body><div id="card"><svg id="s" width="322" height="127" viewBox="0 0 322 127"></svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  glyphs:['圓','方','角','！'],        // 圓、方、三角、半圓內的字
+  red:'#ff4954', cream:'#f6efe8', yellow:'#f3c85c', ink:'#0b0c11',
+  shadowY:118,
+  LOOP:120
+};
+/* 各圖形中心逐幀路徑（量自參考，k=0 為起跳前一幀）：原地小跳 → 弧線換到右邊一格（半圓繞到最左）→ 原地小跳 → 弧線換回 → 原地小跳歸位 */
+const PC=[[61,63],[61,32],[61,28],[61,30],[62,37],[62,46],[63,59],[65,54],[68,43],[72,34],[78,29],[86,29],[97,30],[104,38],[110,45],[115,48],[118,46],[120,36],[121,30],[121,28],[121,32],[121,41],[121,55],[120,71],[120,61],[117,53],[110,47],[104,38],[100,36],[96,56],[87,66],[79,78],[73,72],[68,59],[65,48],[63,40],[62,37],[62,39],[62,44],[61,57],[61,61],[61,57],[61,59],[61,63]];
+const PS=[[129,63],[129,32],[128,39],[128,51],[129,62],[129,50],[130,39],[133,31],[137,28],[142,30],[147,36],[154,57],[173,61],[181,54],[188,42],[193,34],[197,29],[200,29],[201,34],[202,43],[202,55],[202,56],[202,41],[201,28],[199,23],[197,22],[192,22],[187,24],[180,32],[173,43],[154,41],[147,23],[143,21],[137,21],[134,22],[131,26],[129,39],[128,54],[128,52],[128,49],[128,48],[128,51],[128,57],[128,63]];
+const PT=[[195,64],[193,57],[196,58],[198,48],[199,39],[201,34],[202,32],[204,36],[200,44],[213,66],[220,67],[231,52],[241,42],[251,36],[260,34],[267,36],[272,41],[277,51],[280,61],[282,55],[284,44],[287,38],[286,38],[286,42],[283,51],[279,61],[272,74],[263,76],[253,68],[239,59],[224,53],[213,58],[205,66],[200,60],[198,68],[197,75],[198,59],[198,48],[199,37],[199,44],[197,50],[196,57],[195,62],[195,64]];
+const PH=[[262,66],[262,43],[262,35],[262,31],[262,32],[260,37],[255,47],[248,59],[236,59],[220,47],[198,37],[168,32],[140,32],[122,36],[92,48],[70,58],[55,63],[48,50],[44,40],[42,33],[42,31],[42,31],[42,35],[44,42],[48,52],[55,40],[80,30],[100,24],[118,18],[134,15],[168,18],[198,27],[220,41],[236,42],[248,32],[255,26],[260,23],[262,26],[262,33],[262,51],[262,60],[262,64],[262,63],[261,65]];
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+const NS='http://www.w3.org/2000/svg',S=document.getElementById('s');
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);(p||S).appendChild(e);return e}
+const sh=[0,1,2,3].map(()=>el('ellipse',{cy:CFG.shadowY,ry:2.6,fill:'#000',opacity:.3}));
+function shape(kind,i){
+  const g=el('g',{});
+  const inner=el('g',{},g);
+  let gy=0;
+  if(kind=='circle'){el('circle',{r:25.5,fill:CFG.red},inner)}
+  if(kind=='square'){el('rect',{x:-25.5,y:-25.5,width:51,height:51,rx:8,fill:CFG.cream},inner)}
+  if(kind=='tri'){el('path',{d:'M0 -20L19.5 18.5L-19.5 18.5Z',fill:CFG.yellow,stroke:CFG.yellow,'stroke-width':6,'stroke-linejoin':'round'},inner);gy=7}
+  if(kind=='half'){el('path',{d:'M-27 16A27 32 0 0 1 27 16Z',fill:CFG.red,stroke:CFG.red,'stroke-width':1,'stroke-linejoin':'round'},inner);gy=6}
+  const col=kind=='square'||kind=='tri'?CFG.ink:CFG.cream;
+  const fs=kind=='tri'?19:kind=='half'?24:28;
+  const t=el('text',{x:0,y:gy+fs*.36,'font-size':fs,fill:col},inner);t.textContent=CFG.glyphs[i];
+  return g;
+}
+const SH=[shape('circle',0),shape('square',1),shape('tri',2),shape('half',3)];
+const PATH=[PC,PS,PT,PH];
+const lerp=(a,b,t)=>a+(b-a)*t;
+function pos(P,F){const n=P.length-1;if(F>=n)return P[n];const i=Math.floor(F),t=F-i;return [lerp(P[i][0],P[i+1][0],t),lerp(P[i][1],P[i+1][1],t)]}
+function render(F){
+  F=Math.floor(F);
+  PATH.forEach((P,i)=>{
+    const p=pos(P,F),pp=pos(P,Math.max(0,F-1)),nn=pos(P,F+1);
+    const vx=(nn[0]-pp[0])/2;
+    const rot=i==0?0:cl(vx*(i==2?.55:.6),-24,24)*(i==3?-.6:1);
+    SH[i].setAttribute('transform',`translate(${p[0].toFixed(1)} ${p[1].toFixed(1)}) rotate(${rot.toFixed(1)})`);
+    const h=cl((CFG.shadowY-p[1]-26)/90);
+    sh[i].setAttribute('cx',p[0].toFixed(1));
+    sh[i].setAttribute('rx',(24*(1-h*.55)).toFixed(1));
+    sh[i].setAttribute('opacity',(.32*(1-h*.7)).toFixed(2));
+  });
+}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+document.fonts.load('900 28px "Noto Sans TC"','圓方角！').then(start,start);
+</script></body></html>

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>OP46 粒子聚合</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@900&family=Noto+Sans+TC:wght@700;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0c11}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:322px;height:127px;border-radius:12px;overflow:hidden;background:#16171e}
+svg,canvas{position:absolute;left:0;top:0}
+text{font-family:'Noto Sans TC',sans-serif;text-anchor:middle}
+</style></head><body><div id="card"><svg id="s" width="322" height="127" viewBox="0 0 322 127"></svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  text:'集結',size:78,cream:'#f4ede6',red:'#ff4954',gray:'#9a9ca8',
+  step:2,            // 取樣間距（px）
+  moveFrom:0,moveTo:23,spread:7,  // 粒子移動：起跑幀、完成幀、起跑錯開幀數
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3),eio=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const back=(x,s=1.6)=>{const c=s+1;return 1+c*Math.pow(x-1,3)+s*Math.pow(x-1,2)};
+const lerp=(a,b,t)=>a+(b-a)*t;
+const rng=s=>()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
+const hex=c=>[1,3,5].map(i=>parseInt(c.substr(i,2),16));
+const mix=(a,b,t)=>{const A=hex(a),B=hex(b);return'rgb('+A.map((v,i)=>Math.round(lerp(v,B[i],t))).join(',')+')'};
+const NS='http://www.w3.org/2000/svg';
+const S=document.getElementById('s');
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);(p||S).appendChild(e);return e}
+function start(){const T=q.get('t');if(T!==null){render(Math.round(+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(Math.floor((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+
+S.remove();
+const cv=document.createElement('canvas');cv.width=644;cv.height=254;cv.style.width='322px';cv.style.height='127px';
+document.getElementById('card').appendChild(cv);
+const cx=cv.getContext('2d');cx.scale(2,2);
+let P=[];
+function build(){
+  const o=document.createElement('canvas');o.width=322;o.height=127;const c=o.getContext('2d');
+  c.fillStyle='#fff';c.font='900 '+CFG.size+'px "Noto Sans TC"';c.textAlign='center';c.textBaseline='middle';c.fillText(CFG.text,161,66);
+  const d=c.getImageData(0,0,322,127).data,R=rng(42);
+  for(let y=0;y<127;y+=CFG.step)for(let x=0;x<322;x+=CFG.step){
+    if(d[(y*322+x)*4+3]>140){
+      const r=R(),col=r<.22?CFG.red:r<.5?CFG.gray:CFG.cream;
+      P.push({tx:x,ty:y,sx:R()*322,sy:R()*127,dl:R()*CFG.spread,col,sz:1.3+R()*1.2,ph:R()*6.28});
+    }
+  }
+}
+const UL={x:121,w:68};
+function render(F){
+  if(!P.length)build();
+  cx.clearRect(0,0,322,127);
+  for(const p of P){
+    const t=eio(seg(F,CFG.moveFrom+p.dl,CFG.moveTo-CFG.spread+p.dl));
+    const sw=(1-t)*t*10;  // 移動途中的些微擺動
+    const x=lerp(p.sx,p.tx,t)+Math.sin(p.ph+F*.5)*sw,y=lerp(p.sy,p.ty,t)+Math.cos(p.ph+F*.4)*sw;
+    cx.fillStyle=mix(p.col,CFG.cream,seg(F,16,24));
+    const s=lerp(p.sz,CFG.step+.2,t);
+    cx.fillRect(x-s/2,y-s/2,s,s);
+  }
+  const u=eo(seg(F,28,36));
+  cx.fillStyle=CFG.red;cx.fillRect(lerp(155,UL.x,u),109.5,u*UL.w,2.5);
+}
+document.fonts.load('900 78px "Noto Sans TC"','集結').then(start,start);
+
+</script></body></html>

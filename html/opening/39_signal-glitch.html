@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>OP39 訊號故障</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@700;900&family=Roboto+Mono:wght@500;700&family=Anton&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0c11}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh}
+body.m{display:block;min-height:0}
+#card{position:relative;width:322px;height:127px;border-radius:12px;overflow:hidden;background:#16171e}
+canvas{display:block;width:322px;height:127px}
+</style></head><body><div id="card"><canvas id="cv"></canvas></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  text:'收訊', live:'ON AIR',
+  cream:'#f1ebe2', red:'#ff4757', bg:'#16171e',
+  bars:['#c9c9c9','#d8b43a','#4fb8b0','#4a9a58','#d54a4a','#4757d8','#0c0c0e'],
+  clean:116,     // 此幀（參考幀）起訊號乾淨
+  R0:80, LOOP:120
+};
+const FONTS=[['900 76px "Noto Sans TC"','收訊'],['500 7px "Roboto Mono"','ON AIRNO SIGNAL']];
+/* ================ */
+
+const q=new URLSearchParams(location.search);const Z=+q.get('z')||1;
+const card=document.getElementById('card');if(Z!=1)card.style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3),eio=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const lerp=(a,b,t)=>a+(b-a)*t;
+const tab=(r,T)=>{if(r<=T[0][0])return T[0][1];for(let i=1;i<T.length;i++)if(r<=T[i][0]){const a=T[i-1],b=T[i];return lerp(a[1],b[1],(r-a[0])/(b[0]-a[0]))}return T[T.length-1][1]};
+const R=n=>{const x=Math.sin(n*127.1+311.7)*43758.5453;return x-Math.floor(x)};
+const W=322,H=127,D=2*Z;
+const cv=document.getElementById('cv');cv.width=W*D;cv.height=H*D;const c=cv.getContext('2d');
+function off(){const o=document.createElement('canvas');o.width=W*D;o.height=H*D;const x=o.getContext('2d');x.setTransform(D,0,0,D,0,0);return[o,x]}
+function render(F){c.setTransform(D,0,0,D,0,0);c.globalAlpha=1;c.globalCompositeOperation='source-over';c.filter='none';c.shadowBlur=0;c.letterSpacing='0px';c.setLineDash([]);
+  c.clearRect(0,0,W,H);c.fillStyle=CFG.bg;c.fillRect(0,0,W,H);draw(c,F+CFG.R0,F)}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+Promise.all(FONTS.map(f=>document.fonts.load(f[0],f[1]))).then(start,start);
+
+
+const [TO,tx]=off();let built=false;
+function build(){tx.clearRect(0,0,W,H);tx.font='900 76px "Noto Sans TC"';tx.textAlign='center';tx.textBaseline='middle';tx.fillStyle=CFG.cream;tx.fillText(CFG.text,161,63);
+  tx.globalCompositeOperation='source-atop';tx.fillStyle='rgba(22,23,30,.28)';for(let y=0;y<H;y+=3)tx.fillRect(0,y+1.5,W,1.5);tx.globalCompositeOperation='source-over'}
+const NC=document.createElement('canvas');NC.width=W;NC.height=H;const nx=NC.getContext('2d');const ID=nx.createImageData(W,H);
+function noise(r,bright){const d=ID.data;let s=Math.floor(r*977)+1;
+  for(let i=0;i<d.length;i+=4){s=(s*1103515245+12345)&0x7fffffff;const v=((s>>8)&255)*bright;d[i]=d[i+1]=d[i+2]=v;d[i+3]=255}
+  nx.putImageData(ID,0,0)}
+function draw(c,r){
+  if(!built){build();built=true}
+  const cl_=r>=CFG.clean;
+  if(r<104){
+    // 色條
+    const bw=W/7;CFG.bars.forEach((col,i)=>{c.fillStyle=col;c.fillRect(i*bw,0,bw+.5,H)});
+    c.fillStyle='rgba(8,8,10,.85)';c.fillRect(131,57,60,12);c.fillStyle='#e8e8ee';c.font='500 6px "Roboto Mono"';c.textAlign='center';c.textBaseline='middle';c.letterSpacing='.8px';c.fillText('NO SIGNAL',161.4,63.5);c.letterSpacing='0px';
+  }
+  const na=tab(r,[[80,.25],[85,.3],[87,.5],[89,.85],[91,1],[103,1],[116,.0],[200,0]]);
+  if(na>0){
+    const bright=tab(r,[[80,.8],[102,.8],[112,.3],[116,.25],[200,.25]]);
+    noise(r,bright);c.globalAlpha=na;c.drawImage(NC,0,0,W,H);c.globalAlpha=1;
+  }
+  // 文字撕裂浮現
+  const ta=seg(r,103,106);
+  if(ta>0&&!cl_){
+    const amp=44*(1-seg(r,104,116)),nb=12,bh=H/nb;
+    for(let i=0;i<nb;i++){
+      const dx=(R(r*4.1+i*7.3)-.5)*2*amp;
+      c.save();c.beginPath();c.rect(0,i*bh,W,bh+.5);c.clip();c.globalAlpha=ta;c.drawImage(TO,dx,(R(r*2.9)-.5)*6*(1-seg(r,104,116)),W,H);c.restore();
+    }
+    c.fillStyle='rgba(255,255,255,.35)';
+    for(let i=0;i<10;i++){const y=R(r*5+i)*H;c.fillRect(0,y,W,1)}
+  }
+  if(cl_){
+    c.drawImage(TO,0,0,W,H);
+    const on=Math.floor((r-CFG.clean)/10)%2==0;
+    c.fillStyle=on?CFG.red:'#5a2430';c.beginPath();c.arc(23.5,15,3.2,0,6.2832);c.fill();
+    c.fillStyle='#e8e8ee';c.font='700 7px "Roboto Mono"';c.textAlign='left';c.textBaseline='middle';c.fillText(CFG.live,32,15);
+  }
+}
+</script></body></html>

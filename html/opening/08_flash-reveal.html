@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>OP08 閃光現身</title>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0c11}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh}
+body.m{display:block;min-height:0}
+#card{position:relative;width:322px;height:127px;border-radius:12px;overflow:hidden;background:#09090c}
+canvas{position:absolute;left:0;top:0;width:322px;height:127px}
+</style></head><body><div id="card"><canvas id="c" width="644" height="254"></canvas></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  word:'2026', sub:'NEW ERA',
+  fontFam:'Anton', textH:86,               // 數字高度 px（自動換算字級，確保不超出畫面）
+  cx:160.5, cy:54.5,
+  bg:'#09090c', cream:'#f7f1ee', red:'#ff4757',
+  // 開場連續閃光：先兩次灰色閃光（畫面是黑的，沒有放射背景），之後放射光才出現
+  flashes:[[2,.5],[7,.5]],                 // [幀, 不透明度]（單幀閃光）
+  burstF:[8,14],                           // 放射光芒淡入（之後持續旋轉）
+  spin:.01745,                             // 放射光旋轉（弧度／幀，120 幀轉 120°）
+  bigFlash:[[16,1],[17,.92],[18,.85],[19,.7],[21,.5],[24,.32],[27,.18],[30,.08],[33,0]], // 白閃光不透明度（幀→值）
+  textF:[19,28],                           // 大字從畫面外衝入（放大 → 正常大小）
+  blurF:[19,38],                           // 模糊 → 清晰（比到位晚一點才清晰）
+  textS0:3.2, textBlur:16,
+  ringF:[18,34],
+  subF:[30,36],
+  rays:24,
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const g=document.getElementById('c').getContext('2d');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a)),eo=x=>1-Math.pow(1-x,3);
+function key(T,F){if(F<=T[0][0])return T[0][1];for(let i=1;i<T.length;i++)if(F<=T[i][0]){const a=T[i-1],b=T[i];return a[1]+(b[1]-a[1])*(F-a[0])/(b[0]-a[0])}return T[T.length-1][1]}
+let FS=80,ASC=60;
+function render(F){
+  g.setTransform(2,0,0,2,0,0);g.filter='none';
+  g.fillStyle=CFG.bg;g.fillRect(0,0,322,127);
+  const {cx,cy}=CFG;
+  /* 放射光芒（持續旋轉） */
+  const bp=eo(seg(F,CFG.burstF[0],CFG.burstF[1]));
+  if(bp>0){
+    g.save();g.globalAlpha=bp;
+    const rg=g.createRadialGradient(cx,cy,0,cx,cy,190);rg.addColorStop(0,'#4a1520');rg.addColorStop(.5,'#2a0f16');rg.addColorStop(1,'#0e0a0d');
+    g.fillStyle=rg;g.fillRect(0,0,322,127);
+    const n=CFG.rays,rot=F*CFG.spin;
+    for(let i=0;i<n;i+=2){const a1=i/n*Math.PI*2+.1+rot,a2=(i+1)/n*Math.PI*2+.1+rot;
+      g.beginPath();g.moveTo(cx,cy);g.lineTo(cx+Math.cos(a1)*400,cy+Math.sin(a1)*400);g.lineTo(cx+Math.cos(a2)*400,cy+Math.sin(a2)*400);g.closePath();
+      const wg=g.createRadialGradient(cx,cy,10,cx,cy,200);wg.addColorStop(0,'rgba(255,255,255,.28)');wg.addColorStop(1,'rgba(255,255,255,.10)');g.fillStyle=wg;g.fill()}
+    g.restore();
+  }
+  /* 文字：從畫面外衝入中間，模糊到清晰 */
+  if(F>=CFG.textF[0]){
+    const t=seg(F,CFG.textF[0],CFG.textF[1]),tb=seg(F,CFG.blurF[0],CFG.blurF[1]);
+    const sc=1+(CFG.textS0-1)*Math.pow(1-t,2.2),bl=CFG.textBlur*Math.pow(1-tb,1.6);
+    g.save();g.translate(cx+1,cy);g.scale(sc,sc);g.globalAlpha=Math.min(1,t*4);
+    if(bl>.2)g.filter='blur('+bl.toFixed(1)+'px)';
+    g.font='400 '+FS+'px '+CFG.fontFam;g.textAlign='center';g.textBaseline='alphabetic';
+    const ga=1-seg(F,28,36),by=ASC/2;
+    g.shadowColor='rgba(255,71,87,'+(.55+.4*(1-ga))+')';g.shadowBlur=12;
+    g.fillStyle=CFG.cream;g.fillText(CFG.word,0,by);g.shadowBlur=0;g.fillText(CFG.word,0,by);
+    g.restore();g.filter='none';
+  }
+  /* 橢圓衝擊環（以畫面中心為圓心，不是以大字為中心） */
+  const rt=(F-CFG.ringF[0])/(CFG.ringF[1]-CFG.ringF[0]);
+  if(rt>0&&rt<1){g.strokeStyle='rgba(240,240,245,'+(.8*(1-rt))+')';g.lineWidth=1.6;g.beginPath();g.ellipse(161,63.5,40+eo(rt)*200,20+eo(rt)*70,0,0,7);g.stroke()}
+  /* 連續閃光 */
+  CFG.flashes.forEach(([f,a])=>{if(F>=f&&F<f+1){g.fillStyle='rgba(248,248,250,'+a+')';g.fillRect(0,0,322,127)}});
+  const fa=key(CFG.bigFlash,F);
+  if(fa>0&&F>=CFG.bigFlash[0][0]){g.fillStyle='rgba(248,248,250,'+fa+')';g.fillRect(0,0,322,127)}
+  /* 副標（逐字置中對齊） */
+  const sa=seg(F,CFG.subF[0],CFG.subF[1]);
+  if(sa>0){g.globalAlpha=sa;g.fillStyle=CFG.red;g.font='500 7px "Roboto Mono"';g.textBaseline='alphabetic';g.textAlign='center';
+    const n=CFG.sub.length;for(let i=0;i<n;i++)g.fillText(CFG.sub[i],162+(i-(n-1)/2)*11.4,112);g.globalAlpha=1}
+}
+function start(){
+  g.font='400 100px '+CFG.fontFam;ASC=g.measureText(CFG.word).actualBoundingBoxAscent;FS=100*CFG.textH/ASC;ASC=CFG.textH;
+  const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+Promise.all([document.fonts.load('400 80px '+CFG.fontFam,CFG.word),document.fonts.load('500 7px "Roboto Mono"','NEW ERA')]).then(start,start);
+</script></body></html>

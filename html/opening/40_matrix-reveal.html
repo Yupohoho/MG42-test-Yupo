@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>OP40 矩陣顯現</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@700;900&family=Roboto+Mono:wght@500;700&family=Anton&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0c11}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh}
+body.m{display:block;min-height:0}
+#card{position:relative;width:322px;height:127px;border-radius:12px;overflow:hidden;background:#16171e}
+canvas{display:block;width:322px;height:127px}
+</style></head><body><div id="card"><canvas id="cv"></canvas></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  text:'入侵', cream:'#f1ebe2', red:'#ff4757', bg:'#16171e',
+  chars:'ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿ0123456789ABCDEF',
+  cw:8, ch:9, textY:62,
+  R0:80, LOOP:120
+};
+const FONTS=[['900 84px "Noto Sans TC"','入侵'],['500 8px "Roboto Mono"','ｱｲｳ0123456789ABCDEF']];
+/* ================ */
+
+const q=new URLSearchParams(location.search);const Z=+q.get('z')||1;
+const card=document.getElementById('card');if(Z!=1)card.style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3),eio=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const lerp=(a,b,t)=>a+(b-a)*t;
+const tab=(r,T)=>{if(r<=T[0][0])return T[0][1];for(let i=1;i<T.length;i++)if(r<=T[i][0]){const a=T[i-1],b=T[i];return lerp(a[1],b[1],(r-a[0])/(b[0]-a[0]))}return T[T.length-1][1]};
+const R=n=>{const x=Math.sin(n*127.1+311.7)*43758.5453;return x-Math.floor(x)};
+const W=322,H=127,D=2*Z;
+const cv=document.getElementById('cv');cv.width=W*D;cv.height=H*D;const c=cv.getContext('2d');
+function off(){const o=document.createElement('canvas');o.width=W*D;o.height=H*D;const x=o.getContext('2d');x.setTransform(D,0,0,D,0,0);return[o,x]}
+function render(F){c.setTransform(D,0,0,D,0,0);c.globalAlpha=1;c.globalCompositeOperation='source-over';c.filter='none';c.shadowBlur=0;c.letterSpacing='0px';c.setLineDash([]);
+  c.clearRect(0,0,W,H);c.fillStyle=CFG.bg;c.fillRect(0,0,W,H);draw(c,F+CFG.R0,F)}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+Promise.all(FONTS.map(f=>document.fonts.load(f[0],f[1]))).then(start,start);
+
+
+const [TO,tx]=off();let mask=null;
+function build(){tx.clearRect(0,0,W,H);tx.font='900 84px "Noto Sans TC"';tx.textAlign='center';tx.textBaseline='middle';tx.fillStyle='#fff';tx.fillText(CFG.text,161,CFG.textY);
+  const t=document.createElement('canvas');t.width=W;t.height=H;const x=t.getContext('2d');x.drawImage(TO,0,0,W,H);mask=x.getImageData(0,0,W,H).data}
+const inside=(x,y)=>{const ix=Math.floor(x),iy=Math.floor(y);if(ix<0||iy<0||ix>=W||iy>=H)return false;return mask[(iy*W+ix)*4+3]>110};
+function draw(c,r){
+  if(!mask)build();
+  const cw=CFG.cw,ch=CFG.ch,cols=Math.ceil(W/cw),rows=Math.ceil(H/ch),S=CFG.chars;
+  c.font='500 8px "Roboto Mono"';c.textAlign='left';c.textBaseline='top';
+  const rainA=1,RSTOP=100;   // 雨在第 RSTOP 幀後不再有新的落下，已落下的繼續掉出畫面（自然落完）
+  const form=seg(r,94,106);
+  for(let i=0;i<cols;i++){
+    const sp=7+R(i*3.3)*5,d=R(i*7.1)*6,L=40+R(i*1.9)*60;
+    for(let dd=0;dd<2;dd++){
+    const Lc=H+L+30,pp=(r-80-d)*sp+dd*Lc*.5,nn=Math.floor(pp/Lc),head=pp-nn*Lc;
+    if(80+d+(nn*Lc-dd*Lc*.5)/sp>RSTOP)continue;
+    for(let k=0;k*ch<L;k++){
+      const y=head-k*ch;if(y<-ch||y>H)continue;
+      const x=i*cw,ins=inside(x+cw/2,y+ch/2);
+      let a=(1-k*ch/L);if(r<80+d)a=0;
+      a*=ins?1:(1-form*.72);
+      if(a<=0)continue;
+      const col=k==0?'#eef0f4':(i%4==1?'rgba(255,71,87,1)':'#9a9ea8');
+      c.globalAlpha=a*rainA;c.fillStyle=col;
+      c.fillText(S[Math.floor(R(i*31+k*7+dd*17+Math.floor(r/3)*3.1)*S.length)],x,y);
+    }
+    }
+  }
+  // 字形內以字元填滿，再轉為實心字
+  // 字形內以數碼字元組成文字：停留一段時間，字元快速變換，亮光由左掃到右，之後才轉為實心字
+  const cA=seg(r,98,106)*(1-seg(r,110,120)),swx=lerp(-24,W+24,seg(r,104,116));
+  if(cA>0){
+    for(let i=0;i<cols;i++)for(let j=0;j<rows;j++){
+      const x=i*cw,y=j*ch;if(!inside(x+cw/2,y+ch/2))continue;
+      const dsw=Math.abs(x+cw/2-swx),hot=r>=104&&r<=118?cl(1-dsw/22):0;
+      c.fillStyle=hot>0?'rgb('+Math.round(lerp(201,255,hot))+','+Math.round(lerp(204,255,hot))+','+Math.round(lerp(212,255,hot))+')':(R(i*3+j*11)<.12?'#ff6b78':'#c9ccd4');
+      c.globalAlpha=cA*(.72+.28*R(i*9+j*4+r*.7))+hot*.2;c.globalAlpha=Math.min(1,c.globalAlpha);c.fillText(S[Math.floor(R(i*13+j*5+Math.floor(r))*S.length)],x,y);
+    }
+  }
+  c.globalAlpha=1;
+  const sa=seg(r,110,122);
+  if(sa>0){c.globalAlpha=sa;c.font='900 84px "Noto Sans TC"';c.textAlign='center';c.textBaseline='middle';
+    const m=Math.round(lerp(150,241,sa));c.fillStyle='rgb('+m+','+Math.round(lerp(152,235,sa))+','+Math.round(lerp(160,226,sa))+')';
+    c.fillText(CFG.text,161,CFG.textY);c.globalAlpha=1}
+  const u=eo(seg(r,122,130));
+  if(u>0){c.fillStyle=CFG.red;c.fillRect(161-20*u,111,40*u,2.5)}
+}
+</script></body></html>

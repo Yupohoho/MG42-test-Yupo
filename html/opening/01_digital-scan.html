@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>OP01 數位掃描</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@900&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0c11}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh}
+body.m{display:block;min-height:0}
+#card{position:relative;width:322px;height:127px;border-radius:12px;overflow:hidden;background:#16171e}
+canvas{position:absolute;left:0;top:0;width:322px;height:127px}
+</style></head><body><div id="card"><canvas id="c" width="644" height="254"></canvas></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  word:'解析',                              // 示範文字
+  font:'900 78px "Noto Sans TC"',
+  cy:63,                                    // 文字垂直中心
+  bg:'#16171e', cream:'#f7f2ef', accent:'#ff4757', gray:'#8b8d98', outline:'#3b3d48',
+  pct:[[0,5],[3,13],[6,27],[9,56],[12,73],[15,87],[18,95],[21,98],[24,100]], // 掃描進度%（幀,%）量自參考
+  doneF:27,                                 // 出現「SCAN COMPLETE」的幀
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const g=document.getElementById('c').getContext('2d');
+function pct(F){const T=CFG.pct;if(F<=T[0][0])return T[0][1];for(let i=1;i<T.length;i++)if(F<=T[i][0]){const a=T[i-1],b=T[i],t=(F-a[0])/(b[0]-a[0]);return a[1]+(b[1]-a[1])*t}return 100}
+/* 只留字形外緣的輪廓：先畫粗描邊，再把字形內部挖掉（避免筆畫重疊處出現內線） */
+const oc=document.createElement('canvas');oc.width=644;oc.height=254;const og=oc.getContext('2d');
+function outl(col,lw){og.setTransform(1,0,0,1,0,0);og.clearRect(0,0,644,254);og.setTransform(2,0,0,2,0,0);
+  og.font=CFG.font;og.textAlign='center';og.textBaseline='middle';og.lineJoin='round';
+  og.globalCompositeOperation='source-over';og.strokeStyle=col;og.lineWidth=lw;og.strokeText(CFG.word,161,CFG.cy);
+  og.globalCompositeOperation='destination-out';og.fillStyle='#000';og.fillText(CFG.word,161,CFG.cy);og.globalCompositeOperation='source-over';return oc}
+function render(F){
+  g.setTransform(2,0,0,2,0,0);
+  g.fillStyle=CFG.bg;g.fillRect(0,0,322,127);
+  g.fillStyle='rgba(255,255,255,.07)';
+  for(let y=6;y<127;y+=12)for(let x=6;x<322;x+=12)g.fillRect(x,y,1,1);
+  const p=pct(F),bx=p/100*322;
+  g.font=CFG.font;g.textAlign='center';g.textBaseline='middle';
+  g.lineJoin='round';
+  g.drawImage(outl(CFG.outline,2),0,0,322,127);
+  g.save();g.beginPath();g.rect(0,0,bx,127);g.clip();
+  g.fillStyle=CFG.cream;g.fillText(CFG.word,161,CFG.cy);g.strokeStyle=CFG.cream;g.lineWidth=1.2;g.strokeText(CFG.word,161,CFG.cy);g.restore();
+  if(F<25){
+    const gr=g.createLinearGradient(bx-40,0,bx,0);gr.addColorStop(0,'rgba(255,71,87,0)');gr.addColorStop(1,'rgba(255,71,87,.5)');
+    g.fillStyle=gr;g.fillRect(bx-40,0,40,127);
+    g.fillStyle=CFG.accent;g.fillRect(bx-1,0,2,127);
+  }
+  /* 角括號 */
+  g.strokeStyle='#5b5d68';g.lineWidth=1;
+  const c=[[9,9,1,1],[313,9,-1,1],[9,118,1,-1],[313,118,-1,-1]];
+  c.forEach(([x,y,sx,sy])=>{g.beginPath();g.moveTo(x+sx*8,y);g.lineTo(x,y);g.lineTo(x,y+sy*8);g.stroke()});
+  /* 標籤 */
+  g.font='500 7.5px "Roboto Mono"';g.textAlign='left';g.textBaseline='alphabetic';
+  if(F>=CFG.doneF){g.fillStyle=CFG.accent;g.fillText('SCAN COMPLETE  100%',14,17)}
+  else{g.fillStyle=CFG.gray;g.fillText('SCANNING...  '+String(Math.round(p)).padStart(3,'0')+'%',14,17)}
+}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+Promise.all([document.fonts.load(CFG.font,CFG.word),document.fonts.load('500 8px "Roboto Mono"','SCAN0123')]).then(start,start);
+</script></body></html>

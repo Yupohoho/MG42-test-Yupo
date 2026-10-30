@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OP15 monochrome-reveal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;900&family=Noto+Serif+JP:wght@600;900&family=Montserrat:wght@800&family=Playfair+Display:wght@400&family=Roboto+Mono:wght@500&display=swap">
+<style>
+html,body{margin:0;background:#0b0c11}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh}
+body.m{display:block;min-height:0}
+#card{position:relative;width:322px;height:127px;border-radius:12px;overflow:hidden;background:#16171e}
+
+</style></head><body><div id="wrap"><div id="card"></div></div>
+<script>
+const q=new URLSearchParams(location.search),Z=+q.get('z')||1;
+document.getElementById('wrap').style.zoom=Z;if(q.get('m')==='1')document.body.className='m';
+const card=document.getElementById('card');
+const cl=(v,a=0,b=1)=>Math.min(b,Math.max(a,v)),pr=(f,a,b)=>cl((f-a)/(b-a));
+const eo=p=>1-Math.pow(1-p,3),eio=p=>p<.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2,lerp=(a,b,p)=>a+(b-a)*p;
+function kf(f,a){if(f<=a[0][0])return a[0][1];for(let i=1;i<a.length;i++){if(f<=a[i][0]){const p=(f-a[i-1][0])/(a[i][0]-a[i-1][0]);return lerp(a[i-1][1],a[i][1],p)}}return a[a.length-1][1]}
+function el(css,txt,parent){const e=document.createElement('div');e.style.cssText='position:absolute;'+css;if(txt!=null)e.textContent=txt;(parent||card).appendChild(e);return e}
+function fit(e,target,cx){e.style.letterSpacing='0px';const w0=e.offsetWidth,n=[...e.textContent].length;const ls=(target-w0)/(n-1);e.style.letterSpacing=ls+'px';e.style.left=(cx-target/2)+'px';return w0}
+
+const CFG={text:'白と黒'};
+const LOOP=120,FPS=30;
+const FONTS=['900 70px "Noto Sans JP"'],SAMPLE=CFG.text;
+let stripes=[],full,ul;
+const CW=322/12;
+/* 各條紋長高的起訖幀：中間兩條先長，再依序往兩側（由中間往兩側） */
+const TM=[[6,14],[3,11],[0,8],[0,8],[3,11],[6,14]];
+function layer(bg,col,parent){const d=el('left:0;top:0;width:322px;height:127px;background:'+bg+';overflow:hidden',null,parent);
+ el('left:0;top:25px;width:327px;text-align:center;font:900 70px/70px "Noto Sans JP",sans-serif;color:'+col+';white-space:nowrap;',CFG.text,d);return d}
+function init(){
+ card.style.background='#0a0b0f';
+ layer('#0a0b0f','#f2ede8',card);
+ for(let k=0;k<6;k++){const x=2*k*CW;const s=el('left:'+x+'px;width:'+(CW+.5)+'px;overflow:hidden;');
+  const inner=layer('#f2ede8','#080302',s);inner.style.left=(-x)+'px';stripes.push({s,inner,x,k})}
+ full=layer('#f2ede8','#080302',card);
+ ul=el('top:111px;height:3px;background:#ff3d5c;');
+}
+function render(f){
+ stripes.forEach(o=>{const h=127*eo(pr(f,TM[o.k][0],TM[o.k][1]));
+  o.s.style.height=h+'px';
+  const t=(127-h)/2;o.s.style.top=t+'px';o.inner.style.top=(-t)+'px'});
+ full.style.opacity=eo(pr(f,22,34));
+ const w=53*eo(pr(f,24,32));ul.style.width=w+'px';ul.style.left=(160.5-w/2)+'px';
+}
+function start(){init();const tp=q.get('t');if(tp!==null){render(Math.round(+tp*FPS+1e-6)%LOOP);return}
+const t0=performance.now();let last=-1;(function tick(){const f=Math.floor((performance.now()-t0)/1000*FPS)%LOOP;if(f!==last){last=f;render(f)}requestAnimationFrame(tick)})()}
+Promise.all(FONTS.map(f=>document.fonts.load(f,SAMPLE))).catch(()=>{}).then(start);
+</script></body></html>

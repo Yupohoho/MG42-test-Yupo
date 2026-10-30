@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>OP24 彩紙爆發</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0c11}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans JP',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:322px;height:127px;border-radius:12px;overflow:hidden;background:#16171e}
+svg{position:absolute;left:0;top:0}
+text{font-family:'Noto Sans JP',sans-serif;font-weight:900;text-anchor:middle}
+</style></head><body><div id="card"><svg id="s" width="322" height="127" viewBox="0 0 322 127"></svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  word:'おめでとう', size:35, textLen:190,       // 示範文字（5 字）、字級、字寬
+  cx:163.5, cy:66.5,                              // 停穩時文字中心
+  red:'#ff4954', redDark:'#d23a48', cream:'#f6efe8',
+  confetti:['#ff4954','#ff8fa3','#f3c85c','#5bb8f0','#f6efe8','#f3c85c','#ff4954','#f6efe8','#5bb8f0'],
+  N:110,                                          // 彩紙數量
+  corners:[[8,114],[314,114]],                    // 左下、右下發射點
+  appear:1, burst:8,                              // 彩紙在角落聚集的起始幀、炸開幀
+  LOOP:120
+};
+/* 文字縮放與傾斜（量自參考，k=0 為文字首次出現）：放大過衝到 1.2 倍再回穩 */
+const TS=[.2,.45,.845,1.03,1.136,1.19,1.2,1.18,1.136,1.08,1.036,1.005,1];
+const TR=[-10,-8,-6,-3,-1,.5,0,0,0,0,0,0,0];
+const TEXT_AT=6;
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const NS='http://www.w3.org/2000/svg',S=document.getElementById('s');
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);(p||S).appendChild(e);return e}
+let sd=11;const rnd=()=>(sd=(sd*16807)%2147483647)/2147483647;
+/* 文字三層：奶油色（左上）、深紅（右下）、紅色字面 */
+const tg=el('g',{});
+const mkT=(dx,dy,fill,sw)=>{const t=el('text',{x:dx,y:dy+CFG.size*.35,'font-size':CFG.size,fill,stroke:fill,'stroke-width':sw,'stroke-linejoin':'round',textLength:CFG.textLen,lengthAdjust:'spacing'},tg);t.textContent=CFG.word;return t};
+mkT(-2,-2.2,CFG.cream,.5);mkT(1.8,2.2,CFG.redDark,.5);mkT(0,0,CFG.red,.5);
+/* 彩紙：事先逐幀模擬（隨機數固定，render 仍是 F 的確定函數） */
+const P=[];
+for(let i=0;i<CFG.N;i++){
+  const side=i%2,c=CFG.corners[side];
+  const ang=(-(10+rnd()*75))*Math.PI/180, sp=7+rnd()*21, dir=side?-1:1;
+  const col=CFG.confetti[Math.floor(rnd()*CFG.confetti.length)];
+  const w=3.5+rnd()*5, h=2+rnd()*2.6, line=rnd()<.2;
+  const p={side,ang,sp,dir,col,w:line?8+rnd()*3:w,h:line?1:h,
+           jx:(rnd()-.5)*2,jy:(rnd()-.5)*2,rot0:rnd()*360,spin:(rnd()-.5)*16,fp:rnd()*6.28,fs:.25+rnd()*.35,
+           delay:Math.floor(rnd()*3),pts:[]};
+  let x=c[0],y=c[1],vx=Math.cos(ang)*sp*dir,vy=Math.sin(ang)*sp;
+  for(let F=0;F<CFG.LOOP+1;F++){
+    if(F<CFG.appear+p.delay){p.pts.push(null);continue}
+    if(F<CFG.burst){ // 角落聚集：小範圍慢慢外擴
+      const r=5+(F-CFG.appear)*2.8;
+      p.pts.push([c[0]+p.jx*r*(side?-1:1)*.9,c[1]+p.jy*r*.8-(F-CFG.appear)*.6]);
+      x=p.pts[p.pts.length-1][0];y=p.pts[p.pts.length-1][1];continue;
+    }
+    vx*=.9;vy=vy*.9+.05;
+    x+=vx+.35*Math.sin(p.fp+F*.22);y+=vy;
+    p.pts.push([x,y]);
+  }
+  p.e=el('rect',{x:-p.w/2,y:-p.h/2,width:p.w,height:p.h,fill:col});
+  P.push(p);
+}
+function render(F){
+  F=Math.floor(F);
+  const k=F-TEXT_AT;
+  if(k<0){tg.setAttribute('opacity',0)}
+  else{const kk=Math.min(k,TS.length-1);tg.setAttribute('opacity',1);
+    tg.setAttribute('transform',`translate(${CFG.cx} ${CFG.cy}) rotate(${TR[kk]}) scale(${TS[kk]})`)}
+  P.forEach(p=>{
+    const pt=p.pts[F];
+    if(!pt){p.e.setAttribute('opacity',0);return}
+    const fl=Math.max(.25,Math.abs(Math.cos(p.fp+F*p.fs)));
+    p.e.setAttribute('opacity',1);
+    p.e.setAttribute('transform',`translate(${pt[0].toFixed(1)} ${pt[1].toFixed(1)}) rotate(${(p.rot0+p.spin*F).toFixed(0)}) scale(1 ${fl.toFixed(2)})`);
+  });
+}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+document.fonts.load('900 35px "Noto Sans JP"','おめでとう').then(start,start);
+</script></body></html>

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>OP23 彈簧字</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0c11}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh}
+body.m{display:block;min-height:0}
+#card{position:relative;width:322px;height:127px;border-radius:12px;overflow:hidden;background:#16171e}
+svg{position:absolute;left:0;top:0}
+text{font-family:'Archivo Black','Noto Sans TC',sans-serif;text-anchor:middle}
+</style></head><body><div id="card"><svg id="s" width="322" height="127" viewBox="0 0 322 127"></svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  letters:['B','O','I','N','G','!'],
+  cx:[45.5,91.5,138,185,231,278.5],
+  col:['#f6efe8','#f3c85c','#ff4954','#f6efe8','#f3c85c','#ff4954'],
+  delay:[3,5,8,10,12,15],            // 各字開始下落的幀（量自參考，彼此相隔約 2–3 幀）
+  fs:48, capH:35,                   // 字級、停穩時字高
+  spring:'#9a9ca8', coils:7, amp:4.6,
+  LOOP:120
+};
+/* 量自參考（B 字）：字頂 y 與字底 y 的逐幀值，t=0 為開始下落；先被彈簧拉到最低(底 113)再彈起、阻尼收斂到 57–91 */
+const TOP=[27,39,52,64,72,75,74,70,64,58,53,50,49,50,52,55,58,60,61,61,60,59,57,56,55,55,55,56,57,58,57,58,58,57,57];
+const BOT=[53,68,85,99,109,113,112,107,99,91,85,81,80,81,84,88,91,94,95,95,95,93,91,90,89,89,89,89,89,91,91,92,92,91,91];
+const REST_TOP=19, REST_BOT=43;   // 下落前：字被壓扁收在彈簧上方
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const NS='http://www.w3.org/2000/svg',S=document.getElementById('s');
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);(p||S).appendChild(e);return e}
+const L=CFG.letters.map((c,i)=>{
+  const sp=el('path',{fill:'none',stroke:CFG.spring,'stroke-width':1.5,'stroke-linejoin':'round'});
+  const tab=el('rect',{x:CFG.cx[i]-4,y:2,width:8,height:4,rx:1,fill:CFG.spring});
+  const g=el('g',{});const t=el('text',{x:0,y:0,'font-size':CFG.fs,fill:CFG.col[i]},g);t.textContent=c;
+  return{sp,g};
+});
+function render(F){
+  F=Math.floor(F);
+  L.forEach((o,i)=>{
+    const t=F-CFG.delay[i];
+    let top,bot;
+    if(t<0){top=REST_TOP;bot=REST_BOT}
+    else{const k=Math.min(t,TOP.length-1);top=TOP[k];bot=BOT[k]}
+    const h=bot-top+1, sy=h/CFG.capH;
+    o.g.setAttribute('transform',`translate(${CFG.cx[i]} ${bot}) scale(1 ${sy.toFixed(3)})`);
+    // 彈簧：由天花板往字頂拉伸的鋸齒線
+    const y0=7,y1=top-1,n=CFG.coils*2;let d=`M${CFG.cx[i]} ${y0}`;
+    for(let j=1;j<n;j++){const y=y0+(y1-y0)*j/n;d+=`L${(CFG.cx[i]+(j%2?-1:1)*CFG.amp).toFixed(1)} ${y.toFixed(1)}`}
+    d+=`L${CFG.cx[i]} ${y1}`;
+    o.sp.setAttribute('d',d);
+  });
+}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+document.fonts.load('48px "Archivo Black"','BOING!').then(start,start);
+</script></body></html>

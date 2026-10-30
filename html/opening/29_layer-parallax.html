@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>OP29 レイヤーパララックス</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@900&family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0c11}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:322px;height:127px;border-radius:12px;overflow:hidden;background:#16171e}
+svg{position:absolute;left:0;top:0}
+text{text-anchor:middle}
+</style></head><body><div id="card"><svg id="s" width="322" height="127" viewBox="0 0 322 127"></svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  title:'出發吧',sub:'JOURNEY',            // 標題與副標
+  sky:['#1a1015','#3b1621'],              // 天空漸層（上→地平線）
+  sun:{x:240,r:20,y1:59,rise:30,color:'#f6cdb4',t:[80,130]},   // 太陽最終中心 y1、升起量、起訖（參考幀）
+  // 山層：[基準y, 振幅, 顏色, 每幀向左漂移px, 種子]
+  /* 速度（px/幀）拉大遠近視差：遠山幾乎不動、近景快速掠過，像在公路的車上往外看 */
+  layers:[[63,7,'#7e2035',.12,3],[80,12,'#581a2b',.32,7],[95,14,'#3c1420',.75,11],[108,9,'#1f0f15',1.6,5],[120,5,'#0c0b10',3.2,9]],
+  period:400,                             // 山形一個循環的寬度（無縫連續捲動）
+  titleIn:[90,100], titleMove:[90,120], titleRise:20, subIn:[110,120],
+  SH:80,                                   // render(0) 對應參考第 80 幀
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3);
+const NS='http://www.w3.org/2000/svg',S=document.getElementById('s');
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);(p||S).appendChild(e);return e}
+const defs=el('defs',{});
+const lg=el('linearGradient',{id:'sky',x1:0,y1:0,x2:0,y2:1},defs);
+el('stop',{offset:0,'stop-color':CFG.sky[0]},lg);el('stop',{offset:.55,'stop-color':CFG.sky[1]},lg);
+el('rect',{x:0,y:0,width:322,height:127,fill:'url(#sky)'});
+const sun=el('circle',{cx:CFG.sun.x,cy:0,r:CFG.sun.r,fill:CFG.sun.color});
+function rnd(seed){let s=seed*9301+49297;return()=>{s=(s*9301+49297)%233280;return s/233280}}
+const LY=CFG.layers.map(L=>{
+  /* 一個週期的山形（頭尾同高，可無縫接續），重複 3 段，再向左偏移 1 個週期 */
+  const r=rnd(L[4]),P=CFG.period,base=[];let x=0;
+  while(x<P-20){base.push([x,L[0]+(r()*2-1)*L[1]]);x+=18+r()*20}
+  base.push([P,base[0][1]]);
+  const pts=[];for(let k=0;k<3;k++)base.forEach((p,i)=>{if(k>0&&i==0)return;pts.push([p[0]+k*P-P,p[1]])});
+  const d='M'+pts.map(p=>p[0].toFixed(1)+' '+p[1].toFixed(1)).join('L')+'L'+pts[pts.length-1][0]+' 130L'+pts[0][0]+' 130Z';
+  return el('path',{d,fill:L[2]})});
+const tg=el('g',{});
+const T=el('text',{x:161,y:67,'font-size':40,'font-weight':900,fill:'#f2eeee',style:'font-family:"Noto Sans TC"'},tg);T.textContent=CFG.title;
+const U=el('text',{x:162.75,y:85,'font-size':7,'font-weight':700,fill:'#cbbfc1','letter-spacing':3.5,style:'font-family:"Roboto Mono"'});U.textContent=CFG.sub;
+function render(F,FA){
+  if(FA===undefined)FA=F;   // FA：累計幀數（不隨循環重設），山脈用它才不會每次重播都回到起點
+  const R=F+CFG.SH,s=CFG.sun,u=1-Math.pow(1-seg(R,s.t[0],s.t[1]),3);   // 太陽漸緩升起（四次方緩出，升起時間拉長）
+  sun.setAttribute('cy',s.y1+s.rise*(1-u)+ (R<s.t[0]?0:0));
+  LY.forEach((p,i)=>p.setAttribute('transform','translate('+(-((CFG.layers[i][3]*(FA+37))%CFG.period)).toFixed(2)+' 0)'));   // 從第 0 幀起持續移動
+  const a=eo(seg(R,CFG.titleIn[0],CFG.titleIn[1])),rise=CFG.titleRise*Math.pow(1-seg(R,CFG.titleMove[0],CFG.titleMove[1]),4);   // 標題大字漸緩升起
+  T.setAttribute('opacity',a);tg.setAttribute('transform','translate(0 '+rise+')');
+  U.setAttribute('opacity',.9*seg(R,CFG.subIn[0],CFG.subIn[1]));
+}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){const fa=(performance.now()-t0)/1000*30;render(fa%CFG.LOOP,fa);requestAnimationFrame(tick)})()}
+document.fonts.load('900 40px "Noto Sans TC"',CFG.title).then(start,start);
+</script></body></html>

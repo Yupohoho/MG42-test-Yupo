@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>OP37 霓虹網格</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@700;900&family=Roboto+Mono:wght@500;700&family=Anton&family=Dela+Gothic+One&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0c11}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh}
+body.m{display:block;min-height:0}
+#card{position:relative;width:322px;height:127px;border-radius:12px;overflow:hidden;background:#16171e}
+canvas{display:block;width:322px;height:127px}
+</style></head><body><div id="card"><canvas id="cv"></canvas></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  text:'夜行', sub:'NIGHT DRIVE',
+  cream:'#f1ebe2', red:'#ff4757', coral:'#ff6b78', bg:'#0f0c12',
+  H0:66,      // 地平線 y
+  R0:80, LOOP:120
+};
+const FONTS=[['38px "Dela Gothic One"','夜行'],['500 8px "Roboto Mono"','NIGHT DRIVE']];
+/* ================ */
+
+const q=new URLSearchParams(location.search);const Z=+q.get('z')||1;
+const card=document.getElementById('card');if(Z!=1)card.style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3),eio=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const lerp=(a,b,t)=>a+(b-a)*t;
+const tab=(r,T)=>{if(r<=T[0][0])return T[0][1];for(let i=1;i<T.length;i++)if(r<=T[i][0]){const a=T[i-1],b=T[i];return lerp(a[1],b[1],(r-a[0])/(b[0]-a[0]))}return T[T.length-1][1]};
+const R=n=>{const x=Math.sin(n*127.1+311.7)*43758.5453;return x-Math.floor(x)};
+const W=322,H=127,D=2*Z;
+const cv=document.getElementById('cv');cv.width=W*D;cv.height=H*D;const c=cv.getContext('2d');
+function off(){const o=document.createElement('canvas');o.width=W*D;o.height=H*D;const x=o.getContext('2d');x.setTransform(D,0,0,D,0,0);return[o,x]}
+function render(F){c.setTransform(D,0,0,D,0,0);c.globalAlpha=1;c.globalCompositeOperation='source-over';c.filter='none';c.shadowBlur=0;c.letterSpacing='0px';c.setLineDash([]);
+  c.clearRect(0,0,W,H);c.fillStyle=CFG.bg;c.fillRect(0,0,W,H);draw(c,F+CFG.R0,F)}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+Promise.all(FONTS.map(f=>document.fonts.load(f[0],f[1]))).then(start,start);
+
+
+function draw(c,r){
+  const H0=CFG.H0,cx=161;
+  let g=c.createLinearGradient(0,0,0,H0);g.addColorStop(0,'#15101a');g.addColorStop(1,'#45182a');
+  c.fillStyle=g;c.fillRect(0,0,W,H0);
+  g=c.createLinearGradient(0,H0,0,H);g.addColorStop(0,'#1c0d14');g.addColorStop(1,'#0f0a0e');
+  c.fillStyle=g;c.fillRect(0,H0,W,H-H0);
+  // 太陽：緩緩升起後停住，不再落下
+  const off=28*(1-eo(seg(r,80,104)));
+  c.save();c.beginPath();c.rect(0,0,W,H0);c.clip();
+  let g2;const sy=H0+off;
+  g=c.createLinearGradient(0,sy-26,0,sy);g.addColorStop(0,'#ff8f95');g.addColorStop(1,'#ff4757');
+  c.fillStyle=g;c.beginPath();c.arc(cx,sy,26,0,6.2832);c.fill();
+  c.fillStyle='#2a1520';
+  for(let i=0;i<6;i++){const y=sy-3-i*4.2;c.fillRect(cx-27,y,54,.6+i*.35)}
+  c.restore();
+  // 格線
+  const gp=eo(seg(r,81,92));
+  c.strokeStyle='#ff4a5e';c.lineWidth=.8;
+  const N=8,fr=((r-80)/40)%1;   // 橫線持續向前流動（120 幀剛好 3 圈，無縫循環）
+  for(let k=0;k<=N;k++){
+    const z=(k+fr)/N,y=H0+(H-H0)*z*z*z*.6+(H-H0)*z*z*.4,a=cl(gp*1.6-z*.9)*Math.min(1,z*6);
+    if(a>0&&y<H){c.globalAlpha=a*.9;c.beginPath();c.moveTo(0,y);c.lineTo(W,y);c.stroke()}
+  }
+  c.save();c.beginPath();c.rect(0,H0,W,(H-H0)*gp);c.clip();c.globalAlpha=.9;
+  for(let j=-8;j<=8;j++){c.beginPath();c.moveTo(cx,H0);c.lineTo(cx+j*30,H);c.stroke()}
+  c.restore();c.globalAlpha=1;
+  c.strokeStyle='#ff5a6a';c.lineWidth=1.1;c.beginPath();c.moveTo(0,H0);c.lineTo(W,H0);c.stroke();
+  // 文字
+  const ta=seg(r,96,99),s=tab(r,[[96,.4],[98,.8],[100,1.12],[102,1],[200,1]]);
+  if(ta>0){
+    c.save();c.globalAlpha=ta;c.translate(cx,42);c.scale(s,s);
+    c.font='38px "Dela Gothic One"';c.textAlign='center';c.textBaseline='middle';c.letterSpacing='2px';
+    c.shadowColor='#ff4757';c.shadowBlur=14*D;c.fillStyle='#ff4757';c.fillText(CFG.text,0,3);c.shadowBlur=0;
+    c.fillStyle=CFG.cream;c.fillText(CFG.text,0,0);c.restore();
+  }
+  const sa=seg(r,108,118);
+  if(sa>0){c.globalAlpha=sa;c.fillStyle='#f1ebe2';c.font='500 8px "Roboto Mono"';c.textAlign='center';c.letterSpacing='5px';c.fillText(CFG.sub,cx+2.5,99);c.globalAlpha=1}
+}
+</script></body></html>

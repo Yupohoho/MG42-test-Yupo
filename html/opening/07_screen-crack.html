@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>OP07 畫面碎裂</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0c11}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh}
+body.m{display:block;min-height:0}
+#card{position:relative;width:322px;height:127px;border-radius:12px;overflow:hidden;background:#16171e}
+canvas{position:absolute;left:0;top:0;width:322px;height:127px}
+</style></head><body><div id="card"><canvas id="c" width="644" height="254"></canvas></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  word:'極限突破',
+  font:'900 56px "Noto Sans TC"',
+  cx:161, cy:63,
+  hit:[138,60],                 // 撞擊點
+  rays:13,                      // 放射裂線數
+  rings:[14,34,64,110,180,320], // 同心裂環半徑
+  impactF:8,                    // 撞擊白點（之前是靜止的灰色玻璃蜘蛛網）
+  crackF:[8,14],                // 彩色裂紋從中心長出的幀區間
+  dimF:22,                      // 彩色裂紋消失
+  fallF:23,                     // 碎片開始掉落
+  nCrack:12,
+  fallLen:11,
+  glassA:'#2b2d37', glassB:'#1b1c23', pink:'#ff8c9a',
+  bgA:'#ff6b75', bgB:'#ff4757', cream:'#f6f1ec', shadow:'#1a0a0d',
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const g=document.getElementById('c').getContext('2d');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a)),eo=x=>1-Math.pow(1-x,3);
+function rng(s){return()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const R=rng(11);
+let cells=[];
+function build(){
+  const n=CFG.rays,ang=[];let a=0;
+  for(let i=0;i<n;i++){ang.push(a);a+=(Math.PI*2/n)*(.6+R()*.8)}
+  const tot=a;for(let i=0;i<n;i++)ang[i]*=Math.PI*2/tot;
+  const rad=CFG.rings.map(r=>ang.map(()=>r*(1+(R()-.5)*.3)));
+  const [hx,hy]=CFG.hit;
+  for(let j=0;j<CFG.rings.length-1;j++)for(let i=0;i<n;i++){
+    const i2=(i+1)%n,a1=ang[i],a2=i2==0?ang[0]+Math.PI*2:ang[i2];
+    const P=(rr,aa)=>[hx+Math.cos(aa)*rr,hy+Math.sin(aa)*rr];
+    const pts=j==0?[[hx,hy],P(rad[1][i],a1),P(rad[1][i2],a2)]:[P(rad[j][i],a1),P(rad[j+1][i],a1),P(rad[j+1][i2],a2),P(rad[j][i2],a2)];
+    const c=pts.reduce((s,p)=>[s[0]+p[0]/pts.length,s[1]+p[1]/pts.length],[0,0]);
+    cells.push({pts,c,del:j*1.3+R()*3.5,vx:(R()-.5)*40,rot:(R()-.5)*2.4,sp:90+R()*80});
+  }
+}
+let cracks=[];
+function buildCracks(){const Rc=rng(5),n=CFG.nCrack;
+  for(let i=0;i<n;i++){const a0=(i+Rc()*.7)/n*Math.PI*2,L=150+Rc()*190,pts=[[CFG.hit[0],CFG.hit[1]]];let d=0,a=a0;
+    while(d<L){const step=14+Rc()*16;a+=(Rc()-.5)*.14;d+=step;const last=pts[pts.length-1];pts.push([last[0]+Math.cos(a)*step,last[1]+Math.sin(a)*step])}
+    cracks.push({pts,L:d,del:Rc()*1.5})}}
+function render(F){
+  g.setTransform(2,0,0,2,0,0);
+  /* 紅底與文字（在玻璃後面） */
+  const bg=g.createLinearGradient(0,0,322,127);bg.addColorStop(0,CFG.bgA);bg.addColorStop(1,CFG.bgB);
+  g.fillStyle=bg;g.fillRect(0,0,322,127);
+  g.font=CFG.font;g.textAlign='center';g.textBaseline='middle';g.lineJoin='round';
+  g.fillStyle=CFG.shadow;g.fillText(CFG.word,CFG.cx+3,CFG.cy+3);
+  g.fillStyle=CFG.cream;g.strokeStyle=CFG.cream;g.lineWidth=1.2;g.strokeText(CFG.word,CFG.cx,CFG.cy);g.fillText(CFG.word,CFG.cx,CFG.cy);
+  /* 玻璃碎片 */
+  const edgeCol=F<CFG.fallF?'rgba(120,122,135,.6)':'rgba(225,227,235,.8)';
+  const gl=g.createLinearGradient(0,0,322,127);gl.addColorStop(0,CFG.glassA);gl.addColorStop(1,CFG.glassB);
+  cells.forEach(cl_=>{
+    const t=(F-CFG.fallF-cl_.del)/CFG.fallLen;
+    if(t>=1)return;
+    g.save();
+    if(t>0){g.translate(cl_.c[0]+cl_.vx*t,cl_.c[1]+cl_.sp*t*t*1.4);g.rotate(cl_.rot*t);g.translate(-cl_.c[0],-cl_.c[1]);g.globalAlpha=1-t*t}
+    g.beginPath();cl_.pts.forEach((p,k)=>k?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1]));g.closePath();
+    g.fillStyle=gl;g.fill();
+    g.save();g.clip();g.restore();
+    g.lineJoin='round';
+    /* 裂線只在已長出的半徑內畫 */
+    g.strokeStyle=edgeCol;g.lineWidth=t>0?1:.8;g.stroke();
+    g.restore();
+  });
+  /* 彩色裂紋：從撞擊點長出，之後轉暗消失 */
+  if(F>=CFG.crackF[0]&&F<CFG.dimF){
+    g.lineCap='round';g.lineJoin='round';g.strokeStyle=CFG.pink;g.lineWidth=1.3;
+    cracks.forEach(c=>{const u=eo(seg(F,CFG.crackF[0]+c.del,CFG.crackF[1]+c.del)),len=u*c.L;if(len<=0)return;
+      g.beginPath();g.moveTo(c.pts[0][0],c.pts[0][1]);let acc=0;
+      for(let k=1;k<c.pts.length;k++){const p=c.pts[k-1],q2=c.pts[k],dd=Math.hypot(q2[0]-p[0],q2[1]-p[1]);
+        if(acc+dd<=len){g.lineTo(q2[0],q2[1]);acc+=dd}else{const f=(len-acc)/dd;g.lineTo(p[0]+(q2[0]-p[0])*f,p[1]+(q2[1]-p[1])*f);break}}
+      g.stroke()})}
+  /* 撞擊白點與光暈 */
+  const fi=F-CFG.impactF;
+  if(fi>=0&&fi<6){const a=1-fi/6;g.fillStyle='rgba(255,255,255,'+(.25*a)+')';g.beginPath();g.arc(CFG.hit[0],CFG.hit[1],5+fi*2.2,0,7);g.fill();
+    g.fillStyle='rgba(255,255,255,'+(fi<2?1:a)+')';g.beginPath();g.arc(CFG.hit[0],CFG.hit[1],Math.max(1.5,4-fi*.5),0,7);g.fill()}
+}
+function start(){build();buildCracks();const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+document.fonts.load(CFG.font,CFG.word).then(start,start);
+</script></body></html>

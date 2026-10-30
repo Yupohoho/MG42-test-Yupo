@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>OP43 墨滴飛濺</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@900&family=Noto+Sans+TC:wght@700;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0c11}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:322px;height:127px;border-radius:12px;overflow:hidden;background:#f4ede6}
+svg,canvas{position:absolute;left:0;top:0}
+text{font-family:'Noto Sans TC',sans-serif;text-anchor:middle}
+</style></head><body><div id="card"><svg id="s" width="322" height="127" viewBox="0 0 322 127"></svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  text:'一滴',size:56,red:'#ff4954',paper:'#f4ede6',ink:'#f8f3ec',
+  drop:{x:161,from:-14,hit:10},                 // 墨滴落下的位置、起點 y、撞擊幀
+  // 撞擊後飛濺的小墨點：[角度°,距離,半徑,拋物高度]
+  spat:[[-168,128,4.5,22],[-150,98,3,28],[-122,72,2.5,36],[-62,76,2.8,34],[-34,112,3.6,26],[-12,134,5,20],[12,128,3.4,12],[28,100,2.6,10],[158,124,3.2,14],[172,138,4,18],[-100,60,2,40],[-80,62,2.2,38]],
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3),eo4=x=>1-Math.pow(1-x,4),eio=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const back=(x,s=1.6)=>{const c=s+1;return 1+c*Math.pow(x-1,3)+s*Math.pow(x-1,2)};
+const lerp=(a,b,t)=>a+(b-a)*t;
+const rng=s=>()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
+const NS='http://www.w3.org/2000/svg';
+const S=document.getElementById('s');
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);(p||S).appendChild(e);return e}
+function start(){const T=q.get('t');if(T!==null){render(Math.round(+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(Math.floor((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+
+const CX=161,CY=64,HIT=CFG.drop.hit;
+const defs=el('defs',{});
+const f=el('filter',{id:'goo',filterUnits:'userSpaceOnUse',x:-40,y:-40,width:402,height:207},defs);
+el('feGaussianBlur',{in:'SourceGraphic',stdDeviation:3.2,result:'b'},f);
+el('feColorMatrix',{in:'b',values:'1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -8'},f);
+const G=el('g',{filter:'url(#goo)',fill:CFG.red});
+// 落下的墨滴：頭＋拖尾，黏稠地拉成水滴形
+const dHead=el('circle',{r:6},G),dTail=el('circle',{r:3.5},G);
+// 暈開的墨塊：中心圓＋多顆往外長的瓣（x 方向拉寬）
+const R=rng(5);
+// 墨滴撞擊後是以落點為中心、各方向差不多地往外暈開（近圓的大墨團），邊緣有大小不一的瓣和幾道細長的墨絲
+const lobes=[];for(let i=0;i<22;i++){const a=i/22*6.2832+(R()-.5)*.2;lobes.push({a,d:70+R()*40,r:12+R()*12,dl:R()*3,c:el('circle',{},G)})}
+for(let i=0;i<9;i++){const a=R()*6.2832,D2=125+R()*45;lobes.push({a,d:D2*.62,r:6.5,dl:1+R()*2,c:el('circle',{},G)});lobes.push({a,d:D2,r:4+R()*4,dl:2+R()*2,c:el('circle',{},G)})}
+const core=el('circle',{},G);
+// 飛濺的墨點
+const sp=CFG.spat.map(d=>el('circle',{r:d[2]},G));
+// 墨水往下流的一條
+const stem=el('rect',{width:5},G),dripHead=el('circle',{r:4},G);
+const tx=el('text',{x:CX+3,y:66,'font-size':CFG.size,'font-weight':900,'dominant-baseline':'central',fill:CFG.ink});
+tx.textContent=CFG.text;
+function render(F){
+  // 1. 落下（加速）
+  const fall=seg(F,0,HIT),y=lerp(CFG.drop.from,CY,fall*fall),st=1+.7*fall;
+  const showDrop=F<HIT;
+  dHead.setAttribute('cx',CX);dHead.setAttribute('cy',y);dHead.setAttribute('r',showDrop?6:0);
+  dTail.setAttribute('cx',CX);dTail.setAttribute('cy',y-9*st);dTail.setAttribute('r',showDrop?3.5*(1-.3*fall):0);
+  // 2. 撞擊後暈開
+  const k=seg(F,HIT,HIT+14),e=eo4(k),wob=1+.04*Math.sin((F-HIT)*.55)*(1-seg(F,HIT+8,HIT+30));
+  core.setAttribute('cx',CX);core.setAttribute('cy',CY);core.setAttribute('r',k>0?lerp(6,84,eo(k))*wob:0);
+  lobes.forEach(L=>{const kk=eo4(seg(F,HIT+L.dl,HIT+L.dl+13));
+    L.c.setAttribute('cx',CX+Math.cos(L.a)*L.d*kk);L.c.setAttribute('cy',CY+Math.sin(L.a)*L.d*kk);L.c.setAttribute('r',kk>0?L.r*(.6+.4*kk)*(1-.12*seg(F,HIT+14,HIT+30)):0)});
+  // 3. 飛濺（拋物線）
+  CFG.spat.forEach((d,i)=>{const t=eo(seg(F,HIT,HIT+14+i%3)),a=d[0]*Math.PI/180;
+    sp[i].setAttribute('cx',CX+Math.cos(a)*d[1]*t);sp[i].setAttribute('cy',CY+Math.sin(a)*d[1]*t-Math.sin(Math.PI*t)*d[3]*.35+8*t*t);
+    sp[i].setAttribute('opacity',t>0?1:0)});
+  // 4. 往下流的墨痕（慢慢拉長、末端有圓頭）
+  const dk=eo(seg(F,HIT+16,HIT+44)),top=CY+30,len=dk*24;
+  stem.setAttribute('x',CX-62-2.5);stem.setAttribute('y',top);stem.setAttribute('height',Math.max(0,len));
+  dripHead.setAttribute('cx',CX-62);dripHead.setAttribute('cy',top+len);dripHead.setAttribute('r',dk>0?4+1.5*dk:0);
+  // 5. 字（墨色底上出現）
+  const ta=seg(F,HIT+8,HIT+18);
+  tx.setAttribute('opacity',ta);
+  tx.setAttribute('transform','translate('+(CX+3)+' 66) scale('+lerp(.8,1,eo(seg(F,HIT+8,HIT+22))).toFixed(3)+') translate('+-(CX+3)+' -66)');
+}
+document.fonts.load('900 56px "Noto Sans TC"','一滴').then(start,start);
+
+</script></body></html>

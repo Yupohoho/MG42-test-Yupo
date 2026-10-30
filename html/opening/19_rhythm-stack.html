@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>OP19 節奏堆疊</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0c11}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:322px;height:127px;border-radius:12px;overflow:hidden;background:#16171e}
+svg{position:absolute;left:0;top:0}
+text{font-family:'Noto Sans TC',sans-serif;font-weight:900;text-anchor:middle}
+</style></head><body><div id="card"><svg id="s" width="322" height="127" viewBox="0 0 322 127"></svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  rows:[                                   // 由上到下：文字、底色、字色、入場方向(-1 由左、+1 由右)、字級
+    {t:'節奏感',   bg:'#ff4954', ink:'#f6efe8', dir:-1, size:32},
+    {t:'跟著旋律', bg:'#f6efe8', ink:'#0b0c11', dir: 1, size:32},
+    {t:'舞動吧', bg:'#f3c85c', ink:'#0b0c11', dir:-1, size:32}
+  ],
+  beat:15, pulse:.16,                     // 節拍週期（幀）、每拍文字放大幅度；三行節拍相差 5 幀，像依序跟著節奏舞動
+  start:[0,9,18],                          // 各行入場起始幀（每行晚 9 幀）
+  cx:162,
+  LOOP:120
+};
+/* 量自參考：整條色帶（含文字）由畫面外衝入，過衝約 56px 後彈回（位移對應入場後第 0–6 幀） */
+const OFF=[-230,-42,42,56,33,5,0];
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const NS='http://www.w3.org/2000/svg',S=document.getElementById('s');
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);(p||S).appendChild(e);return e}
+const H=127/3;
+const R=CFG.rows.map((r,i)=>{const g=el('g',{});
+  el('rect',{x:0,y:i*H,width:322,height:H+(i<2?.6:0),fill:r.bg},g);
+  const t=el('text',{x:CFG.cx,y:i*H+H/2+r.size*.36,'font-size':r.size,fill:r.ink},g);t.textContent=r.t;return {g,t,cy:i*H+H/2}});
+function render(F){
+  F=Math.floor(F);
+  R.forEach(({g,t,cy},i)=>{
+    const k=F-CFG.start[i];
+    const o=CFG.rows[i].dir;
+    const dx=k<0?-400*o*-1:(k>=OFF.length?0:OFF[k]*-o);
+    g.setAttribute('transform',`translate(${dx} 0)`);
+    g.setAttribute('opacity',k<0?0:1);
+    /* 到位後（第 7 幀起）文字隨節拍彈一下：快速放大再回彈，支點在文字中心 */
+    let sc=1;const kb=k-OFF.length-i*5;
+    if(kb>=0){const p=(kb%CFG.beat)/CFG.beat;sc=1+CFG.pulse*(p<.14?p/.14:Math.exp(-(p-.14)*6))}
+    t.setAttribute('transform',`translate(${CFG.cx} ${cy}) scale(${sc.toFixed(3)}) translate(${-CFG.cx} ${-cy})`);
+  });
+}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+document.fonts.load('900 32px "Noto Sans TC"','節奏感跟著旋律舞動吧').then(start,start);
+</script></body></html>

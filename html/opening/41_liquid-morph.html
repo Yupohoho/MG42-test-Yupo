@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>OP41 液態變形</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@900&family=Noto+Sans+TC:wght@700;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0c11}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:322px;height:127px;border-radius:12px;overflow:hidden;background:#16171e}
+svg,canvas{position:absolute;left:0;top:0}
+text{font-family:'Noto Sans TC',sans-serif;text-anchor:middle}
+</style></head><body><div id="card"><svg id="s" width="322" height="127" viewBox="0 0 322 127"></svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  text:'液體',size:78,          // 示範文字
+  red:'#ff4954',cream:'#f4ede6',
+  band:{cx:161,cy:64,w:236,h:52},
+  // 液滴：[起點x,起點y,終點x,終點y,半徑,起跑幀]
+  drops:[[8,6,64,62,13,0],[44,-4,108,58,10,0],[96,-6,150,72,12,1],[312,8,236,62,13,0],[286,-2,190,58,10,1],[316,40,276,68,11,2],[4,70,38,66,9,2],[316,112,206,74,8,2]],
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3),eio=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const back=(x,s=1.6)=>{const c=s+1;return 1+c*Math.pow(x-1,3)+s*Math.pow(x-1,2)};
+const lerp=(a,b,t)=>a+(b-a)*t;
+const rng=s=>()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
+const hex=c=>[1,3,5].map(i=>parseInt(c.substr(i,2),16));
+const mix=(a,b,t)=>{const A=hex(a),B=hex(b);return'rgb('+A.map((v,i)=>Math.round(lerp(v,B[i],t))).join(',')+')'};
+const NS='http://www.w3.org/2000/svg';
+const S=document.getElementById('s');
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);(p||S).appendChild(e);return e}
+function start(){const T=q.get('t');if(T!==null){render(Math.round(+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(Math.floor((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+
+const defs=el('defs',{});
+const f=el('filter',{id:'goo',filterUnits:'userSpaceOnUse',x:-40,y:-40,width:402,height:207},defs);
+const gb=el('feGaussianBlur',{in:'SourceGraphic',stdDeviation:4.2,result:'b'},f);
+el('feColorMatrix',{in:'b',values:'1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -10'},f);
+const G=el('g',{filter:'url(#goo)'});
+const dr=CFG.drops.map(d=>el('circle',{r:d[4],fill:CFG.red},G));
+// 不規則的液體團：多顆大小不一、高低錯落的圓聚在一起（goo 濾鏡融合），不是單一膠囊
+const rr=rng(9);const BL=[];for(let i=0;i<17;i++){const u=i/16;BL.push({x:(u-.5)*CFG.band.w*.9+(rr()-.5)*12,y:(rr()-.5)*30,r:12+rr()*12,dl:Math.round(rr()*6),ph:rr()*6.28,c:el('circle',{fill:CFG.red},G)})}
+const tx=el('text',{x:161,y:64,'font-size':CFG.size,'font-weight':900,'dominant-baseline':'central','stroke-linejoin':'round'},G);
+tx.textContent=CFG.text;
+function render(F){
+  CFG.drops.forEach((d,i)=>{
+    const p=eo(seg(F,d[5],d[5]+11));
+    dr[i].setAttribute('cx',lerp(d[0],d[2],p));dr[i].setAttribute('cy',lerp(d[1],d[3],p));
+    dr[i].setAttribute('r',Math.max(.01,d[4]*(1-.25*p)*(1-seg(F,14,22))));
+    dr[i].setAttribute('opacity',1);
+  });
+  const m=eio(seg(F,12,24)),bo=1-seg(F,19,29);
+  BL.forEach((b,i)=>{const bp=back(seg(F,3+b.dl,12+b.dl),1.3),w=1+.08*Math.sin(F*.5+b.ph);
+    const tx0=(b.x/CFG.band.w)*150*1.0;   // 聚成字的寬度時各團往中心收
+    const x=CFG.band.cx+lerp(b.x,tx0*1.0,m)*Math.max(.01,bp),y=CFG.band.cy+lerp(b.y,b.y*.8,m)*Math.max(.01,bp);
+    b.c.setAttribute('cx',x);b.c.setAttribute('cy',y);b.c.setAttribute('r',F<3?0:Math.max(.01,b.r*Math.max(.01,bp)*w*lerp(1,1.45,m)));b.c.setAttribute('opacity',bo)});
+  gb.setAttribute('stdDeviation',(4.2-3*seg(F,20,34)).toFixed(2));
+  const to=seg(F,16,26);
+  tx.setAttribute('opacity',to);
+  const col=mix(CFG.red,CFG.cream,seg(F,25,33));
+  tx.setAttribute('fill',col);
+  const sw=F<34?5*(1-seg(F,17,30)):0;
+  tx.setAttribute('stroke',col);tx.setAttribute('stroke-width',sw.toFixed(2));
+  G.setAttribute('filter',F<36?'url(#goo)':'none');
+}
+document.fonts.load('900 78px "Noto Sans TC"','液體').then(start,start);
+
+</script></body></html>

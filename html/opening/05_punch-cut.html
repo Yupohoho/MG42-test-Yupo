@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>OP05 硬切文字</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@900&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0c11}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh}
+body.m{display:block;min-height:0}
+#card{position:relative;width:322px;height:127px;border-radius:12px;overflow:hidden;background:#16171e}
+canvas{position:absolute;left:0;top:0;width:322px;height:127px}
+</style></head><body><div id="card"><canvas id="c" width="644" height="254"></canvas></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  words:['突','破'], word:'突破', sub:'BREAKTHROUGH',
+  font:'900 78px "Noto Sans TC"',
+  cx:161, cy:47,                 // 到位後文字中心
+  bg:'#16171e', cream:'#f6f1ec', red:'#ff4757', black:'#0a0a0c', gray:'#8b8d98',
+  // 四拍（閃光燈快拍跳接）：每拍第一幀為發白閃光，之後字持續縮放（量自參考，倍率為每幀）
+  blankUntil:3,                  // 開頭空白幀數
+  b1:{a:3, bg:'#ff4757', sx:3.4, sy:3.4, dy:54, grow:1.03, rot:-3, rotStep:.7, flash:[.6,.3]},   // 第一拍「突」：漸大，微微轉動（不位移）
+  b2:{a:10,bg:'#f6f1ec', sx:3.4, sy:3.4, dy:55,  grow:0.96, rot:2.5, rotStep:-.6, flash:[.4]},    // 第二拍「破」：大字漸小落入畫面，微微轉正
+  b3:{a:16,bg:'#0a0b0f', s:1.75, sy:1.75, grow:0.97, flash:[.35]},                         // 第三拍：空心「突破」＋紅斜帶，縮小
+  landF:22,                      // 第四拍：到位（第一幀發白閃光）
+  lineF:[22,28],                 // 紅底線長出
+  subF:[28,36],                  // 副標由暗到亮
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const g=document.getElementById('c').getContext('2d');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a)),eo=x=>1-Math.pow(1-x,3);
+function txt(word,sx,sy,x,y,fill,stroke,lw,ctx,rot){
+  const c=ctx||g;c.save();c.translate(x,y);if(rot)c.rotate(rot*Math.PI/180);c.scale(sx,sy);c.font=CFG.font;c.textAlign='center';c.textBaseline='middle';c.lineJoin='round';
+  if(fill){c.fillStyle=fill;c.fillText(word,0,0)}
+  if(stroke){c.strokeStyle=stroke;c.lineWidth=lw;c.strokeText(word,0,0)}
+  c.restore()}
+/* 空心字（只留外緣輪廓：先畫粗描邊再挖掉內部，避免可變字體筆畫重疊處出現內線） */
+const oc=document.createElement('canvas');oc.width=644;oc.height=254;const og=oc.getContext('2d');
+function hollow(word,sx,sy,x,y,col,lw){
+  og.setTransform(1,0,0,1,0,0);og.clearRect(0,0,644,254);og.setTransform(2,0,0,2,0,0);
+  og.globalCompositeOperation='source-over';txt(word,sx,sy,x,y,null,col,lw*2/((sx+sy)/2),og);
+  og.globalCompositeOperation='destination-out';txt(word,sx,sy,x,y,'#000',null,0,og);og.globalCompositeOperation='source-over';
+  g.drawImage(oc,0,0,322,127)}
+function flash(F,start,list){const i=F-start;if(i>=0&&i<list.length){g.fillStyle='rgba(255,255,255,'+list[i]+')';g.fillRect(0,0,322,127)}}
+function render(F){
+  g.setTransform(2,0,0,2,0,0);
+  g.fillStyle=CFG.bg;g.fillRect(0,0,322,127);
+  if(F<CFG.blankUntil)return;
+  if(F<CFG.b2.a){
+    const B=CFG.b1,k=F-B.a-2,s=Math.pow(B.grow,k);   // 第 5 幀為基準倍率
+    g.fillStyle=B.bg;g.fillRect(0,0,322,127);
+    txt(CFG.words[0],B.sx*s,B.sy*s,161,63.5+B.dy,CFG.black,null,0,null,B.rot+B.rotStep*k);
+    flash(F,B.a,B.flash);return;
+  }
+  if(F<CFG.b3.a){
+    const B=CFG.b2,k=F-B.a-1,s=Math.pow(B.grow,k);
+    g.fillStyle=B.bg;g.fillRect(0,0,322,127);
+    txt(CFG.words[1],B.sx*s,B.sy*s,161,63.5+B.dy,CFG.black,null,0,null,B.rot+B.rotStep*k);
+    flash(F,B.a,B.flash);return;
+  }
+  if(F<CFG.landF){
+    const B=CFG.b3,k=F-B.a-1,s=Math.pow(B.grow,k);
+    g.fillStyle=B.bg;g.fillRect(0,0,322,127);
+    /* 紅色斜帶（在字後面） */
+    g.save();g.translate(161,54-.5*k);g.rotate(-.1);g.fillStyle=CFG.red;g.fillRect(-230,-13,460,26);g.restore();
+    hollow(CFG.word,B.s*s,B.sy*s,161,56,CFG.cream,1.4);
+    flash(F,B.a,B.flash);return;
+  }
+  /* 第四拍：到位 */
+  txt(CFG.word,1,1,CFG.cx,CFG.cy,CFG.cream,CFG.cream,1.2);
+  const u=eo(seg(F,CFG.lineF[0],CFG.lineF[1]));
+  if(u>0){g.fillStyle=CFG.red;g.fillRect(CFG.cx-(30+57*u),102,2*(30+57*u),3)}
+  const sa=seg(F,CFG.subF[0],CFG.subF[1]);
+  if(sa>0){g.globalAlpha=.35+.65*sa;g.fillStyle=CFG.gray;g.font='500 9.5px "Roboto Mono"';g.textBaseline='alphabetic';g.textAlign='center';
+    const n=CFG.sub.length;for(let i=0;i<n;i++)g.fillText(CFG.sub[i],160.5+(i-(n-1)/2)*8.2,119);g.globalAlpha=1}
+  flash(F,CFG.landF,[.35]);
+}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+Promise.all([document.fonts.load(CFG.font,CFG.word),document.fonts.load('500 9.5px "Roboto Mono"','BREAKTHROUGH')]).then(start,start);
+</script></body></html>

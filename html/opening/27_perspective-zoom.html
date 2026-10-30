@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>OP27 パースペクティブズーム</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0c11}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:322px;height:127px;border-radius:12px;overflow:hidden;background:#16171e;perspective:330px;perspective-origin:50% 50%}
+#plane{position:absolute;left:-400px;top:-300px;width:1122px;height:727px;transform-origin:50% 50%;
+  background-image:linear-gradient(#2d2e38 1px,transparent 1px),linear-gradient(90deg,#2d2e38 1px,transparent 1px);
+  background-size:26px 26px;background-position:center center;
+  -webkit-mask-image:radial-gradient(ellipse 45% 45% at 50% 50%,#000 55%,transparent 100%);mask-image:radial-gradient(ellipse 45% 45% at 50% 50%,#000 55%,transparent 100%)}
+#plane2{position:absolute;left:0;top:0;width:322px;height:127px;transform-origin:50% 50%}
+#t{position:absolute;left:0;right:0;top:25px;text-align:center;font:900 62px/1 'Noto Sans TC',sans-serif;color:#f4f2ee;letter-spacing:2px;white-space:nowrap}
+#ul{position:absolute;left:161px;top:97px;height:3px;width:0;background:#f4444f}
+</style></head><body><div id="card"><div id="plane"></div><div id="plane2"><div id="t"></div><div id="ul"></div></div></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  title:'縱深感',            // 標題
+  a0:71,                     // 起始傾倒角（度，趴在地面）
+  tilt:[84,103],             // 立起起訖（參考幀）
+  ul:[96,112], ulW:150,      // 紅底線長出（在立起收尾時就接上，不等畫面停下）
+  SH:72,                     // render(0) 對應參考第 72 幀（前面多出 12 幀給鏡頭往前推）
+  cam:{from:-60, peak:24, push:[72,90], pull:[90,112]},   // 攝影機 Z 位置：和緩往前推到最近點（第 90 幀），再順順拉遠退回 0（推到最近點前，立起已經開始，不停頓）
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3);
+const P=document.getElementById('plane'),P2=document.getElementById('plane2'),UL=document.getElementById('ul');
+document.getElementById('t').textContent=CFG.title;
+function render(F){
+  const R=F+CFG.SH,u=seg(R,CFG.tilt[0],CFG.tilt[1]);
+  const a=CFG.a0*(1-u*u);
+  /* 攝影機：立起前往前推（畫面放大逼近），立起的同時稍微拉遠 */
+  const C=CFG.cam,pp=seg(R,C.push[0],C.push[1]),pl=seg(R,C.pull[0],C.pull[1]);
+  const sm=x=>x*x*(3-2*x);   // 兩端速度為 0 的平滑曲線：推到最近點時速度剛好為 0，接著無縫轉成拉遠
+  const cz=C.from+(C.peak-C.from)*sm(pp)-C.peak*sm(pl);
+  const cs=330/(330-cz);
+  P.style.transform='translateZ('+cz.toFixed(1)+'px) rotateX('+a+'deg)';P2.style.transform='translateZ('+cz.toFixed(1)+'px) rotateX('+a+'deg)';
+  const g=eo(seg(R,CFG.ul[0],CFG.ul[1])),w=CFG.ulW*g;
+  P.style.opacity=1-seg(R,CFG.ul[0],CFG.ul[1]+2);   // 紅線畫出時，後面的網格同步淡出
+  UL.style.width=(w*cs)+'px';UL.style.left=(161-w*cs/2)+'px';UL.style.top=(63.5+(97-63.5)*cs)+'px';UL.style.height=(3*cs)+'px';
+}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+document.fonts.load('900 62px "Noto Sans TC"',CFG.title).then(start,start);
+</script></body></html>

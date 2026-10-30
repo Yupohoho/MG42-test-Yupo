@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>OP42 剪紙層疊</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@900&family=Noto+Sans+TC:wght@700;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0c11}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:322px;height:127px;border-radius:12px;overflow:hidden;background:#16171e}
+svg,canvas{position:absolute;left:0;top:0}
+text{font-family:'Noto Sans TC',sans-serif;text-anchor:middle}
+</style></head><body><div id="card"><svg id="s" width="322" height="127" viewBox="0 0 322 127"></svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  text:'紙',size:62,ink:'#14151a',
+  // 紙層：[色,左,上,右,下,旋轉角,從左(-1)或右(1)進場,起跑幀,種子]
+  layers:[['#7a1522',16,8,306,118,1.2,-1,0,3],['#ff4954',28,4,298,110,-1.6,1,2,7],['#f3c85c',22,22,292,112,2,-1,5,11],['#f4ede6',40,28,284,100,-2.5,1,8,19]],
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3),eio=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const back=(x,s=1.6)=>{const c=s+1;return 1+c*Math.pow(x-1,3)+s*Math.pow(x-1,2)};
+const lerp=(a,b,t)=>a+(b-a)*t;
+const rng=s=>()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
+const hex=c=>[1,3,5].map(i=>parseInt(c.substr(i,2),16));
+const mix=(a,b,t)=>{const A=hex(a),B=hex(b);return'rgb('+A.map((v,i)=>Math.round(lerp(v,B[i],t))).join(',')+')'};
+const NS='http://www.w3.org/2000/svg';
+const S=document.getElementById('s');
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);(p||S).appendChild(e);return e}
+function start(){const T=q.get('t');if(T!==null){render(Math.round(+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(Math.floor((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+
+const defs=el('defs',{});
+const fl=el('filter',{id:'sh',x:'-10%',y:'-10%',width:'120%',height:'130%'},defs);
+el('feDropShadow',{dx:0,dy:3,stdDeviation:2.5,'flood-color':'#000','flood-opacity':.45},fl);
+// 鋸齒邊紙片
+function jag(l,t,r,b,seed){
+  const R=rng(seed),p=[],st=15;
+  for(let x=l;x<r;x+=st)p.push([x+R()*6,t+(R()-.5)*14]);
+  for(let y=t;y<b;y+=st)p.push([r+(R()-.5)*12,y+R()*6]);
+  for(let x=r;x>l;x-=st)p.push([x-R()*6,b+(R()-.5)*14]);
+  for(let y=b;y>t;y-=st)p.push([l+(R()-.5)*12,y-R()*6]);
+  return 'M'+p.map(a=>a[0].toFixed(1)+' '+a[1].toFixed(1)).join('L')+'Z';
+}
+const LG=CFG.layers.map(L=>{
+  const g=el('g',{});
+  const inner=el('g',{filter:'url(#sh)'},g);
+  el('path',{d:jag(L[1],L[2],L[3],L[4],L[8]),fill:L[0]},inner);
+  return g;
+});
+const T=el('g',{});
+const t2=el('text',{x:161+1.5,y:66+2,'font-size':CFG.size,'font-weight':900,'dominant-baseline':'central',fill:'rgba(0,0,0,.3)'},T);
+const t1=el('text',{x:161,y:66,'font-size':CFG.size,'font-weight':900,'dominant-baseline':'central',fill:CFG.ink},T);
+t1.textContent=t2.textContent=CFG.text;
+function render(F){
+  CFG.layers.forEach((L,i)=>{
+    const st=[0,3,6,10][i],p=1-Math.pow(1-seg(F,st,st+18),3.2),V=[[-340,-80],[330,70],[-300,95],[310,-90]][i];   // 各層從不同斜向飛入（不只水平），慢一些
+    LG[i].setAttribute('transform','translate('+((1-p)*V[0]).toFixed(1)+' '+((1-p)*V[1]).toFixed(1)+') rotate('+(L[5]+(1-p)*L[6]*-14)+' 161 64)');
+    LG[i].setAttribute('opacity',F<st?0:1);
+  });
+  const s=F<26?0:back(seg(F,26,36),2);
+  T.setAttribute('transform','translate(161 66) scale('+Math.max(.001,s)+') rotate(-2.5) translate(-161 -66)');
+  T.setAttribute('opacity',F<26?0:1);
+}
+document.fonts.load('900 62px "Noto Sans TC"','紙').then(start,start);
+
+</script></body></html>

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>OP28 キューブトランジション</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@900&family=Montserrat:wght@800&family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0c11}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:322px;height:127px;border-radius:12px;overflow:hidden;background:#16171e;perspective:760px;perspective-origin:50% 50%}
+#sh{position:absolute;left:92px;top:108px;width:138px;height:14px;background:radial-gradient(ellipse at center,rgba(4,5,8,.75),transparent 70%)}
+#cube{position:absolute;left:77px;top:21.5px;width:168px;height:84px;transform-style:preserve-3d}
+.f{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;backface-visibility:hidden;-webkit-backface-visibility:hidden;overflow:hidden}
+.num{font:800 40px/1 'Montserrat','Noto Sans TC',sans-serif}
+.big{font:900 42px/1 'Noto Sans TC',sans-serif;color:#f7f5f2;text-shadow:3px 3px 0 #2b0c10;letter-spacing:2px}
+.sm{font:700 7px/1 'Roboto Mono',monospace;letter-spacing:3px;color:#5a1118;margin-top:6px}
+</style></head><body><div id="card"><div id="sh"></div><div id="cube"></div></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  w:168,h:84,depth:168,                       // 面大小與方塊深度
+  faces:[                                      // 四面：背景色、文字色、內容
+    {bg:'#2b2d37',fg:'#f4f2ee',t:'01'},
+    {bg:'#f6f3ec',fg:'#16171e',t:'02'},
+    {bg:'#f2c14e',fg:'#16171e',t:'03'},
+    {bg:'#f4444f',big:'切換',sub:'TRANSITION'}
+  ],
+  turns:[[82,89],[95,102],[108,115]], // 每次轉 90° 的起訖（參考幀）
+  SH:78,                                        // render(0) 對應參考第 78 幀（01 靜止）
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo2=x=>x*x*x*(x*(x*6-15)+10);   // 緩進緩出（smootherstep），轉動起步和收尾都柔和
+const cube=document.getElementById('cube');
+CFG.faces.forEach((f,i)=>{
+  const d=document.createElement('div');d.className='f';
+  d.style.background=f.bg;
+  d.style.transform='rotateY('+(90*i)+'deg) translateZ('+(CFG.depth/2)+'px)';
+  d.dataset.i=i;
+  d.innerHTML=f.big?'<div class="big">'+f.big+'</div><div class="sm">'+f.sub+'</div>':'<div class="num" style="color:'+f.fg+'">'+f.t+'</div>';
+  const ov=document.createElement('div');ov.style.cssText='position:absolute;inset:0;background:#000;opacity:0;pointer-events:none';d.appendChild(ov);
+  cube.appendChild(d)});
+/* 頂面：微俯視時看得到的積木上表面 */
+const topFace=document.createElement('div');topFace.className='f';topFace.style.cssText='backface-visibility:visible;-webkit-backface-visibility:visible;left:0;top:'+(-(CFG.depth-CFG.h)/2)+'px;width:'+CFG.w+'px;height:'+CFG.depth+'px;right:auto;bottom:auto;background:linear-gradient(#e6e7ee,#c3c5d0);transform:rotateX(90deg) translateZ('+(CFG.h/2)+'px)';
+/* 不畫頂面，只靠微微傾角呈現俯視感 */
+const OV=[...cube.querySelectorAll('.f')].slice(0,4).map(d=>d.lastChild);
+const SHD=document.getElementById('sh');
+/* 轉動時的作用力：起步往上、轉過往下、再歸位（物理感） */
+function bounceY(R){let y=0;CFG.turns.forEach(t=>{const p=seg(R,t[0],t[1]);
+    if(p>0&&p<1){
+      /* 起步先微微往上，轉過時往下壓，再歸位 */
+      if(p<.4)y+=-3.6*Math.sin(Math.PI*p/.4);
+      else y+=5.2*Math.sin(Math.PI*(p-.4)/.6);
+    }else if(p>=1){const ts=R-t[1];y+=1.8*Math.exp(-.3*ts)*Math.sin(.8*ts)}});return y}
+function render(F){
+  const R=F+CFG.SH;let a=0;
+  CFG.turns.forEach(t=>{a+=90*eo2(seg(R,t[0],t[1]))});
+  const dy=bounceY(R),sy=1-dy*.006;
+  /* 俯視傾角：每一面旋轉的過程中微微俯視（最大 6°），轉過去後回到平視（0°） */
+  let tilt=0;CFG.turns.forEach(t=>{const p=seg(R,t[0],t[1]);if(p>0&&p<1)tilt-=6*Math.sin(Math.PI*p)});
+  cube.style.transform='translateY('+dy.toFixed(2)+'px) rotateX('+tilt.toFixed(2)+'deg) translateZ('+(-CFG.depth/2)+'px) scaleY('+sy.toFixed(3)+') rotateY('+(-a)+'deg)';
+  /* 各側面隨轉動角度明暗不同（背向光線的面較暗） */
+  OV.forEach((o,i)=>{const ang=((90*i-a)%360+360)%360,c=Math.cos(ang*Math.PI/180);o.style.opacity=Math.max(0,.5*(1-Math.max(0,c))).toFixed(3)});
+  SHD.style.opacity=(1-Math.max(0,dy)*.04).toFixed(2);SHD.style.transform='scaleX('+(1+Math.max(0,dy)*.03)+')';
+}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+document.fonts.load('900 42px "Noto Sans TC"','切換').then(start,start);
+</script></body></html>

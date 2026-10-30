@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>OP18 橡皮筋伸展</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0c11}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:322px;height:127px;border-radius:12px;overflow:hidden;background:#16171e}
+svg{position:absolute;left:0;top:0}
+text{font-family:'Noto Sans TC',sans-serif;font-weight:900;text-anchor:middle}
+</style></head><body><div id="card"><svg id="s" width="322" height="127" viewBox="0 0 322 127"></svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  word:'彈力伸展',                 // 示範文字（4 字）
+  size:43,                          // 字級
+  cx:163, cy:63.5,                  // 停穩時文字中心
+  dots:[20.5,302], dotY:64, dotR:6.5,
+  gap:8,                            // 紅線端點與文字的間距
+  sagK:.1,                          // 紅線下垂量 = 線長 × 此值
+  cream:'#f6efe8', red:'#ff4954', bg:'#16171e',
+  LOOP:120
+};
+/* 量自參考：k=0 為文字出現的那幀；k=3 起拉長，k=15 最長（約 1.4 倍、高 .7 倍），k=17 放開回彈 */
+const SX=[1,1,1,1.012,1.035,1.06,1.09,1.13,1.17,1.22,1.27,1.32,1.347,1.376,1.394,1.4,1.4,1.376,1.19,1.01,.88,.84,.876,.94,1,1.047,1.06,1.04,1.02,.99,.98,.98,.99,.995,1];
+const SY=[1,1,1,1,1,1,.95,.92,.865,.865,.81,.78,.76,.73,.73,.70,.70,.78,1,1.1,1.1,1.13,1.1,1.05,1.05,1.03,1,1,1,1.02,1.02,1,1,1,1];
+const PULSE={17:1.08,18:1.12,19:1.12,20:1.04,21:1.04}; // 彈回時兩端圓點微脹
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const NS='http://www.w3.org/2000/svg',S=document.getElementById('s');
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);(p||S).appendChild(e);return e}
+const lineL=el('path',{fill:'none',stroke:CFG.red,'stroke-width':3.2,'stroke-linecap':'round'});
+const lineR=el('path',{fill:'none',stroke:CFG.red,'stroke-width':3.2,'stroke-linecap':'round'});
+const dL=el('circle',{cx:CFG.dots[0],cy:CFG.dotY,r:CFG.dotR,fill:CFG.cream});
+const dR=el('circle',{cx:CFG.dots[1],cy:CFG.dotY,r:CFG.dotR,fill:CFG.cream});
+const tg=el('g',{});const tx=el('text',{x:0,y:0,'font-size':CFG.size,fill:CFG.cream},tg);tx.textContent=CFG.word;
+function render(F){
+  F=Math.floor(F);
+  const k=Math.min(F,SX.length-1);
+  const sx=SX[k],sy=SY[k];
+  tg.setAttribute('transform',`translate(${CFG.cx} ${CFG.cy+CFG.size*.35*sy}) scale(${sx} ${sy})`);
+  const hw=85*sx;                                   // 文字半寬（停穩 170）
+  const a=CFG.dots[0]+CFG.dotR+.5, b=CFG.cx-hw-CFG.gap;      // 左線
+  const c=CFG.cx+hw+CFG.gap, d=CFG.dots[1]-CFG.dotR-.5;      // 右線
+  const seg=(x0,x1)=>{const len=Math.max(0,x1-x0);const sag=len*CFG.sagK;const y=CFG.dotY+.5;
+    return `M${x0.toFixed(1)} ${y}Q${((x0+x1)/2).toFixed(1)} ${(y+2*sag).toFixed(1)} ${x1.toFixed(1)} ${y}`};
+  lineL.setAttribute('d',seg(a,Math.max(a,b)));
+  lineR.setAttribute('d',seg(Math.min(d,c),d));
+  const p=PULSE[F]||1;
+  dL.setAttribute('r',CFG.dotR*p);dR.setAttribute('r',CFG.dotR*p);
+}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+document.fonts.load('900 43px "Noto Sans TC"','彈力伸展').then(start,start);
+</script></body></html>

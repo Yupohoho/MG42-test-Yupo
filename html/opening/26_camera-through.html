@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>OP26 カメラスルー</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@700;900&family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0c11}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:322px;height:127px;border-radius:12px;overflow:hidden;background:#16171e}
+svg{position:absolute;left:0;top:0}
+text{font-family:'Noto Sans TC',sans-serif;text-anchor:middle}
+.lb{font-family:'Roboto Mono',monospace;font-weight:700;text-anchor:start}
+</style></head><body><div id="card"><svg id="s" width="322" height="127" viewBox="0 0 322 127"></svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  title:'向前邁進',                 // 最後的大標題
+  red:'#f4444f', grey:'#c4c5ca', bg:[22,23,30], white:'#f4f2ee', dim:'#9a9ba1',
+  // 五層框：[初始寬, 距離z, 線寬, 顏色(r紅/g灰)]；高 = 寬/2.3
+  frames:[[270,.12,4,'r'],[155,.165,2.4,'g'],[108,.264,2,'r'],[78,.326,2,'g'],[56,.356,2,'r']],
+  SH:80,            // render(0) 對應參考內部第 80 幀（前 4 幀靜止）
+  zoom:[84,112],    // 鏡頭推進起訖（參考幀）
+  D:.663,           // 鏡頭總推進量（標題從 0.337 倍放大到 1）
+  ul:[114,128],     // 紅底線長出
+  // 背景閃光：{參考幀:增亮量}（量自參考）
+  flash:{94:40,95:29,97:29,98:29,100:40,101:23,103:24,104:49,105:29,106:10,109:16,110:24,111:33,112:38,113:44,114:38,115:33,116:24,117:16,118:8},
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3);
+const NS='http://www.w3.org/2000/svg',S=document.getElementById('s'),CARD=document.getElementById('card');
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);(p||S).appendChild(e);return e}
+const root=el('g',{});
+const FR=CFG.frames.map((f,i)=>{
+  const g=el('g',{},root);
+  const w=f[0],h=w/2.3;
+  const r=el('rect',{x:-w/2,y:-h/2,width:w,height:h,fill:'none',stroke:f[3]=='r'?CFG.red:CFG.grey,'stroke-width':f[2],'stroke-linejoin':'miter'},g);
+  const lb=el('text',{x:-w/2+4,y:-h/2+11,class:'lb','font-size':8,fill:f[3]=='r'?CFG.red:CFG.grey,opacity:.8},g);
+  lb.textContent='0'+(i+1);
+  return g});
+const tg=el('g',{},root);
+const tx=el('text',{x:0,y:15,'font-size':44,'font-weight':900,fill:CFG.white},tg);tx.textContent=CFG.title;
+const ul=el('rect',{x:-27,y:47,width:54,height:3,fill:CFG.red},root);   // 底線也在同一個旋轉群組裡
+/* 傾斜角（度）隨參考幀 R：先慢慢往逆時針傾斜到約 −3.8° 並維持，之後順暢收回 0°（第 112 幀），不回彈、不反向迴轉 */
+const ROLL=[[80,0],[84,0],[88,-2.4],[92,-3.2],[96,-3.8],[102,-3.4],[112,0]];   // 單向傾斜後順暢收回正，不反向擺回去
+function rollAt(R){if(R<=ROLL[0][0])return ROLL[0][1];for(let i=1;i<ROLL.length;i++){if(R<=ROLL[i][0]){const a=ROLL[i-1],b=ROLL[i],t=(R-a[0])/(b[0]-a[0]),e=t*t*(3-2*t);return a[1]+(b[1]-a[1])*e}}return 0}
+function render(F){
+  const R=F+CFG.SH;
+  const u=seg(R,CFG.zoom[0],CFG.zoom[1]),d=CFG.D*(1-Math.pow(1-u*u*u*(u*(u*6-15)+10),1.8));   // 推進先加速、後段拉長漸緩到位（原本 u² 是越推越快，到位瞬間最快）
+  /* 框、標題、底線同屬一個群組一起傾斜（隧穿感，不各自旋轉）；傾斜在鏡頭推進結束（第 112 幀）時一起收回正 */
+  const roll=rollAt(R);
+  root.setAttribute('transform','translate(161 63) rotate('+roll+')');
+  FR.forEach((g,i)=>{
+    const z=CFG.frames[i][1];
+    if(d>=z-.004){g.setAttribute('visibility','hidden');return}
+    const s=z/(z-d);
+    g.setAttribute('visibility',s>6?'hidden':'visible');
+    g.setAttribute('transform','scale('+s+')');
+    g.lastChild.setAttribute('font-size',8/s);
+    g.firstChild.setAttribute('stroke-width',CFG.frames[i][2]*Math.min(1.8,.6+.4*s));
+  });
+  /* 標題在比最內層框更遠的深度（zt），起始縮在最內層框裡面（0.25 倍），推進到終點剛好 1 倍 */
+  const zt=CFG.D/.75;
+  tg.setAttribute('transform','scale('+((zt-CFG.D)/(zt-d))+')');
+  const wh=seg(R,102,110);
+  tx.setAttribute('fill',wh>0?'rgb('+Math.round(154+90*wh)+','+Math.round(155+87*wh)+','+Math.round(161+77*wh)+')':CFG.dim);
+  ul.setAttribute('width',54*eo(seg(R,CFG.ul[0],CFG.ul[1])));
+  ul.setAttribute('x',-27*eo(seg(R,CFG.ul[0],CFG.ul[1])));
+  const f=CFG.flash[Math.floor(R)]||0,b=CFG.bg;
+  CARD.style.background='rgb('+(b[0]+f)+','+(b[1]+f)+','+(b[2]+f)+')';
+}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+document.fonts.load('900 44px "Noto Sans TC"',CFG.title).then(start,start);
+</script></body></html>

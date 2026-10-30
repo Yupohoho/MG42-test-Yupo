@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>OP47 文字斬切</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@900&family=Noto+Sans+TC:wght@700;900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0c11}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:322px;height:127px;border-radius:12px;overflow:hidden;background:#16171e}
+svg,canvas{position:absolute;left:0;top:0}
+text{font-family:'Noto Sans TC',sans-serif;text-anchor:middle}
+</style></head><body><div id="card"><svg id="s" width="322" height="127" viewBox="0 0 322 127"></svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  text:'一閃',size:84,cream:'#f4ede6',red:'#ff4954',bg:'#16171e',
+  cut:[0,98,322,34],            // 斬切線 x1,y1,x2,y2
+  slide:[56,26],                // 斬開時上下兩半的錯位量（x,y）
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3),eio=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const back=(x,s=1.6)=>{const c=s+1;return 1+c*Math.pow(x-1,3)+s*Math.pow(x-1,2)};
+const lerp=(a,b,t)=>a+(b-a)*t;
+const rng=s=>()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
+const hex=c=>[1,3,5].map(i=>parseInt(c.substr(i,2),16));
+const mix=(a,b,t)=>{const A=hex(a),B=hex(b);return'rgb('+A.map((v,i)=>Math.round(lerp(v,B[i],t))).join(',')+')'};
+const NS='http://www.w3.org/2000/svg';
+const S=document.getElementById('s');
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);(p||S).appendChild(e);return e}
+function start(){const T=q.get('t');if(T!==null){render(Math.round(+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(Math.floor((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+
+const defs=el('defs',{});
+// 斜切成 4 塊：3 條平行斜線（和後面劃過的斜線同方向）把字切成 4 片，各片沿切線方向錯開再對合
+const SK=60/127,CUTS=[-1e3,95,161,227,1e3],DIR=[SK,-1]; const DL=Math.hypot(SK,1);
+const pieces=[];
+for(let i=0;i<4;i++){
+  const xa=y=>CUTS[i]+(63.5-y)*SK-(i>0?0:0),xb=y=>CUTS[i+1]+(63.5-y)*SK+.7;   // 右緣多出 .7px，避免相鄰片之間出現抗鋸齒縫
+  const cp=el('clipPath',{id:'pc'+i},defs);
+  el('polygon',{points:xa(-10)+',-10 '+xb(-10)+',-10 '+xb(140)+',140 '+xa(140)+',140'},cp);
+  const g=el('g',{'clip-path':'url(#pc'+i+')'});const m=el('g',{},g);
+  const t=el('text',{x:161,y:66,'font-size':CFG.size,'font-weight':900,'dominant-baseline':'central',fill:CFG.cream},m);t.textContent=CFG.text;
+  pieces.push(m)}
+// 斜線快速由左劃到右：亮白線芯＋紅色粗線，後面拖一段漸層殘影
+const lg=el('linearGradient',{id:'wk',x1:0,y1:0,x2:1,y2:0},defs);
+el('stop',{offset:0,'stop-color':CFG.red,'stop-opacity':0},lg);el('stop',{offset:1,'stop-color':CFG.red,'stop-opacity':.55},lg);
+const slash=el('g',{});
+el('line',{x1:44,y1:0,x2:-16,y2:127,stroke:CFG.red,'stroke-width':3.2},slash);
+const ul=el('rect',{x:160,y:109.5,width:0,height:2.5,fill:CFG.red});
+function render(F){
+  const p=1-Math.pow(1-seg(F,0,12),3.5);
+  pieces.forEach((m,i)=>{const sg=i%2?-1:1,L=(1-p)*sg*(70+i*8);m.setAttribute('transform','translate('+(L*SK/DL).toFixed(1)+' '+(-L/DL).toFixed(1)+')')});
+  const sp=seg(F,10,20),on=F>=10&&F<=20;
+  slash.setAttribute('opacity',on?1:0);
+  slash.setAttribute('transform','translate('+lerp(-70,400,sp).toFixed(1)+' 0)');
+  const u=eo(seg(F,20,30));
+  ul.setAttribute('x',lerp(160,134,u));ul.setAttribute('width',u*52);
+}
+document.fonts.load('900 84px "Noto Sans TC"','一閃').then(start,start);
+
+</script></body></html>

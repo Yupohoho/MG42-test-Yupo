@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>OP30 トンネルタイポ</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0c11}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:322px;height:127px;border-radius:12px;overflow:hidden;background:#16171e}
+svg{position:absolute;left:0;top:0}
+text{font-family:'Noto Sans TC',sans-serif;text-anchor:middle;stroke-linejoin:round;paint-order:stroke fill}
+</style></head><body><div id="card"><svg id="s" width="322" height="127" viewBox="0 0 322 127"></svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  title:'無限',fs:74,cx:161,cy:62,        // 標題、字級、中心
+  red:'#f4444f',white:'#f7f4f0',
+  // 標題寬度（px）隨參考幀：[幀,寬]，最終寬 150
+  W:[[84,25],[86,32],[88,44],[90,53],[92,63],[94,75],[96,89],[98,100],[100,110],[102,119],[104,125],[106,133],[108,138],[110,142],[112,147],[116,150]],
+  echo:[[4,.9],[8,.72],[12,.56],[16,.4],[20,.26]],   // 空心殘影（echo）：[落後幀, 不透明度]，每一層是更早、更小的同一個字
+  fillIn:[110,118],                       // 由灰半透明填色變白
+  echoOut:[112,124],
+  SH:80,                                  // render(0) 對應參考第 80 幀（前 4 幀為空）
+  LOOP:120
+};
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const NS='http://www.w3.org/2000/svg',S=document.getElementById('s');
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);(p||S).appendChild(e);return e}
+function W(R){const a=CFG.W;if(R<=a[0][0])return a[0][1];for(let i=1;i<a.length;i++)if(R<=a[i][0]){const p=a[i-1],c=a[i];return p[1]+(c[1]-p[1])*(R-p[0])/(c[0]-p[0])}return a[a.length-1][1]}
+const FULL=CFG.W[CFG.W.length-1][1];
+const defs=el('defs',{});let MID=0;
+/* 空心輪廓用挖空法：先畫兩倍粗描邊，再用遮罩把字形內部挖掉（避免可變字體筆畫重疊處出現內線） */
+function mk(){
+  const g=el('g',{});
+  const id='mk'+(MID++);
+  const m=el('mask',{id,maskUnits:'userSpaceOnUse',x:-300,y:-200,width:600,height:400},defs);
+  el('rect',{x:-300,y:-200,width:600,height:400,fill:'#fff'},m);
+  const mt=el('text',{x:0,y:CFG.fs*.36,'font-size':CFG.fs,'font-weight':900,fill:'#000'},m);mt.textContent=CFG.title;
+  const fillT=el('text',{x:0,y:CFG.fs*.36,'font-size':CFG.fs,'font-weight':900,stroke:'none'},g);fillT.textContent=CFG.title;
+  const outT=el('text',{x:0,y:CFG.fs*.36,'font-size':CFG.fs,'font-weight':900,fill:'none',mask:'url(#'+id+')','stroke-linejoin':'round'},g);outT.textContent=CFG.title;
+  return {g,fillT,outT};
+}
+const echoes=CFG.echo.map(()=>mk()),main=mk();
+function place(o,R,fill,fo,stroke,sw,op){
+  const s=W(R)/FULL;
+  o.g.setAttribute('transform','translate('+CFG.cx+' '+CFG.cy+') scale('+s+')');
+  o.fillT.setAttribute('fill',fill);o.fillT.setAttribute('fill-opacity',fo);o.fillT.setAttribute('opacity',op);
+  o.outT.setAttribute('stroke',stroke);o.outT.setAttribute('stroke-width',(2*sw/s).toFixed(3));o.outT.setAttribute('opacity',op);
+}
+function render(F){
+  const R=F+CFG.SH;
+  const vis=R>=84;
+  const f=seg(R,CFG.fillIn[0],CFG.fillIn[1]);
+  const eOut=1-seg(R,CFG.echoOut[0],CFG.echoOut[1]);
+  echoes.forEach((e,i)=>{
+    const [lag,op]=CFG.echo[i];
+    e.g.setAttribute('visibility',vis?'visible':'hidden');
+    place(e,R-lag,'none',0,CFG.red,1.25,op*eOut);
+  });
+  main.g.setAttribute('visibility',vis?'visible':'hidden');
+  const r=Math.round(58+(247-58)*f),g=Math.round(58+(244-58)*f),b=Math.round(66+(240-66)*f);
+  place(main,R,'rgb('+r+','+g+','+b+')',R<108?.55:1,CFG.red,3.2*(1-seg(R,114,118)),1);
+}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+document.fonts.load('900 74px "Noto Sans TC"',CFG.title).then(start,start);
+</script></body></html>

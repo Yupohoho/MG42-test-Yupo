@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>OP20 泡泡破裂</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@900&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0c11}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif}
+body.m{display:block;min-height:0}
+#card{position:relative;width:322px;height:127px;border-radius:12px;overflow:hidden;background:#16171e}
+svg{position:absolute;left:0;top:0}
+text{font-family:'Noto Sans TC',sans-serif;font-weight:900;text-anchor:middle}
+</style></head><body><div id="card"><svg id="s" width="322" height="127" viewBox="0 0 322 127"></svg></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  items:[ {t:'泡',c:'#f6efe8',dy:-2}, {chev:1,c:'#ff4954',dy:2}, {t:'泡',c:'#f3c85c',dy:-3}, {chev:1,c:'#f6efe8',dy:2} ], // 四個泡泡內的字／箭頭
+  cx:[57,125.5,195,264], cy:62, R:34,          // 泡泡中心、半徑
+  rise:[0,4,8,12], riseLen:14,                   // 各泡泡升起起點幀、升起幀數
+  pop:[21,26,31,36],                             // 各泡泡破裂起點幀
+  gsize:54,                                      // 字級
+  bg:'#16171e', line:'#dcdce2',
+  LOOP:120
+};
+/* 破裂（k = 破裂後幀數）：字由小彈大回穩、外圈放大變淡 */
+const GS=[.28,.55,.8,1.08,1.12,1.1,1.05,1.02,1];
+const RR=[36,35,39,42,47,52,56,60,64], RW=[3.6,3.4,3,2.2,1.8,1.4,1.1,.9,.7], RA=[1,1,1,.95,.85,.7,.55,.4,.25,.1];
+/* ================ */
+const q=new URLSearchParams(location.search);
+const Z=+q.get('z')||1;if(Z!=1)document.getElementById('card').style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),eo=x=>1-Math.pow(1-x,3);
+const NS='http://www.w3.org/2000/svg',S=document.getElementById('s');
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);(p||S).appendChild(e);return e}
+/* 背景小泡 */
+const amb=[];let sd=7;const rnd=()=>(sd=(sd*9301+49297)%233280)/233280;
+for(let i=0;i<16;i++)amb.push({x:rnd()*322,y:rnd()*140,r:1.8+rnd()*2.6,v:.45+rnd()*.6,e:el('circle',{fill:'none',stroke:'#aeb1bd','stroke-width':.9,opacity:.4})});
+const B=CFG.items.map((it,i)=>{
+  const g=el('g',{});
+  const fill=el('circle',{r:CFG.R,fill:'#ffffff','fill-opacity':.05},g);
+  const rim=el('circle',{r:CFG.R-.8,fill:'none',stroke:CFG.line,'stroke-width':1.6,opacity:.6},g);
+  const hl=el('path',{d:`M${-CFG.R*.62} ${-CFG.R*.32}A${CFG.R*.7} ${CFG.R*.7} 0 0 1 ${-CFG.R*.2} ${-CFG.R*.68}`,fill:'none',stroke:'#fff','stroke-width':1.8,'stroke-linecap':'round',opacity:.85},g);
+  const gl=el('g',{});
+  if(it.chev)el('polyline',{points:'12,-17 -12,0 12,17',fill:'none',stroke:it.c,'stroke-width':14,'stroke-linejoin':'miter','stroke-linecap':'butt'},gl);
+  else{const t=el('text',{x:0,y:CFG.gsize*.35,'font-size':CFG.gsize,fill:it.c},gl);t.textContent=it.t}
+  const ring=el('circle',{fill:'none',stroke:'#ffffff'});
+  const sp=[];for(let j=0;j<10;j++)sp.push(el('circle',{r:1.3,fill:'#ffffff'}));
+  return{g,fill,rim,hl,gl,ring,sp};
+});
+function render(F){
+  F=Math.floor(F);
+  amb.forEach(a=>{const y=((a.y-a.v*F)%140+140)%140-6;a.e.setAttribute('cx',(a.x+2.5*Math.sin(F*.12+a.y)).toFixed(1));a.e.setAttribute('cy',y);a.e.setAttribute('r',a.r)});
+  B.forEach((b,i)=>{
+    const cx=CFG.cx[i];
+    const p=cl((F-CFG.rise[i])/CFG.riseLen), e=eo(p);
+    const k=F-CFG.pop[i];
+    const y=CFG.cy+(150-CFG.cy)*(1-e);
+    /* 要破之前泡泡先微微縮小一點點（最後 4 幀縮到約 92%），再爆開 */
+    const shr=k<0?1-.08*cl((k+4)/3):1;
+    const r=CFG.R*(.55+.45*e)*shr;
+    const it=CFG.items[i];
+    const rising=F>=CFG.rise[i];
+    const idleVis=rising&&k<0;
+    b.g.setAttribute('opacity',idleVis?1:0);
+    b.g.setAttribute('transform',`translate(${(cx+(1-e)*2*Math.sin(F*.5+i)).toFixed(1)} ${y.toFixed(1)}) scale(${(r/CFG.R).toFixed(3)})`);
+    b.gl.setAttribute('transform',`translate(${(cx+(1-e)*2*Math.sin(F*.5+i)).toFixed(1)} ${(y+it.dy*.5).toFixed(1)}) scale(${(r/CFG.R*.72).toFixed(3)})`);
+    b.gl.setAttribute('opacity',idleVis?.5:0);
+    if(k>=0){
+      const ks=Math.min(k,GS.length-1),gs=GS[ks];
+      b.gl.setAttribute('transform',`translate(${cx} ${CFG.cy+it.dy}) scale(${gs})`);
+      b.gl.setAttribute('opacity',1);
+      const ra=RA[Math.min(k,RA.length-1)]||0;
+      const rr=RR[Math.min(k,RR.length-1)]+(k>=RR.length?(k-RR.length+1)*3:0);
+      b.ring.setAttribute('cx',cx);b.ring.setAttribute('cy',CFG.cy);b.ring.setAttribute('r',rr);
+      b.ring.setAttribute('stroke-width',RW[Math.min(k,RW.length-1)]);b.ring.setAttribute('opacity',k>9?0:ra);
+      b.sp.forEach((c,j)=>{const ang=j/10*Math.PI*2+i,rad=rr+ (k*1.2)*(j%2?1:-.4);
+        c.setAttribute('cx',cx+Math.cos(ang)*rad);c.setAttribute('cy',CFG.cy+Math.sin(ang)*rad);
+        c.setAttribute('opacity',k<7?.9*(1-k/7):0)});
+    }else{b.ring.setAttribute('opacity',0);b.sp.forEach(c=>c.setAttribute('opacity',0))}
+  });
+}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+document.fonts.load('900 54px "Noto Sans TC"','泡').then(start,start);
+</script></body></html>

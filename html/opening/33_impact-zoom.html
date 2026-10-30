@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>OP33 衝擊放大</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@700;900&family=Roboto+Mono:wght@500;700&family=Anton&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0c11}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh}
+body.m{display:block;min-height:0}
+#card{position:relative;width:322px;height:127px;border-radius:12px;overflow:hidden;background:#16171e}
+canvas{display:block;width:322px;height:127px}
+</style></head><body><div id="card"><canvas id="cv"></canvas></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  text:'衝擊', sub:'IMPACT',
+  cream:'#f1ebe2', red:'#ff4757', grey:'#8b8f99', bg:'#16171e',
+  font:'900 78px "Noto Sans TC"', textY:64, subY:115,
+  R0:80,      // render(0) 對應參考第 80 幀（動作起點）
+  LOOP:120
+};
+const FONTS=[['900 78px "Noto Sans TC"','衝擊'],['500 9px "Roboto Mono"','IMPACT']];
+/* ================ */
+
+const q=new URLSearchParams(location.search);const Z=+q.get('z')||1;
+const card=document.getElementById('card');if(Z!=1)card.style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3),eio=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const lerp=(a,b,t)=>a+(b-a)*t;
+const tab=(r,T)=>{if(r<=T[0][0])return T[0][1];for(let i=1;i<T.length;i++)if(r<=T[i][0]){const a=T[i-1],b=T[i];return lerp(a[1],b[1],(r-a[0])/(b[0]-a[0]))}return T[T.length-1][1]};
+const R=n=>{const x=Math.sin(n*127.1+311.7)*43758.5453;return x-Math.floor(x)};
+const W=322,H=127,D=2*Z;
+const cv=document.getElementById('cv');cv.width=W*D;cv.height=H*D;const c=cv.getContext('2d');
+function off(){const o=document.createElement('canvas');o.width=W*D;o.height=H*D;const x=o.getContext('2d');x.setTransform(D,0,0,D,0,0);return[o,x]}
+function render(F){c.setTransform(D,0,0,D,0,0);c.globalAlpha=1;c.globalCompositeOperation='source-over';c.filter='none';c.shadowBlur=0;c.letterSpacing='0px';c.setLineDash([]);
+  c.clearRect(0,0,W,H);c.fillStyle=CFG.bg;c.fillRect(0,0,W,H);draw(c,F+CFG.R0,F)}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+Promise.all(FONTS.map(f=>document.fonts.load(f[0],f[1]))).then(start,start);
+
+
+const SC=[[80,.1],[84,.22],[88,.38],[90,.48],[92,.64],[94,.8],[95,.92],[96,1.75],[97,1.2],[98,.88],[99,.92],[100,1.04],[101,1.0],[200,1]];
+function draw(c,r){
+  const cx=161,cy=63;
+  const sk=r>=96?Math.max(0,1-seg(r,96,106)):0,shA=7*sk*sk;
+  c.save();if(shA>.05)c.translate((R(r*3.3)-.5)*2*shA,(R(r*5.9)-.5)*2*shA);
+  const ln=1-seg(r,98,106);
+  if(ln>0){
+    for(let i=0;i<96;i++){
+      const a=R(i*3.1)*6.2832,sp=.7+R(i*7.7)*.9,len=14+R(i*5.3)*70;
+      const col=i%7==0?CFG.red:(i%3==0?'#8a8d96':'#d9dbe2');
+      const p=seg(r,80,100),head=p*sp*190*(1+p),t0=Math.max(5,head-len);
+      if(head<6)continue;
+      c.strokeStyle=col;c.globalAlpha=ln*.85;c.lineWidth=.7+R(i*2.3)*.9;
+      c.beginPath();c.moveTo(cx+Math.cos(a)*t0,cy+Math.sin(a)*t0);c.lineTo(cx+Math.cos(a)*head,cy+Math.sin(a)*head);c.stroke();
+    }
+    c.globalAlpha=1;
+  }
+  const s=tab(r,SC),a=seg(r,80.5,82);
+  if(a>0){
+    const off=r>=96?6*(1-seg(r,97,102)):0;
+    const bl=r>=96&&r<98?(r<97?2.5:1.2):0;
+    c.save();c.translate(cx,CFG.textY);c.scale(s,s);c.globalAlpha=a;
+    if(bl)c.filter='blur('+(bl*D)+'px)';
+    c.font=CFG.font;c.textAlign='center';c.textBaseline='middle';c.letterSpacing='-2px';
+    if(off>0){c.fillStyle=CFG.red;c.fillText(CFG.text,off,0)}
+    c.fillStyle='#0b0c11';c.fillText(CFG.text,1.5,2);
+    c.fillStyle=CFG.cream;c.fillText(CFG.text,0,0);
+    c.restore();
+  }
+  const wv=seg(r,96,114);
+  if(wv>0&&wv<1){
+    [[0,1],[2,.75],[4,.5]].forEach(([dl,k])=>{const p=seg(r,96+dl,114+dl*.5);if(p<=0||p>=1)return;const e=1-Math.pow(1-p,2.6),rad=10+e*190;
+      c.strokeStyle=k==1?'#ffffff':CFG.red;c.globalAlpha=(1-p)*k;c.lineWidth=1+(1-p)*(k==1?7:4);c.beginPath();c.ellipse(cx,cy,rad,rad*.82,0,0,6.2832);c.stroke()});
+    const gl=c.createRadialGradient(cx,cy,0,cx,cy,90);gl.addColorStop(0,'rgba(255,255,255,'+(.5*(1-wv))+')');gl.addColorStop(1,'rgba(255,71,87,0)');c.globalAlpha=1;c.fillStyle=gl;c.fillRect(0,0,W,H);
+  }
+  c.globalAlpha=1;
+  const fl=tab(r,[[95,0],[96,.92],[97,.6],[98,.3],[99,.1],[100,0],[200,0]]);
+  if(fl>0){c.fillStyle='rgba(255,255,255,'+fl+')';c.fillRect(0,0,W,H)}
+  const sa=seg(r,106,116);
+  if(sa>0){c.globalAlpha=sa;c.fillStyle=CFG.grey;c.font='500 9px "Roboto Mono"';c.textAlign='center';c.textBaseline='middle';c.letterSpacing='5px';c.fillText(CFG.sub,cx+2,CFG.subY)}
+  c.restore();
+}
+</script></body></html>

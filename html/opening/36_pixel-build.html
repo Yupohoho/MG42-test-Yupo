@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>OP36 像素成形</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@700;900&family=Roboto+Mono:wght@500;700&family=Anton&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b0c11}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh}
+body.m{display:block;min-height:0}
+#card{position:relative;width:322px;height:127px;border-radius:12px;overflow:hidden;background:#16171e}
+canvas{display:block;width:322px;height:127px}
+</style></head><body><div id="card"><canvas id="cv"></canvas></div>
+<script>
+/* ===== CFG ===== */
+const CFG={
+  text:'像素', grey:'#8b8f99', red:'#ff4757', bg:'#16171e',
+  font:'900 70px "Noto Sans TC"', textY:64,
+  // [起始參考幀, 解析度px, 字色]：解析度愈低方塊愈粗
+  steps:[[80,5,'#ff7580'],[82,8,'#ff7580'],[84,12,'#ff7580'],[86,17,'#ff8a93'],[88,24,'#ffa0a8'],[92,34,'#ffb4ba'],[94,48,'#ffc8cc'],[98,80,'#f6d6d8'],[102,161,'#f1ebe2'],[108,482,'#f1ebe2']],
+  R0:80, LOOP:120
+};
+const FONTS=[['900 70px "Noto Sans TC"','像素'],['500 8px "Roboto Mono"','RES 0123456789px']];
+/* ================ */
+
+const q=new URLSearchParams(location.search);const Z=+q.get('z')||1;
+const card=document.getElementById('card');if(Z!=1)card.style.zoom=Z;
+if(q.get('m'))document.body.classList.add('m');
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),seg=(f,a,b)=>cl((f-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3),eio=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const lerp=(a,b,t)=>a+(b-a)*t;
+const tab=(r,T)=>{if(r<=T[0][0])return T[0][1];for(let i=1;i<T.length;i++)if(r<=T[i][0]){const a=T[i-1],b=T[i];return lerp(a[1],b[1],(r-a[0])/(b[0]-a[0]))}return T[T.length-1][1]};
+const R=n=>{const x=Math.sin(n*127.1+311.7)*43758.5453;return x-Math.floor(x)};
+const W=322,H=127,D=2*Z;
+const cv=document.getElementById('cv');cv.width=W*D;cv.height=H*D;const c=cv.getContext('2d');
+function off(){const o=document.createElement('canvas');o.width=W*D;o.height=H*D;const x=o.getContext('2d');x.setTransform(D,0,0,D,0,0);return[o,x]}
+function render(F){c.setTransform(D,0,0,D,0,0);c.globalAlpha=1;c.globalCompositeOperation='source-over';c.filter='none';c.shadowBlur=0;c.letterSpacing='0px';c.setLineDash([]);
+  c.clearRect(0,0,W,H);c.fillStyle=CFG.bg;c.fillRect(0,0,W,H);draw(c,F+CFG.R0,F)}
+function start(){const T=q.get('t');if(T!==null){render((+T*30)%CFG.LOOP);return}
+  const t0=performance.now();(function tick(){render(((performance.now()-t0)/1000*30)%CFG.LOOP);requestAnimationFrame(tick)})()}
+Promise.all(FONTS.map(f=>document.fonts.load(f[0],f[1]))).then(start,start);
+
+
+function step(r){let s=CFG.steps[0];for(const t of CFG.steps)if(r>=t[0])s=t;return s}
+function draw(c,r){
+  const s=step(r),N=s[1];
+  if(N<=80){
+    c.fillStyle='rgba(255,71,87,'+(N<=12?.05:.12)+')';c.fillRect(0,0,W,H);
+    c.strokeStyle='rgba(255,71,87,'+(N<=12?.35:.28)+')';c.lineWidth=.6;
+    const cw=W/N;
+    for(let x=0;x<=W;x+=cw){c.beginPath();c.moveTo(x,0);c.lineTo(x,H);c.stroke()}
+    for(let y=0;y<=H;y+=cw){c.beginPath();c.moveTo(0,y);c.lineTo(W,y);c.stroke()}
+  }
+  if(N>=300){
+    c.font=CFG.font;c.textAlign='center';c.textBaseline='middle';c.fillStyle=s[2];c.fillText(CFG.text,161,CFG.textY);
+  }else{
+    const sw=Math.max(2,Math.round(N*Math.max(1,Z))),sh=Math.max(2,Math.round(sw*H/W));
+    const o=document.createElement('canvas');o.width=sw;o.height=sh;const x=o.getContext('2d');
+    x.scale(sw/W,sw/W);x.font=CFG.font;x.textAlign='center';x.textBaseline='middle';x.fillStyle=s[2];x.fillText(CFG.text,161,CFG.textY);
+    c.imageSmoothingEnabled=false;c.drawImage(o,0,0,W,H);c.imageSmoothingEnabled=true;
+  }
+  c.font='500 7.5px "Roboto Mono"';c.textAlign='right';c.textBaseline='alphabetic';c.fillStyle=CFG.grey;c.fillText('RES '+N+'px',W-12,13);
+  const u=eo(seg(r,120,128));
+  if(u>0){c.fillStyle=CFG.red;c.fillRect(161-20*u,110,40*u,2.5)}
+}
+</script></body></html>
