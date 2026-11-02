@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>21 Smooth Push In</title>
+<style>
+html,body{margin:0;background:#0b1118}
+.card{position:relative;width:326px;height:158px;border-radius:12px;overflow:hidden;background:#000}
+video{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;object-position:50% 12%;will-change:transform}
+</style>
+</head>
+<body>
+<div class="card" id="card"></div>
+<script>
+// ===== 設定區 =====
+// 底圖影片是示範素材，使用時請替換。此效果不需要人物遮罩。
+// 平滑推近：由慢到快再到慢（正弦緩動），朝主體推進並微微橫移，結束後停住。
+const CFG = {
+  W: 326, H: 158, FPS: 30, LOOP: 120,
+  src: ['media/base3.mp4'],       // 來源陣列（只用第 1 支）
+  pivotX: 205, pivotY: 62,        // 推進支點（卡片座標，大約主體位置）
+  endScale: 1.4,                  // 最終倍率
+  driftX: -8,                     // 推進同時的水平位移 px
+  startFrame: 0, endFrame: 84     // 動作起訖幀（之後停住）
+};
+// ==================
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const card = $('card');
+if (qs.get('z')) card.style.zoom = qs.get('z');
+if (!qs.get('m')) document.body.style.padding = '20px';
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const easeIOs = x => 0.5 - 0.5 * Math.cos(Math.PI * x);
+const vids = CFG.src.map(s => { const v = document.createElement('video'); v.preload = 'auto'; v.muted = true; v.loop = true; v.playsInline = true; v.src = s; card.appendChild(v); return v; });
+const vid = vids[0];
+vid.style.transformOrigin = `${CFG.pivotX}px ${CFG.pivotY}px`;
+
+function render(t) {
+  const f = (t * CFG.FPS) % CFG.LOOP;
+  const p = easeIOs(clamp((f - CFG.startFrame) / (CFG.endFrame - CFG.startFrame), 0, 1));
+  vid.style.transform = `translateX(${CFG.driftX * p}px) scale(${1 + (CFG.endScale - 1) * p})`;
+}
+
+const seekAll = t => vids.forEach(v => { if (Math.abs(v.currentTime - t) > 0.01) v.currentTime = t; });
+const ready = () => Promise.all(vids.map(v => new Promise(r => v.readyState >= 2 ? r() : v.addEventListener('loadeddata', r, { once: true }))));
+if (qs.get('t') !== null) {
+  const t = parseFloat(qs.get('t')); vids.forEach(v => v.pause());
+  ready().then(() => { seekAll(t); render(t); });
+} else {
+  const loop = () => { render(vid.currentTime); requestAnimationFrame(loop); };
+  vids.forEach(v => v.play()); requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

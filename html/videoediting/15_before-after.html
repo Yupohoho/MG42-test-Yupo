@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>15 Before After</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@800&display=swap">
+<style>
+html,body{margin:0;background:#0b1118}
+.card{position:relative;width:326px;height:158px;border-radius:12px;overflow:hidden;background:#000}
+video{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;object-position:50% 15%}
+#vB{filter:grayscale(1) contrast(.9) brightness(.95)}
+#vA{filter:saturate(1.4) contrast(1.08) brightness(1.03);will-change:clip-path}
+#ln{position:absolute;top:0;width:1.5px;height:100%;background:#fff;margin-left:-.75px;box-shadow:0 0 3px rgba(0,0,0,.4)}
+#hd{position:absolute;top:50%;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.35);box-sizing:border-box}
+.lb{position:absolute;top:6px;padding:2px 6px;border-radius:4px;background:rgba(20,20,24,.7);color:#fff;font:800 7px/1 'Noto Sans JP',sans-serif;letter-spacing:.06em}
+#lbB{left:6px}#lbA{right:6px}
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <div class="lb" id="lbB">BEFORE</div><div class="lb" id="lbA">AFTER</div>
+  <div id="ln"></div>
+  <div id="hd"><svg viewBox="0 0 22 22" width="22" height="22" style="position:absolute;left:0;top:0"><path d="M9 7 L5 11 L9 15 M13 7 L17 11 L13 15" fill="none" stroke="#1c1f26" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+</div>
+<script>
+// ===== 設定區 =====
+// 影片素材是示範，使用時請替換（只需一段影片，左邊 BEFORE 做成灰階、右邊 AFTER 做成鮮豔調色；若有真的調色前後兩段影片可分別填入 clips[0]/clips[1]）。
+const CFG = {
+  W: 326, H: 158, FPS: 30, LOOP: 120, DUR: 4,
+  clips: ['media/base.mp4', 'media/base.mp4'],   // [BEFORE 用, AFTER 用]
+  // 分隔線位置關鍵幀（卡片寬比例），段與段之間緩入緩出，最後停在中央
+  keys: [[0, 0.34], [24, 0.93], [32, 0.93], [54, 0.14], [64, 0.14], [88, 0.5]]
+};
+// ==================
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const card = $('card'), ln = $('ln'), hd = $('hd'), lbA = $('lbA'), lbB = $('lbB');
+if (qs.get('z')) card.style.zoom = qs.get('z');
+if (!qs.get('m')) document.body.style.padding = '20px';
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const eio = x => x < .5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+const mk = (src, id) => { const v = document.createElement('video'); v.src = src; v.id = id; v.muted = v.loop = v.playsInline = true; v.preload = 'auto'; card.insertBefore(v, card.firstChild); return v; };
+const vA = mk(CFG.clips[1], 'vA'), vB = mk(CFG.clips[0], 'vB');   // vB 在最下層
+card.insertBefore(vB, vA);
+function pos(f) {
+  const k = CFG.keys; if (f <= k[0][0]) return k[0][1];
+  for (let i = 1; i < k.length; i++) if (f <= k[i][0]) return k[i - 1][1] + (k[i][1] - k[i - 1][1]) * eio((f - k[i - 1][0]) / (k[i][0] - k[i - 1][0]));
+  return k[k.length - 1][1];
+}
+function render(t) {
+  const f = (t * CFG.FPS) % CFG.LOOP, x = pos(f) * CFG.W;
+  vA.style.clipPath = `inset(0 0 0 ${x}px)`;
+  ln.style.left = hd.style.left = x + 'px';
+  lbB.style.opacity = x < 52 ? 0.25 : 1;
+  lbA.style.opacity = x > CFG.W - 52 ? 0.25 : 1;
+}
+
+const vids = [vB, vA], main = vB;
+const seekAll = t => vids.forEach(v => { if (Math.abs(v.currentTime - t) > 0.01) v.currentTime = t; });
+const ready = () => Promise.all(vids.map(v => new Promise(r => v.readyState >= 2 ? r() : v.addEventListener('loadeddata', r, { once: true }))));
+if (qs.get('t') !== null) {
+  const t = parseFloat(qs.get('t')); vids.forEach(v => v.pause());
+  ready().then(() => { seekAll(t); render(t); });
+} else {
+  const loop = () => { const t = main.currentTime; vids.forEach(v => { if (v !== main && Math.abs(v.currentTime - t) > 0.06) v.currentTime = t; }); render(t); requestAnimationFrame(loop); };
+  vids.forEach(v => v.play()); requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>25 Match Cut</title>
+<style>
+html,body{margin:0;background:#0b1118}
+.card{position:relative;width:326px;height:158px;border-radius:12px;overflow:hidden;background:#000}
+video{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;object-position:50% 12%}
+.layer{position:absolute;left:0;top:0;width:100%;height:100%;transform-origin:0 0}
+#sb{visibility:hidden}
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <div class="layer" id="sa"><video id="a" muted loop playsinline preload="auto"></video></div>
+  <div class="layer" id="sb"><video id="b" muted loop playsinline preload="auto"></video></div>
+</div>
+<script>
+// ===== 設定區 =====
+// match cut（匹配剪輯）的重點是「挑兩段能接上的素材」，不是動態：A、B 兩段素材在切換瞬間，主體（這裡是臉）的位置與大小要相同，硬切一次，觀眾就覺得是同一個東西換了場景。
+// 素材是示範，使用時請替換。換素材時：量出兩段在硬切幀的臉（或任何要對齊的主體）的中心與寬度，填到 headA / headB（影片畫面的比例 0~1）。
+const CFG = {
+  W: 326, H: 158, FPS: 30, LOOP: 120,
+  A: 'media/base.mp4', B: 'media/base6.mp4',   // 切換前、後的兩段畫面
+  cut: 38,                                     // 硬切幀
+  headA: { x: 0.490, y: 0.253, w: 0.182 },     // A 在硬切幀：臉中心 x、y、臉寬（影片畫面比例，以太陽眼鏡位置校正）
+  headB: { x: 0.470, y: 0.205, w: 0.225 },    // B 在硬切幀：同上
+  target: { x: 0.50, y: 0.21, w: 0.25 },       // 兩邊對齊後，臉在卡片中的位置與臉寬（卡片比例）
+  vpos: 0.12                                   // 影片取景垂直位置（對應 CSS object-position 的 y）
+};
+// ==================
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const card = $('card');
+if (qs.get('z')) card.style.zoom = qs.get('z');
+if (!qs.get('m')) document.body.style.padding = '20px';
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const sa = $('sa'), sb = $('sb');
+const VAR = 16 / 9;                              // 素材長寬比（取景方式為 cover：寬度填滿卡片、上下裁切）
+// 把影片中的 head 點對到卡片的 target 點，倍率讓臉寬等於 target.w（不讓畫面邊緣露出）
+function fit(el, head) {
+  const W = CFG.W, H = CFG.H, vh = W / VAR, oy = (vh - H) * CFG.vpos;
+  const s = Math.max(1, CFG.target.w / head.w);
+  const hx = head.x * W, hy = head.y * vh - oy;
+  const tx = clamp(CFG.target.x * W - s * hx, W * (1 - s), 0), ty = clamp(CFG.target.y * H - s * hy, H * (1 - s), 0);
+  el.style.transform = `translate(${tx.toFixed(2)}px,${ty.toFixed(2)}px) scale(${s.toFixed(4)})`;
+}
+fit(sa, CFG.headA); fit(sb, CFG.headB);
+function render(t) {
+  const f = (t * CFG.FPS) % CFG.LOOP, early = f < CFG.cut;
+  sa.style.visibility = early ? 'visible' : 'hidden';
+  sb.style.visibility = early ? 'hidden' : 'visible';
+}
+
+// ===== 影片同步 =====
+$('a').src = CFG.A; $('b').src = CFG.B;
+const vids = [$('a'), $('b')], main = vids[0];
+const seekAll = t => vids.forEach(v => { if (Math.abs(v.currentTime - t) > 0.01) v.currentTime = t; });
+const ready = () => Promise.all(vids.map(v => new Promise(r => v.readyState >= 2 ? r() : v.addEventListener('loadeddata', r, { once: true }))));
+if (qs.get('t') !== null) {
+  const t = parseFloat(qs.get('t')); vids.forEach(v => v.pause());
+  ready().then(() => { seekAll(t); render(t); });
+} else {
+  const loop = () => { const t = main.currentTime; vids.forEach(v => { if (v !== main && Math.abs(v.currentTime - t) > 0.06) v.currentTime = t; }); render(t); requestAnimationFrame(loop); };
+  vids.forEach(v => v.play()); requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

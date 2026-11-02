@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>23 Dynamic Tilt</title>
+<style>
+html,body{margin:0;background:#0b1118}
+.card{position:relative;width:326px;height:158px;border-radius:12px;overflow:hidden;background:#000}
+video{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;object-position:50% 12%;will-change:transform,filter}
+</style>
+</head>
+<body>
+<div class="card" id="card"></div>
+<script>
+// ===== 設定區 =====
+// 底圖影片是示範素材，使用時請替換。此效果不需要人物遮罩。
+// 動態傾斜（dynamic tilt）：鏡頭在移動的過程中，視角平順地旋轉、樞轉，帶來沉浸的電影感。
+// 整個過程是連續的左右傾斜（一圈剛好一個來回，所以無縫循環），並帶著輕微的位移與推近，不是猛甩一下。
+const CFG = {
+  W: 326, H: 158, FPS: 30, LOOP: 120,
+  src: ['media/base2.mp4'],       // 來源陣列（只用第 1 支）
+  scale: 1.5,                      // 放大倍率（要大於旋轉時覆蓋整個畫面所需：約 cos(角)+2.06×sin(角)）
+  roll: 7,                         // 傾斜幅度（度）：左右各轉到這個角度
+  pivot: [0.55, 0.68],             // 旋轉樞軸（畫面比例）：樞軸在人物胸口，所以臉會隨著傾斜左右擺動
+  sway: 1.6,                       // 傾斜時順帶的水平位移（px / 度）
+  bob: 3,                          // 輕微上下位移 px
+  push: 0.04                       // 推近的起伏（倍率）
+};
+// ==================
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const card = $('card');
+if (qs.get('z')) card.style.zoom = qs.get('z');
+if (!qs.get('m')) document.body.style.padding = '20px';
+const vids = CFG.src.map(s => { const v = document.createElement('video'); v.preload = 'auto'; v.muted = true; v.loop = true; v.playsInline = true; v.src = s; card.appendChild(v); return v; });
+const vid = vids[0];
+
+function render(t) {
+  const f = (t * CFG.FPS) % CFG.LOOP, u = f / CFG.LOOP, w = 2 * Math.PI * u;
+  const roll = CFG.roll * Math.sin(w);                                  // 平順的左右傾斜（正弦，起訖都柔和）
+  const tx = -CFG.sway * roll, ty = CFG.bob * Math.sin(w * 2 + 0.8);
+  const sc = CFG.scale + CFG.push * (0.5 - 0.5 * Math.cos(w));
+  vid.style.transformOrigin = (CFG.pivot[0] * 100) + "% " + (CFG.pivot[1] * 100) + "%";
+  vid.style.transform = `translate(${tx}px,${ty}px) rotate(${roll}deg) scale(${sc})`;
+  vid.style.filter = "none";
+}
+
+const seekAll = t => vids.forEach(v => { if (Math.abs(v.currentTime - t) > 0.01) v.currentTime = t; });
+const ready = () => Promise.all(vids.map(v => new Promise(r => v.readyState >= 2 ? r() : v.addEventListener('loadeddata', r, { once: true }))));
+if (qs.get('t') !== null) {
+  const t = parseFloat(qs.get('t')); vids.forEach(v => v.pause());
+  ready().then(() => { seekAll(t); render(t); });
+} else {
+  const loop = () => { render(vid.currentTime); requestAnimationFrame(loop); };
+  vids.forEach(v => v.play()); requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

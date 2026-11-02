@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>22 Wide Pull Out</title>
+<style>canvas{z-index:2}
+html,body{margin:0;background:#0b1118}
+.card{position:relative;width:326px;height:158px;border-radius:12px;overflow:hidden;background:#000}
+canvas{position:absolute;left:0;top:0;width:100%;height:100%}
+video{position:absolute;left:0;top:0;width:100%;height:100%;opacity:0.01;pointer-events:none}
+</style>
+</head>
+<body>
+<div class="card" id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區 =====
+// 底圖影片是示範素材，使用時請替換。此效果不需要人物遮罩。
+// 一開始是放大的局部特寫，停 8 幀後以放射模糊快速拉遠到全景，之後緩慢飄移停住。
+const CFG = {
+  W: 326, H: 158, FPS: 30, LOOP: 120,
+  src: ['media/land4.mp4'],       // 來源陣列（只用第 1 支）
+  pivotX: 100, pivotY: 85,        // 縮放支點（卡片座標）
+  startScale: 1.8,                // 特寫起始倍率（素材為縮小壓縮的示範檔，放太大會糊）
+  holdFrames: 8,                  // 特寫靜止幀數
+  pullFrames: 13,                 // 拉遠所需幀數（由快到慢，對數倍率）
+  blurK: 2.2,                     // 放射模糊強度（倍率速度 × 此值 = 掃過的對數倍率半幅）
+  blurCopies: 14,
+  driftScale: 1.1, driftX: -10, driftEnd: 84   // 拉遠後緩飄：倍率、水平位移 px、結束幀
+};
+// ==================
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const card = $('card'), cv = $('cv'), ctx = cv.getContext('2d');
+if (qs.get('z')) card.style.zoom = qs.get('z');
+if (!qs.get('m')) document.body.style.padding = '20px';
+const K = 2; cv.width = CFG.W * K; cv.height = CFG.H * K;
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const easeIOs = x => 0.5 - 0.5 * Math.cos(Math.PI * x);
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+
+const vids = CFG.src.map(s => { const v = document.createElement('video'); v.preload = 'auto'; v.muted = true; v.loop = true; v.playsInline = true; v.src = s; card.appendChild(v); return v; });
+const vid = vids[0];
+
+function state(f) {                         // 回傳 [倍率, 水平位移]
+  const p = clamp((f - CFG.holdFrames) / CFG.pullFrames, 0, 1);
+  const d = easeOut(clamp((f - CFG.holdFrames - CFG.pullFrames) / (CFG.driftEnd - CFG.holdFrames - CFG.pullFrames), 0, 1));
+  const s = Math.exp(Math.log(CFG.startScale) * (1 - easeIOs(p))) * (1 + (CFG.driftScale - 1) * d);
+  return [s, CFG.driftX * d];
+}
+function draw(s, tx, a) {
+  if (!vid.videoWidth) return;
+  const vh = CFG.W * vid.videoHeight / vid.videoWidth, vy = -Math.max(0, vh - CFG.H) * 0.12;
+  ctx.save(); ctx.globalAlpha = a; ctx.setTransform(K, 0, 0, K, 0, 0);
+  ctx.translate(tx + CFG.pivotX, CFG.pivotY); ctx.scale(s, s); ctx.translate(-CFG.pivotX, -CFG.pivotY);
+  ctx.drawImage(vid, 0, vy, CFG.W, vh); ctx.restore();
+}
+
+function render(t) {
+  const f = (t * CFG.FPS) % CFG.LOOP;
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height);
+  const [s, tx] = state(f), s1 = state(f + 0.5)[0], s0 = state(f - 0.5)[0];
+  const v = Math.abs(Math.log(s1 / s0));     // 每幀對數倍率速度
+  const half = v * CFG.blurK, n = v > 0.004 ? CFG.blurCopies : 1;
+  for (let i = 0; i < n; i++) draw(n === 1 ? s : s * Math.exp(-half + 2 * half * i / (n - 1)), tx, 1 / (i + 1));
+}
+
+const seekAll = t => vids.forEach(v => { if (Math.abs(v.currentTime - t) > 0.01) v.currentTime = t; });
+const ready = () => Promise.all(vids.map(v => new Promise(r => v.readyState >= 2 ? r() : v.addEventListener('loadeddata', r, { once: true }))));
+if (qs.get('t') !== null) {
+  const t = parseFloat(qs.get('t')); vids.forEach(v => v.pause());
+  seekAll(t); const tick = () => { render(t); requestAnimationFrame(tick); }; ready().then(tick);
+} else {
+  const loop = () => { const t = vid.currentTime; render(t); requestAnimationFrame(loop); };
+  vids.forEach(v => v.play()); requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

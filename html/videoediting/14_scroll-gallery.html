@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>14 Scroll Gallery</title>
+<style>
+html,body{margin:0;background:#0b1118}
+.card{position:relative;width:326px;height:158px;border-radius:12px;overflow:hidden;background:#0a1018}
+canvas{position:absolute;left:0;top:0;width:326px;height:158px}
+video{position:absolute;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none}
+</style>
+</head>
+<body>
+<div class="card" id="card"><canvas id="cv" width="652" height="316"></canvas></div>
+<script>
+// ===== 設定區 =====
+// 影片素材是示範，使用時請替換（clips 陣列 = 相簿用到的影片來源；pos 為各來源的取景位置）。
+// 格子用哪支影片是自動分配的：同一時間畫面上看得到的格子盡量不重複同一支（素材數量不夠時才重複）。
+// 畫面以一個 canvas 繪製，只用 clips.length 個 video 元素，不管格子多少。
+const CFG = {
+  W: 326, H: 158, FPS: 30, LOOP: 120, DUR: 4,
+  clips: ['media/base.mp4', 'media/base2.mp4', 'media/base3.mp4', 'media/land.mp4', 'media/land2.mp4', 'media/land3.mp4', 'media/land4.mp4'],
+  // [x,y] 取景位置 0~1：人物素材要讓主角落在格子正中間（女生橫向約 51%、背包女生走動約 43–69%、男生約 75%）
+  pos: [[0.5, 0.2], [0.8, 0.2], [1.0, 0.2], [0.5, 0.5], [0.5, 0.5], [0.5, 0.5], [0.5, 0.5]],
+  margin: 6, gap: 4, radius: 6,
+  cols: [                                  // 每欄：格子高度（px）循環、總捲動距離（px）
+    { h: [70, 56, 84, 60, 72, 90, 58, 70], dist: 210 },
+    { h: [50, 84, 64, 76, 58, 66, 80, 54], dist: 300 },
+    { h: [78, 60, 70, 88, 52, 74, 62, 80], dist: 250 }
+  ],
+  scrollStart: 0, scrollEnd: 78,           // 捲動開始／停止幀（減速停下）
+  fade: 20                                 // 上下邊緣漸暗高度（px）
+};
+// ==================
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const card = $('card'), cv = $('cv'), ctx = cv.getContext('2d');
+if (qs.get('z')) card.style.zoom = qs.get('z');
+if (!qs.get('m')) document.body.style.padding = '20px';
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+const vids = CFG.clips.map(src => { const v = document.createElement('video'); v.src = src; v.muted = v.loop = v.playsInline = true; v.preload = 'auto'; card.appendChild(v); return v; });
+const main = vids[0];
+
+// ---- 格子與素材分配：捲動過程中同時看得到的格子，盡量用不同影片 ----
+const cwid = (CFG.W - 2 * CFG.margin - (CFG.cols.length - 1) * CFG.gap) / CFG.cols.length;
+const NS = 40, cells = [];
+CFG.cols.forEach((col, ci) => { let off = 0; for (let i = 0; i < 16; i++) { const h = col.h[i % col.h.length]; cells.push({ ci, i, h, off, col, k: 0, vis: [] }); off += h + CFG.gap; } });
+cells.forEach(c => { for (let s = 0; s <= NS; s++) { const y = CFG.margin - c.col.dist * easeOut(s / NS) + c.off; c.vis.push(y + c.h > 8 && y < CFG.H - 8); } c.first = c.vis.indexOf(true); });
+{
+  const used = vids.map(() => 0), done = [];
+  cells.filter(c => c.first >= 0).sort((a, b) => a.first - b.first || a.ci - b.ci).forEach(c => {
+    let best = 0, bestScore = 1e9;
+    vids.forEach((_, k) => {
+      let conf = 0; done.forEach(o => { if (o.k === k) for (let s = 0; s <= NS; s++) if (o.vis[s] && c.vis[s]) conf++; });
+      const score = conf * 1000 + used[k] * 10 + k;
+      if (score < bestScore) { bestScore = score; best = k; }
+    });
+    c.k = best; used[best]++; done.push(c);
+  });
+}
+const rr = (x, y, w, h, r) => { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); };
+function cover(v, pos, x, y, w, h) {
+  const vw = v.videoWidth, vh = v.videoHeight; if (!vw) return;
+  const s = Math.max(w / vw, h / vh), sw = w / s, sh = h / s;
+  ctx.drawImage(v, (vw - sw) * pos[0], (vh - sh) * pos[1], sw, sh, x, y, w, h);
+}
+function heart(cx, cy, s) {
+  ctx.beginPath(); ctx.moveTo(cx, cy + s * .9);
+  ctx.bezierCurveTo(cx - s * 1.6, cy - s * .2, cx - s * .7, cy - s * 1.2, cx, cy - s * .4);
+  ctx.bezierCurveTo(cx + s * .7, cy - s * 1.2, cx + s * 1.6, cy - s * .2, cx, cy + s * .9); ctx.fill();
+}
+
+function render(t) {
+  const f = (t * CFG.FPS) % CFG.LOOP;
+  const p = easeOut(clamp((f - CFG.scrollStart) / (CFG.scrollEnd - CFG.scrollStart), 0, 1));
+  ctx.setTransform(2, 0, 0, 2, 0, 0);
+  ctx.fillStyle = '#0a1018'; ctx.fillRect(0, 0, CFG.W, CFG.H);
+  const cw = cwid;
+  cells.forEach(c => {
+    const x = CFG.margin + c.ci * (cw + CFG.gap), y = CFG.margin - c.col.dist * p + c.off, h = c.h;
+    if (y + h > 0 && y < CFG.H) {
+      ctx.save(); rr(x, y, cw, h, CFG.radius); ctx.clip();
+      ctx.fillStyle = '#222'; ctx.fillRect(x, y, cw, h);
+      cover(vids[c.k], CFG.pos[c.k], x, y, cw, h);
+      ctx.restore();
+      ctx.fillStyle = 'rgba(255,255,255,.85)'; heart(x + cw - 9, y + h - 9, 3);
+    }
+  });
+  [[0, 1], [CFG.H, -1]].forEach(([y0, d]) => {
+    const g = ctx.createLinearGradient(0, y0, 0, y0 + d * CFG.fade);
+    g.addColorStop(0, 'rgba(10,16,24,.95)'); g.addColorStop(1, 'rgba(10,16,24,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, d > 0 ? 0 : CFG.H - CFG.fade, CFG.W, CFG.fade);
+  });
+}
+
+const seekAll = t => Promise.all(vids.map(v => new Promise(r => { if (Math.abs(v.currentTime - t) <= 0.01) return r(); v.addEventListener('seeked', r, { once: true }); v.currentTime = t; setTimeout(r, 800); })));
+const ready = () => Promise.all(vids.map(v => new Promise(r => v.readyState >= 2 ? r() : v.addEventListener('loadeddata', r, { once: true }))));
+if (qs.get('t') !== null) {
+  const t = parseFloat(qs.get('t')); vids.forEach(v => v.pause());
+  ready().then(() => seekAll(t)).then(() => render(t));
+} else {
+  const loop = () => { const t = main.currentTime; vids.forEach(v => { if (v !== main && Math.abs(v.currentTime - t) > 0.06) v.currentTime = t; }); render(t); requestAnimationFrame(loop); };
+  vids.forEach(v => v.play()); requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

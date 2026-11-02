@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>31 Page Turn</title>
+<style>
+html,body{margin:0;background:#0b1118}
+.card{position:relative;width:326px;height:158px;border-radius:12px;overflow:hidden;background:#000}
+video{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;object-position:50% 12%}
+.layer{position:absolute;left:0;top:0;width:100%;height:100%}
+#pg{background:#fff}
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <video id="b" muted loop playsinline preload="auto"></video>
+  <div class="layer" id="aw"><video id="a" muted loop playsinline preload="auto"></video></div>
+  <div class="layer" id="pg"></div>
+</div>
+<script>
+// ===== 設定區 =====
+// 素材是示範，使用時請替換。A 畫面、B 畫面是兩段各自完整的影片（轉場形狀只決定新畫面露出的範圍），來源可在下方 A / B 自行更換。
+const CFG = {
+  W: 326, H: 158, FPS: 30, LOOP: 120,
+  A: 'media/base.mp4', B: 'media/base2.mp4',  // A 是被翻開的頁面、B 是翻開後露出的頁面
+  angle: 35,                                  // 折線法線角度（度，0=水平向右、90=向下）；35 = 從右下角往左上翻
+  start: 22, end: 54,                         // 翻頁起訖幀
+  shade: 38                                   // 背面紙張靠折線處的陰影寬度 px
+};
+// ==================
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const card = $('card');
+if (qs.get('z')) card.style.zoom = qs.get('z');
+if (!qs.get('m')) document.body.style.padding = '20px';
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const lerp = (a, b, t) => a + (b - a) * t;
+const seg = (f, a, b) => clamp((f - a) / (b - a), 0, 1);
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+const easeIn = x => x * x;
+const easeInOut = x => x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+const frameOf = t => (t * CFG.FPS) % CFG.LOOP;
+const aw = $('aw'), pg = $('pg');
+const nx = Math.cos(CFG.angle * Math.PI / 180), ny = Math.sin(CFG.angle * Math.PI / 180);
+const U = (x, y) => x * nx + y * ny, UMAX = U(CFG.W, CFG.H);
+// 以 d(p) >= 0 保留的半平面裁切多邊形（Sutherland-Hodgman）
+function clipPoly(poly, d) {
+  const out = [];
+  for (let i = 0; i < poly.length; i++) {
+    const p = poly[i], q = poly[(i + 1) % poly.length], dp = d(p), dq = d(q);
+    if (dp >= 0) out.push(p);
+    if ((dp >= 0) !== (dq >= 0)) { const k = dp / (dp - dq); out.push([p[0] + (q[0] - p[0]) * k, p[1] + (q[1] - p[1]) * k]); }
+  }
+  return out;
+}
+const toCss = poly => poly.length < 3 ? 'polygon(0 0,0 0,0 0)' : 'polygon(' + poly.map(p => p[0].toFixed(1) + 'px ' + p[1].toFixed(1) + 'px').join(',') + ')';
+function render(t) {
+  const f = frameOf(t), W = CFG.W, H = CFG.H;
+  const s = UMAX * (1 - easeInOut(seg(f, CFG.start, CFG.end)));   // 折線位置（沿法線量）：右下角 -> 左上角
+  const rect = [[0, 0], [W, 0], [W, H], [0, H]];
+  aw.style.clipPath = toCss(clipPoly(rect, p => s - U(p[0], p[1])));        // A：折線前側
+  let lifted = clipPoly(rect, p => U(p[0], p[1]) - s);                      // 被掀起的部分
+  lifted = lifted.map(p => { const k = 2 * (U(p[0], p[1]) - s); return [p[0] - k * nx, p[1] - k * ny]; });   // 對折線鏡射 = 紙張背面
+  [p => p[0], p => W - p[0], p => p[1], p => H - p[1]].forEach(d => { lifted = clipPoly(lifted, d); });
+  pg.style.clipPath = toCss(lifted);
+  const a = CFG.angle + 90;
+  pg.style.background = `linear-gradient(${a}deg,#fff 0px,#fff ${(s - CFG.shade).toFixed(1)}px,#d9d9d9 ${s.toFixed(1)}px)`;
+}
+
+// ===== 影片同步 =====
+$('a').src = CFG.A; $('b').src = CFG.B;
+const vids = [$('a'), $('b')].concat(typeof EXTRA !== 'undefined' ? EXTRA : []), main = vids[0];
+const seekAll = t => vids.forEach(v => { if (Math.abs(v.currentTime - t) > 0.01) v.currentTime = t; });
+const ready = () => Promise.all(vids.map(v => new Promise(r => v.readyState >= 2 ? r() : v.addEventListener('loadeddata', r, { once: true }))));
+if (qs.get('t') !== null) {
+  const t = parseFloat(qs.get('t')); vids.forEach(v => v.pause());
+  ready().then(() => { seekAll(t); render(t); });
+} else {
+  const loop = () => { const t = main.currentTime; vids.forEach(v => { if (v !== main && Math.abs(v.currentTime - t) > 0.06) v.currentTime = t; }); render(t); requestAnimationFrame(loop); };
+  vids.forEach(v => v.play()); requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

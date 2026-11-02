@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>19 Vertigo Zoom</title>
+<style>
+html,body{margin:0;background:#0b1118}
+.card{position:relative;width:326px;height:158px;border-radius:12px;overflow:hidden;background:#000}
+video{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;object-position:50% 12%;will-change:transform,filter}
+</style>
+</head>
+<body>
+<div class="card" id="card"></div>
+<script>
+// ===== 設定區 =====
+// 背景影片與人物去背透明影片是示範素材，使用時請替換。
+// 推軌變焦（暈眩變焦）：人物維持差不多大小，背景持續放大，產生空間被拉伸的感覺。
+// 背景用「已把人物抹掉的原場景」（bgplate），否則背景放大時會露出一個更大的人物重影；人物去背層疊在上面。
+const CFG = {
+  W: 326, H: 158, FPS: 30, LOOP: 120,
+  src: ['media/bgplate4.mp4', 'media/cutout4.webm'],  // 來源陣列：[背景（人物已抹掉）, 人物去背]
+  bgScale: 2.1, bgPivot: [163, 79], blurFrom: 0.5, blurTo: 3.5, // 背景最終倍率、支點(px)、模糊 px（由清楚逐漸失焦到很糊，蓋住人物抹除處的補痕）
+  fgScale: 1.12, fgPivot: [200, 42],             // 人物最終倍率、支點（臉的位置）
+  endFrame: 84, ease: 2.2                        // 動作結束幀（之後停住）；緩出指數（越大越快慢下來）
+};
+// ==================
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const card = $('card');
+if (qs.get('z')) card.style.zoom = qs.get('z');
+if (!qs.get('m')) document.body.style.padding = '20px';
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const vids = CFG.src.map(s => { const v = document.createElement('video'); v.preload = 'auto'; v.muted = true; v.loop = true; v.playsInline = true; v.src = s; card.appendChild(v); return v; });
+const [bg, fg] = vids;
+bg.style.transformOrigin = `${CFG.bgPivot[0]}px ${CFG.bgPivot[1]}px`;
+fg.style.transformOrigin = `${CFG.fgPivot[0]}px ${CFG.fgPivot[1]}px`;
+
+function render(t) {
+  const f = (t * CFG.FPS) % CFG.LOOP;
+  const p = 1 - Math.pow(1 - clamp(f / CFG.endFrame, 0, 1), CFG.ease);   // 一開始就動、逐漸減速
+  bg.style.transform = `scale(${1 + (CFG.bgScale - 1) * p})`;
+  bg.style.filter = `blur(${(CFG.blurFrom + (CFG.blurTo - CFG.blurFrom) * p).toFixed(2)}px)`;
+  fg.style.transform = `scale(${1 + (CFG.fgScale - 1) * p})`;
+}
+
+const seekAll = t => vids.forEach(v => { if (Math.abs(v.currentTime - t) > 0.01) v.currentTime = t; });
+const ready = () => Promise.all(vids.map(v => new Promise(r => v.readyState >= 2 ? r() : v.addEventListener('loadeddata', r, { once: true }))));
+if (qs.get('t') !== null) {
+  const t = parseFloat(qs.get('t')); vids.forEach(v => v.pause());
+  ready().then(() => { seekAll(t); render(t); });
+} else {
+  const main = vids[0];
+  const loop = () => { const t = main.currentTime; vids.forEach(v => { if (v !== main && Math.abs(v.currentTime - t) > 0.06) v.currentTime = t; }); render(t); requestAnimationFrame(loop); };
+  vids.forEach(v => v.play()); requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

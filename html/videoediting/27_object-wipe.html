@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>27 Object Wipe</title>
+<style>
+html,body{margin:0;background:#0b1118}
+.card{position:relative;width:326px;height:158px;border-radius:12px;overflow:hidden;background:#000}
+video{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;object-position:50% 12%}
+.layer{position:absolute;left:0;top:0;width:100%;height:100%}
+#obj{will-change:transform}
+#bw{clip-path:inset(0 100% 0 0)}
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <video id="a" muted loop playsinline preload="auto"></video>
+  <div class="layer" id="bw"><video id="b" muted loop playsinline preload="auto"></video></div>
+  <video id="obj" muted loop playsinline preload="auto"></video>
+</div>
+<script>
+// ===== 設定區 =====
+// 素材是示範，使用時請替換。A 畫面、B 畫面是兩段各自完整的影片（轉場形狀只決定新畫面露出的範圍），來源可在下方 A / B 自行更換。
+const CFG = {
+  W: 326, H: 158, FPS: 30, LOOP: 120,
+  A: 'media/base.mp4', B: 'media/base2.mp4',  // 轉場前後的兩段畫面
+  obj: 'media/cutout7.webm',                  // 橫向走過畫面的前景物件（人物去背）；新畫面從物件身後露出
+  objCx: 0.56,                                // 物件在素材中的水平中心（寬度比例），劃接邊界跟著它
+  objSpeed: 2,                                // 物件影片的播放速度倍率（1＝原速）
+  scale: 1.5,                                 // 物件放大倍率（以腳底為支點，頭頂與身體會超出畫面上緣，不露出人物頂端）
+  start: 14, end: 48,                         // 物件走過的起訖幀（近乎等速）
+  fromX: -0.22, toX: 1.22                     // 物件中心起訖位置（卡片寬比例）
+};
+// ==================
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const card = $('card');
+if (qs.get('z')) card.style.zoom = qs.get('z');
+if (!qs.get('m')) document.body.style.padding = '20px';
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const lerp = (a, b, t) => a + (b - a) * t;
+const seg = (f, a, b) => clamp((f - a) / (b - a), 0, 1);
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+const easeIn = x => x * x;
+const easeInOut = x => x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+const frameOf = t => (t * CFG.FPS) % CFG.LOOP;
+const obj = $('obj'), bw = $('bw');
+obj.src = CFG.obj; obj.playbackRate = CFG.objSpeed;
+const DUR = 4;   // 影片長度（秒）
+obj.style.transformOrigin = (CFG.objCx * 100) + '% 100%';
+function render(t) {
+  const f = frameOf(t);
+  const cx = lerp(CFG.fromX, CFG.toX, seg(f, CFG.start, CFG.end)) * CFG.W;
+  bw.style.clipPath = `inset(0 ${Math.max(0, CFG.W - cx).toFixed(1)}px 0 0)`;   // 新畫面只露在物件中心的左側
+  obj.style.transform = `translateX(${(cx - CFG.objCx * CFG.W).toFixed(1)}px) scale(${CFG.scale})`;
+}
+
+// ===== 影片同步 =====
+$('a').src = CFG.A; $('b').src = CFG.B;
+const vids = [$('a'), $('b')], main = vids[0];
+const wantObj = t => (t * CFG.objSpeed) % DUR;
+const seekAll = t => { vids.forEach(v => { if (Math.abs(v.currentTime - t) > 0.01) v.currentTime = t; }); const w = wantObj(t); if (Math.abs(obj.currentTime - w) > 0.01) obj.currentTime = w; };
+const ready = () => Promise.all(vids.concat([obj]).map(v => new Promise(r => v.readyState >= 2 ? r() : v.addEventListener('loadeddata', r, { once: true }))));
+if (qs.get('t') !== null) {
+  const t = parseFloat(qs.get('t')); vids.concat([obj]).forEach(v => v.pause());
+  ready().then(() => { seekAll(t); render(t); });
+} else {
+  const loop = () => { const t = main.currentTime; vids.forEach(v => { if (v !== main && Math.abs(v.currentTime - t) > 0.06) v.currentTime = t; }); { let d = Math.abs(obj.currentTime - wantObj(t)); d = Math.min(d, DUR - d); if (d > 0.12) obj.currentTime = wantObj(t); } render(t); requestAnimationFrame(loop); };
+  vids.concat([obj]).forEach(v => v.play()); requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

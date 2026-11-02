@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>13 Card Shuffle</title>
+<style>
+html,body{margin:0;background:#0b1118}
+.card{position:relative;width:326px;height:158px;border-radius:12px;overflow:hidden;background:radial-gradient(120% 120% at 50% 40%,#142234 0%,#090f17 75%)}
+.pc{position:absolute;box-sizing:border-box;border-radius:6px;overflow:hidden;border:1.5px solid rgba(255,255,255,.7);background:#222;box-shadow:0 5px 12px rgba(0,0,0,.5);will-change:transform}
+.pc video{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover}
+</style>
+</head>
+<body>
+<div class="card" id="card"></div>
+<script>
+// ===== 設定區 =====
+// 影片素材是示範，使用時請替換（clips 陣列 = 疊牌由上到下的初始順序；可增減張數，pos 同長度）。
+const CFG = {
+  W: 326, H: 158, FPS: 30, LOOP: 120, DUR: 4,
+  clips: ['media/base2.mp4', 'media/base.mp4', 'media/base3.mp4', 'media/land.mp4'],
+  pos: ['25% 40%', '50% 20%', '40% 30%', '50% 50%'],
+  cw: 164, ch: 98, x0: 67, y0: 42,      // 牌大小與最前面那張的左上角位置（px）：整疊牌（含往右上疊的偏移）置中於卡片
+  dx: 9, dy: 8,                         // 每往後一層的偏移（右上方）
+  slotRot: [0, 3, -2, 4],               // 每一層的傾角（度）
+  out: { x: 70, y: -6, rot: 13 },       // 最上面那張被抽出時的位移／傾角（抽出時右緣仍在卡片內）
+  shuffles: [6, 36], dur: 24            // 每次洗牌開始幀、時長
+};
+// ==================
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const card = $('card');
+if (qs.get('z')) card.style.zoom = qs.get('z');
+if (!qs.get('m')) document.body.style.padding = '20px';
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const eio = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const N = CFG.clips.length;
+const cards = CFG.clips.map((src, i) => {
+  const d = document.createElement('div'); d.className = 'pc';
+  Object.assign(d.style, { width: CFG.cw + 'px', height: CFG.ch + 'px', left: CFG.x0 + 'px', top: CFG.y0 + 'px' });
+  const v = document.createElement('video'); v.src = src; v.muted = v.loop = v.playsInline = true; v.preload = 'auto'; v.style.objectPosition = CFG.pos[i];
+  d.appendChild(v); card.appendChild(d); return { d, v };
+});
+const slot = k => ({ x: CFG.dx * k, y: -CFG.dy * k, r: CFG.slotRot[k % CFG.slotRot.length] });
+const lerp = (a, b, t) => a + (b - a) * t;
+
+function render(t) {
+  const f = (t * CFG.FPS) % CFG.LOOP;
+  let done = 0, p = 0, active = false;
+  CFG.shuffles.forEach(s => { if (f >= s + CFG.dur) done++; else if (f >= s) { active = true; p = eio((f - s) / CFG.dur); } });
+  cards.forEach((o, c) => {
+    const k0 = ((c - done) % N + N) % N;           // 目前層位（0=最前）
+    let x, y, r, z;
+    if (!active) { const s = slot(k0); x = s.x; y = s.y; r = s.r; z = N - k0; }
+    else if (k0 === 0) {                           // 最上面那張：向右抽出，繞到最後面
+      const a = slot(0), b = slot(N - 1), bell = Math.sin(Math.PI * p);
+      x = lerp(a.x, b.x, p) + CFG.out.x * bell; y = lerp(a.y, b.y, p) + CFG.out.y * bell; r = lerp(a.r, b.r, p) + CFG.out.rot * bell;
+      z = p < 0.5 ? N + 1 : 0;                     // 過半後才移到最底下
+    } else { const a = slot(k0), b = slot(k0 - 1); x = lerp(a.x, b.x, p); y = lerp(a.y, b.y, p); r = lerp(a.r, b.r, p); z = N - k0; }
+    o.d.style.transform = `translate(${x}px,${y}px) rotate(${r}deg)`;
+    o.d.style.zIndex = z;
+  });
+}
+
+const vids = cards.map(o => o.v), main = vids[0];
+const seekAll = t => vids.forEach(v => { if (Math.abs(v.currentTime - t) > 0.01) v.currentTime = t; });
+const ready = () => Promise.all(vids.map(v => new Promise(r => v.readyState >= 2 ? r() : v.addEventListener('loadeddata', r, { once: true }))));
+if (qs.get('t') !== null) {
+  const t = parseFloat(qs.get('t')); vids.forEach(v => v.pause());
+  ready().then(() => { seekAll(t); render(t); });
+} else {
+  const loop = () => { const t = main.currentTime; vids.forEach(v => { if (v !== main && Math.abs(v.currentTime - t) > 0.06) v.currentTime = t; }); render(t); requestAnimationFrame(loop); };
+  vids.forEach(v => v.play()); requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

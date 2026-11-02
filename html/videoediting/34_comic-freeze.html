@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>34 Comic Freeze</title>
+<style>
+html,body{margin:0;background:#0b1118}
+.card{position:relative;width:326px;height:158px;border-radius:12px;overflow:hidden;background:#111}
+.layer{position:absolute;left:0;top:0;width:100%;height:100%}
+video{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;object-position:46% 20%;transform-origin:46% 30%}
+#comic{visibility:hidden;will-change:transform}
+#burst{position:absolute;overflow:visible}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <filter id="sticker" x="-6%" y="-6%" width="112%" height="112%" color-interpolation-filters="sRGB">
+    <feComponentTransfer in="SourceGraphic" result="hard"><feFuncA type="linear" slope="9" intercept="-4"/></feComponentTransfer>
+    <feGaussianBlur in="hard" stdDeviation="1.5" result="b1"/>
+    <feComponentTransfer in="b1" result="m1"><feFuncA type="linear" slope="14" intercept="-1.2"/></feComponentTransfer>
+    <feFlood flood-color="#fff" result="wc"/><feComposite in="wc" in2="m1" operator="in" result="white"/>
+    <feGaussianBlur in="hard" stdDeviation="2.2" result="b2"/>
+    <feComponentTransfer in="b2" result="m2"><feFuncA type="linear" slope="14" intercept="-1.2"/></feComponentTransfer>
+    <feFlood flood-color="#111" result="kc"/><feComposite in="kc" in2="m2" operator="in" result="black"/>
+    <feMerge><feMergeNode in="black"/><feMergeNode in="white"/><feMergeNode in="hard"/></feMerge>
+  </filter>
+</svg>
+<div class="card" id="card">
+  <video id="bg" src="media/base.mp4" muted loop playsinline preload="auto"></video>
+  <div id="comic" class="layer">
+    <div id="rays" class="layer"></div>
+    <div id="dots" class="layer"></div>
+    <video id="cut" src="media/cutout.webm" muted loop playsinline preload="auto"></video>
+    <svg id="burst" width="60" height="60" viewBox="-30 -30 60 60">
+      <polygon id="star" fill="#fff" stroke="#111" stroke-width="2" stroke-linejoin="round"/>
+      <text id="bang" x="0" y="8" text-anchor="middle" font-family="Impact,'Arial Black',sans-serif" font-weight="900" font-size="24" fill="#e0262e" stroke="#111" stroke-width="1" paint-order="stroke fill" stroke-linejoin="round">!</text>
+    </svg>
+  </div>
+</div>
+<script>
+// ===== 設定區 =====
+// 底圖影片與人物去背透明影片是示範素材，使用時請替換。
+const CFG = {
+  W: 326, H: 158, FPS: 30, LOOP: 120,
+  freeze: 32,                      // 第幾幀定格、切成漫畫
+  zoom: 1.6,                       // 畫面放大倍率（人物近拍）
+  rays: { cx: 0.46, cy: 0.42, step: 7.5, c1: '#ffc62e', c2: '#fff4c8', spin: 4 },   // 放射速度線；spin：一圈（LOOP）轉過幾組光芒（整數才能無縫循環，越大轉越快）
+  dot: { size: 4.5, r: 0.9, color: 'rgba(255,255,255,.6)' },              // 網點
+  outline: { white: 3, black: 1.3 },                                      // 人物白描邊、黑描邊粗細（px，畫面上看到的粗細）
+  burst: { x: 0.84, y: 0.2, r: 26, points: 13, rot: 8, bangDelay: 4 },    // 星形爆炸框
+  hitScale: 1.07                   // 定格瞬間的衝擊縮放（過衝回彈）
+};
+// ==================
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const card = $('card'), bg = $('bg'), cut = $('cut'), comic = $('comic');
+if (qs.get('z')) card.style.zoom = qs.get('z');
+if (!qs.get('m')) document.body.style.padding = '20px';
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const spring = x => x <= 0 ? 0 : x >= 1 ? 1 : 1 - Math.exp(-7 * x) * Math.cos(11 * x);
+const R = CFG.rays, D = CFG.dot, B = CFG.burst, O = CFG.outline;
+bg.style.transform = cut.style.transform = `scale(${CFG.zoom})`;
+const raysEl = $('rays');
+const setRays = a => { raysEl.style.background = `repeating-conic-gradient(from ${a.toFixed(2)}deg at ${R.cx * 100}% ${R.cy * 100}%, ${R.c1} 0deg ${R.step}deg, ${R.c2} ${R.step}deg ${R.step * 2}deg)`; };
+setRays(0);
+$('dots').style.background = `radial-gradient(circle, ${D.color} ${D.r}px, transparent ${D.r + 0.5}px) 0 0/${D.size}px ${D.size}px`;
+// 人物：只加白描邊＋黑描邊（以放大倍率補償粗細），不對人物畫面調色
+// 描邊：先把人物邊緣二值化（銳利），再往外擴出白邊、黑邊（先模糊再硬切臨界值，邊緣是圓的、不糊）；擴張量以放大倍率補償
+const grow = px => (px / CFG.zoom / 1.28).toFixed(2);   // 模糊 σ ≈ 擴張量 / 1.28
+const sf = document.getElementById('sticker').querySelectorAll('feGaussianBlur');
+sf[0].setAttribute('stdDeviation', grow(O.white)); sf[1].setAttribute('stdDeviation', grow(O.white + O.black));
+cut.style.filter = 'url(#sticker)';
+// 星形爆炸框
+const pts = []; for (let i = 0; i < B.points * 2; i++) { const a = Math.PI * i / B.points, r = i % 2 ? B.r * 0.62 : B.r; pts.push((Math.cos(a) * r).toFixed(1) + ',' + (Math.sin(a) * r).toFixed(1)); }
+$('star').setAttribute('points', pts.join(' '));
+Object.assign($('burst').style, { left: (B.x * CFG.W - 30) + 'px', top: (B.y * CFG.H - 30) + 'px' });
+
+function render(t) {
+  const f = (t * CFG.FPS) % CFG.LOOP;
+  const on = f >= CFG.freeze;
+  comic.style.visibility = on ? 'visible' : 'hidden';
+  bg.style.visibility = on ? 'hidden' : 'visible';
+  setRays(f / CFG.LOOP * R.spin * R.step * 2);   // 光芒持續旋轉
+  const k = (f - CFG.freeze) / 10;
+  comic.style.transform = `scale(${on ? 1 + (CFG.hitScale - 1) * (1 - spring(k)) : 1})`;
+  const b = clamp((f - CFG.freeze) / 8, 0, 1);
+  $('burst').style.transform = `rotate(${B.rot}deg) scale(${spring(b)})`;
+  $('bang').style.visibility = f >= CFG.freeze + B.bangDelay ? 'visible' : 'hidden';
+}
+
+// 定格：影片在 freeze 幀暫停，到下一輪重新播放
+const vids = [bg, cut], FT = CFG.freeze / CFG.FPS;
+const ready = () => Promise.all(vids.map(v => new Promise(r => v.readyState >= 2 ? r() : v.addEventListener('loadeddata', r, { once: true }))));
+if (qs.get('t') !== null) {
+  const t = parseFloat(qs.get('t')); vids.forEach(v => v.pause());
+  ready().then(() => { vids.forEach(v => v.currentTime = Math.min(t, FT)); render(t); });
+} else {
+  ready().then(() => {
+    let t0 = performance.now(), prev = 0;
+    vids.forEach(v => { v.currentTime = 0; v.play(); });
+    const loop = () => {
+      const f = ((performance.now() - t0) / 1000 * CFG.FPS) % CFG.LOOP;
+      if (f < prev) vids.forEach(v => { v.currentTime = 0; v.play(); });
+      if (f >= CFG.freeze && !bg.paused) { vids.forEach(v => { v.pause(); v.currentTime = FT; }); }
+      prev = f; render(f / CFG.FPS);
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>39 Color Pop</title>
+<style>
+html,body{margin:0;background:#0b1118}
+.card{position:relative;width:326px;height:158px;border-radius:12px;overflow:hidden;background:#111}
+video{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;object-position:50% 12%;transform-origin:50% 60%}
+#cut{will-change:transform,filter}
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <video id="bg" src="media/base.mp4" muted loop playsinline preload="auto"></video>
+  <video id="cut" src="media/cutout.webm" muted loop playsinline preload="auto"></video>
+</div>
+<script>
+// ===== 設定區 =====
+// 底圖影片與人物去背透明影片是示範素材，使用時請替換。
+const CFG = {
+  W: 326, H: 158, FPS: 30, LOOP: 120,
+  lowSat: 0.12,                   // 整張畫面一開始的飽和度（0＝黑白、1＝原色；背景全程維持這個低飽和）
+  bgDim: 0.9, bgContrast: 1.06,   // 低飽和畫面的亮度、對比
+  pop: { start: 14, end: 40 },    // 主角色彩淡入（低飽和 → 原色）的起訖幀
+  zoomFrom: 1.0, zoomTo: 1.0,      // 緩慢推近的起訖倍率（1＝不放大；要推近時背景與人物要同步）
+  zoomStart: 0, zoomEnd: 90
+};
+// ==================
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const card = $('card'), bg = $('bg'), cut = $('cut');
+if (qs.get('z')) card.style.zoom = qs.get('z');
+if (!qs.get('m')) document.body.style.padding = '20px';
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const easeIO = x => x < .5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+
+const lowFilter = `saturate(${CFG.lowSat}) brightness(${CFG.bgDim}) contrast(${CFG.bgContrast})`;
+function render(t) {
+  const f = (t * CFG.FPS) % CFG.LOOP;
+  bg.style.filter = lowFilter;                                   // 背景全程低飽和
+  const p = easeIO(clamp((f - CFG.pop.start) / (CFG.pop.end - CFG.pop.start), 0, 1));   // 主角色彩淡入進度
+  const sat = CFG.lowSat + (1 - CFG.lowSat) * p, br = CFG.bgDim + (1 - CFG.bgDim) * p, ct = CFG.bgContrast + (1 - CFG.bgContrast) * p;
+  cut.style.filter = `saturate(${sat.toFixed(3)}) brightness(${br.toFixed(3)}) contrast(${ct.toFixed(3)})`;   // 開頭與背景完全相同，再慢慢回到原色
+  const z = CFG.zoomFrom + (CFG.zoomTo - CFG.zoomFrom) * easeOut(clamp((f - CFG.zoomStart) / (CFG.zoomEnd - CFG.zoomStart), 0, 1));
+  bg.style.transform = cut.style.transform = `scale(${z})`;
+}
+
+const vids = [bg, cut], main = bg;
+const ready = () => Promise.all(vids.map(v => new Promise(r => v.readyState >= 2 ? r() : v.addEventListener('loadeddata', r, { once: true }))));
+if (qs.get('t') !== null) {
+  const t = parseFloat(qs.get('t')); vids.forEach(v => v.pause());
+  ready().then(() => { vids.forEach(v => v.currentTime = t); render(t); });
+} else {
+  ready().then(() => {
+    const loop = () => { const t = main.currentTime; if (Math.abs(cut.currentTime - t) > 0.06) cut.currentTime = t; render(t); requestAnimationFrame(loop); };
+    vids.forEach(v => v.play()); requestAnimationFrame(loop);
+  });
+}
+</script>
+</body>
+</html>

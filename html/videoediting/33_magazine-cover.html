@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>33 Magazine Cover</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@900&family=Montserrat:wght@700;900&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@900&family=Montserrat:wght@700;900&display=swap">
+<style>
+html,body{margin:0;background:#0b1118}
+.card{position:relative;width:326px;height:158px;border-radius:12px;overflow:hidden;background:#111}
+video{position:absolute;object-fit:cover}
+#bgb{left:0;top:0;width:100%;height:100%;transform:scale(1.25);filter:blur(7px) brightness(.4) saturate(.8)}
+#cover{position:absolute;overflow:hidden;background:#222;box-shadow:0 4px 14px rgba(0,0,0,.6)}
+#vid,#cut{left:0;top:0;width:100%;height:100%;object-position:46% 30%;transform:scale(1.12);transform-origin:46% 30%}
+.t{position:absolute;color:#fff;white-space:nowrap;line-height:1;text-shadow:0 1px 3px rgba(0,0,0,.55);will-change:transform,opacity}
+#mast{left:0;right:0;top:3px;text-align:center;font:900 37px/1 'Playfair Display',serif;letter-spacing:-1px;transform-origin:50% 0}
+#sub{left:8px;top:50px;font:700 6px/1.35 'Montserrat',sans-serif;letter-spacing:.5px}
+#no{right:7px;top:50px;font:700 7px/1.35 'Montserrat',sans-serif;text-align:right}
+#city{left:8px;top:106px;font:900 8px/1 'Montserrat',sans-serif;letter-spacing:1px}
+#walk{left:8px;top:116px;font:900 17px/1 'Montserrat',sans-serif;color:#2cc4f0;letter-spacing:1px}
+#bar{position:absolute;right:7px;bottom:6px;width:26px;height:11px;background:#fff;will-change:transform,opacity}
+#bar i{position:absolute;left:2px;right:2px;top:2px;bottom:2px;background:repeating-linear-gradient(90deg,#000 0 1px,#fff 1px 2px,#000 2px 4px,#fff 4px 5px)}
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <video id="bgb" src="media/base.mp4" muted loop playsinline preload="auto"></video>
+  <div id="cover">
+    <video id="vid" src="media/base.mp4" muted loop playsinline preload="auto"></video>
+    <div class="t" id="mast">MUSE</div>
+    <video id="cut" src="media/cutout.webm" muted loop playsinline preload="auto"></video>
+    <div class="t" id="sub">AUTUMN STREET<br>STYLE ISSUE</div>
+    <div class="t" id="no">NO.11<br>2026</div>
+    <div class="t" id="city">CITY</div>
+    <div class="t" id="walk">WALK</div>
+    <div id="bar"><i></i></div>
+  </div>
+</div>
+<script>
+// ===== 設定區 =====
+// 底圖影片、人物去背透明影片、版面文字都是示範，使用時請替換。
+const CFG = {
+  W: 326, H: 158, FPS: 30, LOOP: 120,
+  cover: { w: 123, h: 158, cx: 0.5, cy: 0.5 },   // 封面尺寸 px（高度＝卡片高度，上下不留空隙）、中心（卡片比例）
+  mastStart: 10, mastEnd: 24,     // 刊頭 MUSE 衝入（過衝回彈）
+  subStart: 26, noStart: 30,      // 副標、期數
+  walkStart: 32,                  // 大標（CITY／WALK）
+  barStart: 40,                   // 條碼
+  textDur: 8                      // 一般文字進場幀數
+};
+// ==================
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const card = $('card'), cover = $('cover');
+if (qs.get('z')) card.style.zoom = qs.get('z');
+if (!qs.get('m')) document.body.style.padding = '20px';
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+const spring = x => x <= 0 ? 0 : x >= 1 ? 1 : 1 - Math.exp(-7 * x) * Math.cos(11 * x);
+const C = CFG.cover;
+Object.assign(cover.style, { width: C.w + 'px', height: C.h + 'px', left: (C.cx * CFG.W - C.w / 2) + 'px', top: (C.cy * CFG.H - C.h / 2) + 'px' });
+
+function render(t) {
+  const f = (t * CFG.FPS) % CFG.LOOP;
+  const p = (s, d) => clamp((f - s) / (d || CFG.textDur), 0, 1);
+  // 刊頭
+  const m = p(CFG.mastStart, CFG.mastEnd - CFG.mastStart);
+  $('mast').style.opacity = clamp(m * 4, 0, 1);
+  $('mast').style.transform = `scale(${1 + 0.45 * (1 - spring(m))})`;
+  // 副標、期數：由下往上滑入
+  for (const [id, s] of [['sub', CFG.subStart], ['no', CFG.noStart]]) {
+    const q = p(s);
+    $(id).style.opacity = q > 0 ? 1 : 0;
+    $(id).style.transform = `translateY(${(1 - easeOut(q)) * 8}px)`;
+    $(id).style.opacity = clamp(q * 3, 0, 1);
+  }
+  // 大標：由左滑入
+  const w = p(CFG.walkStart);
+  for (const id of ['city', 'walk']) {
+    $(id).style.opacity = clamp(w * 3, 0, 1);
+    $(id).style.transform = `translateX(${(1 - easeOut(w)) * -16}px)`;
+  }
+  // 條碼：彈出
+  const b = p(CFG.barStart, 10);
+  $('bar').style.opacity = b > 0 ? 1 : 0;
+  $('bar').style.transform = `scale(${spring(b)})`;
+}
+
+const vids = [$('bgb'), $('vid'), $('cut')], main = vids[0];
+const seekAll = t => vids.forEach(v => { if (Math.abs(v.currentTime - t) > 0.01) v.currentTime = t; });
+const ready = () => Promise.all(vids.map(v => new Promise(r => v.readyState >= 2 ? r() : v.addEventListener('loadeddata', r, { once: true }))));
+const fontsReady = () => Promise.all([document.fonts.load("900 20px 'Playfair Display'"), document.fonts.load("900 20px 'Montserrat'"), document.fonts.load("700 20px 'Montserrat'")]).catch(() => {}).then(() => document.fonts.ready);
+if (qs.get('t') !== null) {
+  const t = parseFloat(qs.get('t')); vids.forEach(v => v.pause());
+  Promise.all([ready(), fontsReady()]).then(() => { seekAll(t); render(t); });
+} else {
+  fontsReady().then(() => {
+    const loop = () => { const t = main.currentTime; vids.forEach(v => { if (v !== main && Math.abs(v.currentTime - t) > 0.06) v.currentTime = t; }); render(t); requestAnimationFrame(loop); };
+    vids.forEach(v => v.play()); requestAnimationFrame(loop);
+  });
+}
+</script>
+</body>
+</html>

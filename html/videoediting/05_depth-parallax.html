@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>05 Depth Parallax</title>
+<style>
+html,body{margin:0;background:#0b1118}
+.card{position:relative;width:326px;height:158px;border-radius:12px;overflow:hidden;background:#000}
+video.full{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;object-position:50% 12%}
+.pn{position:absolute;overflow:hidden;border-radius:50%;-webkit-mask-image:radial-gradient(circle closest-side,#000 58%,rgba(0,0,0,0) 100%);mask-image:radial-gradient(circle closest-side,#000 58%,rgba(0,0,0,0) 100%);will-change:transform,filter}
+.pn video{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover}
+</style>
+</head>
+<body>
+<div class="card" id="card"></div>
+<script>
+// ===== 設定區 =====
+// 底圖影片、人物去背透明影片、記憶片段影片都是示範素材，使用時請替換。
+// 疊法與 02 相同（由後到前）：底圖原片（不縮放、不移動）→ 後方記憶片段（被主角擋住）→ 人物去背（與底圖完全重合）→ 前方記憶片段（從主角前面飛過）。
+// 記憶片段都是由右往左橫越畫面，越靠近鏡頭越大、越快、越模糊；邊緣羽化。
+// 高度位置與主角在畫面中的位置有關，換素材後請調整。
+const CFG = {
+  W: 326, H: 158, FPS: 30, LOOP: 120, DUR: 4,
+  bg: 'media/base.mp4', cut: 'media/cutout.webm',
+  // size 直徑 px；cy 圓心高度（卡片高比例）；k 一圈（4 秒）橫越畫面幾次（越大越快）；phase 起始位置（0~1）；blur 模糊 px；opacity 不透明度；off 影片播放時間差（秒）
+  // 共 3 個，每個一圈（4 秒）只橫越一次，錯開出場時間，畫面上同時最多 1 到 2 個
+  back: [
+    { src: 'media/base2.mp4', size: 96,  cy: 0.30, k: 1, phase: 0.05, blur: 0.8, opacity: 0.95, bob: 3, off: 0.0 },
+    { src: 'media/land.mp4',  size: 88,  cy: 0.58, k: 1, phase: 0.72, blur: 0.9, opacity: 0.95, bob: 3, off: 1.0 }
+  ],
+  front: [
+    { src: 'media/base3.mp4', size: 148, cy: 0.70, k: 1, phase: 0.38, blur: 1.4, opacity: 0.9,  bob: 4, off: 2.0 }
+  ],
+  pad: 24                        // 兩端多留的離場距離 px（完全離開畫面後才從另一側重新進場）
+};
+// ==================
+const qs = new URLSearchParams(location.search);
+const card = document.getElementById('card');
+if (qs.get('z')) card.style.zoom = qs.get('z');
+if (!qs.get('m')) document.body.style.padding = '20px';
+
+function mkVideo(src, cls) { const v = document.createElement('video'); v.src = src; v.muted = true; v.loop = true; v.playsInline = true; v.preload = 'auto'; if (cls) v.className = cls; return v; }
+function mkPanel(o) { const d = document.createElement('div'); d.className = 'pn'; d.style.width = d.style.height = o.size + 'px'; const v = mkVideo(o.src); d.appendChild(v); o.el = d; o.v = v; card.appendChild(d); }
+
+const bg = mkVideo(CFG.bg, 'full'); card.appendChild(bg);
+CFG.back.forEach(mkPanel);
+const cut = mkVideo(CFG.cut, 'full'); card.appendChild(cut);
+CFG.front.forEach(mkPanel);
+
+const vids = [bg, cut].concat(CFG.back.map(o => o.v), CFG.front.map(o => o.v));
+const offs = [0, 0].concat(CFG.back.map(o => o.off), CFG.front.map(o => o.off));
+const TAU = Math.PI * 2;
+
+function place(o, u) {
+  const dist = CFG.W + o.size + CFG.pad * 2;
+  const p = (((u * o.k + o.phase) % 1) + 1) % 1;
+  const x = (CFG.W + CFG.pad) - dist * p;                              // 由右飛到左
+  const y = o.cy * CFG.H - o.size / 2 + o.bob * Math.sin(TAU * (u * 2 + o.phase));
+  o.el.style.transform = `translate(${x}px,${y}px)`;
+  o.el.style.filter = `blur(${o.blur}px)`; o.el.style.opacity = o.opacity;
+}
+function render(t) {
+  const u = ((t * CFG.FPS) % CFG.LOOP) / CFG.LOOP;
+  CFG.back.forEach(o => place(o, u));
+  CFG.front.forEach(o => place(o, u));
+}
+
+const main = bg, want = (t, i) => (t + offs[i]) % CFG.DUR;
+const seekAll = t => vids.forEach((v, i) => { const w = want(t, i); if (Math.abs(v.currentTime - w) > 0.01) v.currentTime = w; });
+const ready = () => Promise.all(vids.map(v => new Promise(r => v.readyState >= 2 ? r() : v.addEventListener('loadeddata', r, { once: true }))));
+if (qs.get('t') !== null) {
+  const t = parseFloat(qs.get('t')); vids.forEach(v => v.pause());
+  ready().then(() => { seekAll(t); render(t); });
+} else {
+  const loop = () => {
+    const t = main.currentTime;
+    vids.forEach((v, i) => { if (v !== main) { let d = Math.abs(v.currentTime - want(t, i)); d = Math.min(d, CFG.DUR - d); if (d > 0.06) v.currentTime = want(t, i); } });
+    render(t); requestAnimationFrame(loop);
+  };
+  vids.forEach(v => v.play()); requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

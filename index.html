@@ -58,6 +58,8 @@
   .acts button + button { border-left: 1px solid var(--ink); }
   .acts button:hover { background: var(--ink); color: var(--on-ink); }
   .acts button.ok { background: var(--ink); color: var(--on-ink); }
+  .acts.one { grid-template-columns: 1fr; }   /* 只有一顆按鈕時（例如只有複製描述）撐滿整列 */
+  .note { font-size: 12px; color: var(--sub); letter-spacing: .06em; margin: 0 0 14px; line-height: 1.6; }
   .empty { color: var(--ink); padding: 60px 0; text-align: center; font-family: var(--mono); }
   @media (max-width: 640px) {
     header { padding: 14px 16px 4px; } main { padding: 12px 16px 40px; }
@@ -94,6 +96,7 @@ const CATS = [
   { key: 'OP', name: '開場動畫' },
   { key: 'B',  name: '背景動畫' },
   { key: 'SH', name: '圖形動畫' },
+  { key: 'VE', name: '剪輯特效', note: '先用「複製描述」讓 AI 產出；效果不好再用「複製 HTML」當參考。去背自動產生，髮絲邊緣可能有瑕疵。' },
 ];
 const DATA = window.MG_DATA || {};
 const main = document.getElementById('main'), tabs = document.getElementById('tabs'), q = document.getElementById('q');
@@ -108,7 +111,7 @@ const io = new IntersectionObserver(es => es.forEach(e => {
   else f.setAttribute('src', 'about:blank');
 }), { rootMargin: '150px' });
 // 動態頁面預設是 324×106；尺寸不同的分頁寫在這裡（預覽框照該尺寸的比例，不會出現捲軸），依格子寬度等比縮放
-const SIZE = { T3: [284, 158], N: [324, 124], D: [324, 126], OP: [322, 127] };
+const SIZE = { T3: [284, 158], N: [324, 124], D: [324, 126], OP: [322, 127], VE: [326, 158] };
 const sizeOf = key => SIZE[key] || [324, 106];
 const ro = new ResizeObserver(es => es.forEach(e => {
   const f = e.target.querySelector('iframe'); if (f) f.style.transform = `scale(${e.contentRect.width / (+f.dataset.w || 324)})`;
@@ -138,7 +141,7 @@ function card(m) {
   d.innerHTML = `
     <div class="head"><span class="id">${m.id.replace(/^([A-Z]+)/, '<span class="pre">$1</span>')}</span><span class="zh">${m.zh}</span>
       <span class="names">${m.en}</span></div>
-    <div class="frame" style="aspect-ratio:${w} / ${h}"><iframe data-src="${m.html}" data-w="${w}" style="width:${w}px;height:${h}px" scrolling="no" tabindex="-1"></iframe></div>
+    <div class="frame" style="aspect-ratio:${w} / ${h}"><iframe data-src="${m.html}${cur === 'VE' ? '?m=1' : ''}" data-w="${w}" style="width:${w}px;height:${h}px" scrolling="no" tabindex="-1"></iframe></div>
     <div class="desc">${m.desc}</div>
     <div class="kw"><div>${m.kw.map(k => `<span>${k}</span>`).join('')}</div></div>`;
   d.querySelectorAll('.kw span').forEach(s => s.onclick = () => { rememberScroll(); q.value = s.textContent; filter(); scrollTo(0, 0); });
@@ -150,6 +153,7 @@ function card(m) {
       b.onclick = () => copyText(text).then(() => { b.textContent = '已複製'; b.classList.add('ok'); setTimeout(() => { b.textContent = label; b.classList.remove('ok'); }, 800); });
       acts.appendChild(b);
     });
+    if (acts.children.length === 1) acts.classList.add('one');
     d.appendChild(acts);
   }
   ro.observe(d.querySelector('.frame'));
@@ -163,6 +167,7 @@ function renderCat() {
   const num = id => +id.replace(/^\D+/, '');
   const c = CATS.find(x => x.key === cur), list = (DATA[cur] || []).slice().sort((a, b) => num(a.id) - num(b.id));
   if (!list.length) { main.innerHTML = '<div class="empty">這個類別尚未建立</div>'; return; }
+  if (c.note) { const nt = document.createElement('div'); nt.className = 'note'; nt.textContent = c.note; main.appendChild(nt); }
   const groups = c.groups || [{ n: list.length }];
   let i = 0;
   groups.forEach(g => {

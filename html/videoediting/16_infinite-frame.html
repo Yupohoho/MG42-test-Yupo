@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>16 Infinite Frame</title>
+<style>
+html,body{margin:0;background:#0b1118}
+.card{position:relative;width:326px;height:158px;border-radius:12px;overflow:hidden;background:#000}
+canvas{position:absolute;left:0;top:0;width:326px;height:158px}
+video{position:absolute;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none}
+</style>
+</head>
+<body>
+<div class="card" id="card"><canvas id="cv" width="652" height="316"></canvas></div>
+<script>
+// ===== 設定區 =====
+// 影片素材是示範，使用時請替換。同一支影片（同一張畫面）：滿版的畫面裡有一個帶白框的縮小版自己，這個縮小版裡又有一個更小的……
+// 每一層都完整落在上一層的框裡面（一張之中還有一張），全部以畫面正中間為中心，像好幾張卡疊在一起；各張卡的傾斜角度都不同（有上限，不會越裡面越歪）。
+// 鏡頭持續往裡推進：卡片一邊放大、一邊慢慢轉動傾斜角（傾斜角隨深度變化），最外層的框長大到滿版時，下一層剛好接手，所以可無縫循環。
+const CFG = {
+  W: 326, H: 158, FPS: 30, LOOP: 120, DUR: 4,
+  clip: 'media/land3.mp4', pos: [0.5, 0.5],   // 素材與取景位置 [x,y] 0~1
+  axis: [0.5, 0.5],                // 各層框的中心（卡片比例）：全部置中
+  scale: 0.60,                     // 每往裡一層的縮小倍率（越小，層與層間距越大、隧道越疏）
+  tiltAmp: 10, tiltFreq: 1.2,      // 傾斜角 = tiltAmp × sin(tiltFreq × 深度)：最大傾斜（度）、各層角度變化快慢。相鄰兩層角度差太大會讓內層框的角超出上一層（scale 0.60 時差不要超過約 15°）
+  levels: 8,                       // 往裡畫幾層
+  steps: 2,                        // 一圈（LOOP）推進幾層（整數才能無縫循環）
+  border: 1.4, radius: 6           // 白色框線粗細 px、圓角 px（隨層縮放）
+};
+// ==================
+const qs = new URLSearchParams(location.search);
+const card = document.getElementById('card'), cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+if (qs.get('z')) card.style.zoom = qs.get('z');
+if (!qs.get('m')) document.body.style.padding = '20px';
+const v = document.createElement('video'); v.src = CFG.clip; v.muted = v.loop = v.playsInline = true; v.preload = 'auto'; card.appendChild(v);
+const W = CFG.W, H = CFG.H;
+
+function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+function cover(c) {
+  const vw = v.videoWidth, vh = v.videoHeight; if (!vw) return;
+  const s = Math.max(W / vw, H / vh), sw = W / s, sh = H / s;
+  c.drawImage(v, (vw - sw) * CFG.pos[0], (vh - sh) * CFG.pos[1], sw, sh, 0, 0, W, H);
+}
+
+function render(t) {
+  const f = (t * CFG.FPS) % CFG.LOOP, u = CFG.steps * f / CFG.LOOP, uf = u - Math.floor(u);   // uf：目前這一層推進到幾成
+  ctx.setTransform(2, 0, 0, 2, 0, 0);
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+  const ax = CFG.axis[0] * W, ay = CFG.axis[1] * H;
+  for (let n = -1; n <= CFG.levels; n++) {              // 由最外層（最大）畫到最內層（最小），內層蓋在外層上
+    const k = n - uf, sc = Math.pow(CFG.scale, k);
+    if (sc < 0.004) break;
+    ctx.save();
+    ctx.translate(ax, ay); ctx.rotate(CFG.tiltAmp * Math.sin(CFG.tiltFreq * k) * Math.PI / 180); ctx.scale(sc, sc); ctx.translate(-ax, -ay);
+    rr(ctx, 0, 0, W, H, CFG.radius);
+    ctx.save(); ctx.clip(); cover(ctx); ctx.restore();
+    if (n >= 0) { ctx.lineWidth = CFG.border / Math.pow(sc, 0.6); ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.stroke(); }
+    ctx.restore();
+  }
+}
+
+if (qs.get('t') !== null) {
+  const t = parseFloat(qs.get('t')); v.pause();
+  const rdy = v.readyState >= 2 ? Promise.resolve() : new Promise(r => v.addEventListener('loadeddata', r, { once: true }));
+  rdy.then(() => new Promise(r => { if (Math.abs(v.currentTime - t) <= 0.01) return r(); v.addEventListener('seeked', r, { once: true }); v.currentTime = t; setTimeout(r, 800); })).then(() => render(t));
+} else {
+  const loop = () => { render(v.currentTime); requestAnimationFrame(loop); };
+  v.play(); requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

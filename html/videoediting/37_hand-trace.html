@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>37 Hand Trace</title>
+<style>
+html,body{margin:0;background:#0b1118}
+.card{position:relative;width:326px;height:158px;border-radius:12px;overflow:hidden;background:#111}
+.layer{position:absolute;left:0;top:0;width:100%;height:100%}
+video{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;object-position:50% 25%;transform-origin:60% 30%}
+#ow{will-change:mask-image}
+.deco{position:absolute;overflow:visible}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" id="defs"></svg>
+<div class="card" id="card">
+  <video id="bg" src="media/base.mp4" muted loop playsinline preload="auto"></video>
+  <div id="ow" class="layer"><video id="cut" src="media/cutout.webm" muted loop playsinline preload="auto"></video></div>
+  <svg id="heart" class="deco" width="44" height="44" viewBox="-22 -22 44 44">
+    <path id="hp" pathLength="100" d="M0,-5 C-3,-13 -15,-10 -12,0 C-10,6 -3,10 0,15 C3,10 10,6 12,0 C15,-10 3,-13 0,-5 Z" fill="rgba(255,214,90,0)" stroke="#ffd45a" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="100" stroke-dashoffset="100"/>
+  </svg>
+  <svg id="spark" class="deco" width="40" height="40" viewBox="-20 -20 40 40">
+    <g stroke="#3cc8f0" stroke-width="3" stroke-linecap="round">
+      <line x1="0" y1="-14" x2="0" y2="14"/><line x1="-14" y1="0" x2="14" y2="0"/>
+      <line x1="-10" y1="-10" x2="10" y2="10"/><line x1="10" y1="-10" x2="-10" y2="10"/>
+    </g>
+  </svg>
+</div>
+<script>
+// ===== 設定區 =====
+// 底圖影片與人物去背透明影片是示範素材，使用時請替換。
+const CFG = {
+  W: 326, H: 158, FPS: 30, LOOP: 120,
+  zoom: 1.5,                        // 畫面放大倍率
+  trace: { start: 8, end: 48, from: 200, cx: 0.5, cy: 0.5 },   // 描邊開始／結束幀、起筆角度(度)、繞行中心（卡片比例）
+  line: { radius: 2.4, wobble: 2.4, grain: 9, color: '#fff' },   // 描邊粗細(px)、手抖幅度、蠟筆顆粒強度（越大缺口越少）、顏色
+  boil: 3,                          // 手繪抖動每幾幀換一次（逐幀硬切）
+  heart: { x: 0.12, y: 0.68, start: 40, end: 56 },             // 愛心塗鴉位置（卡片比例）與畫線幀
+  spark: { x: 0.9, y: 0.22, start: 52, dur: 10 }               // 星芒位置與彈出幀
+};
+// ==================
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const card = $('card'), bg = $('bg'), cut = $('cut'), ow = $('ow');
+if (qs.get('z')) card.style.zoom = qs.get('z');
+if (!qs.get('m')) document.body.style.padding = '20px';
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const easeIO = x => x < .5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+const spring = x => x <= 0 ? 0 : x >= 1 ? 1 : 1 - Math.exp(-7 * x) * Math.cos(11 * x);
+const L = CFG.line, T = CFG.trace;
+bg.style.transform = cut.style.transform = `scale(${CFG.zoom})`;
+// 蠟筆手繪描邊濾鏡（邊緣銳利、不糊）：
+//   人物輪廓先二值化 → 往外擴（先模糊再硬切，圓角）→ 用雜訊擾動出手抖 → 再硬切一次 → 扣掉原輪廓 = 外圈線
+//   → 再用高頻雜訊硬切出蠟筆的顆粒缺口。4 組不同種子輪流切換（逐幀抖動）
+$('defs').innerHTML = [1, 2, 3, 4].map(s => `<filter id="ring${s}" x="-6%" y="-6%" width="112%" height="112%" color-interpolation-filters="sRGB">
+  <feComponentTransfer in="SourceAlpha" result="A"><feFuncA type="linear" slope="9" intercept="-4"/></feComponentTransfer>
+  <feGaussianBlur in="A" stdDeviation="${(L.radius / 1.28).toFixed(2)}" result="b"/>
+  <feComponentTransfer in="b" result="d"><feFuncA type="linear" slope="14" intercept="-1.2"/></feComponentTransfer>
+  <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2" seed="${s * 7}" result="n"/>
+  <feDisplacementMap in="d" in2="n" scale="${L.wobble}" xChannelSelector="R" yChannelSelector="G" result="dd"/>
+  <feComponentTransfer in="dd" result="dd2"><feFuncA type="linear" slope="12" intercept="-5"/></feComponentTransfer>
+  <feComposite in="dd2" in2="A" operator="out" result="r"/>
+  <feTurbulence type="fractalNoise" baseFrequency="1.6" numOctaves="3" seed="${s * 5 + 3}" result="g"/>
+  <feColorMatrix in="g" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  ${L.grain} 0 0 0 ${(-L.grain * 0.30).toFixed(2)}" result="ga"/>
+  <feComposite in="r" in2="ga" operator="in" result="rg"/>
+  <feFlood flood-color="${L.color}"/><feComposite in2="rg" operator="in"/></filter>`).join('');
+$('defs').innerHTML += [1, 2, 3, 4].map(s => `<filter id="cr${s}" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
+  <feTurbulence type="fractalNoise" baseFrequency="0.07" numOctaves="2" seed="${s * 11}" result="n"/>
+  <feDisplacementMap in="SourceGraphic" in2="n" scale="2" xChannelSelector="R" yChannelSelector="G" result="w"/>
+  <feTurbulence type="fractalNoise" baseFrequency="1.6" numOctaves="3" seed="${s * 5 + 1}" result="g"/>
+  <feColorMatrix in="g" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  ${L.grain} 0 0 0 ${(-L.grain * 0.3).toFixed(2)}" result="ga"/>
+  <feComposite in="w" in2="ga" operator="in"/></filter>`).join('');
+const hp = $('hp'), hs = CFG.heart, sp = CFG.spark;
+Object.assign($('heart').style, { left: (hs.x * CFG.W - 22) + 'px', top: (hs.y * CFG.H - 22) + 'px', transform: 'rotate(-12deg)' });
+Object.assign($('spark').style, { left: (sp.x * CFG.W - 20) + 'px', top: (sp.y * CFG.H - 20) + 'px' });
+
+function render(t) {
+  const f = (t * CFG.FPS) % CFG.LOOP;
+  // 描邊：以人物為中心的角度掃描遮罩（順時針畫出一圈）
+  const p = easeIO(clamp((f - T.start) / (T.end - T.start), 0, 1));
+  const ang = p * 360;
+  const m = f < T.start ? 'linear-gradient(transparent,transparent)'
+    : `conic-gradient(from ${T.from}deg at ${T.cx * 100}% ${T.cy * 100}%, #000 0deg ${ang}deg, transparent ${ang}deg 360deg)`;
+  ow.style.webkitMaskImage = ow.style.maskImage = m;
+  const bi = Math.floor(f / CFG.boil) % 4 + 1;
+  cut.style.filter = `url(#ring${bi})`;
+  $('heart').style.filter = $('spark').style.filter = `url(#cr${bi})`;   // 愛心、星芒也是蠟筆質感
+  // 愛心：畫線 → 填色
+  const h = clamp((f - hs.start) / (hs.end - hs.start), 0, 1);
+  hp.setAttribute('stroke-dashoffset', (100 * (1 - h)).toFixed(2));
+  hp.setAttribute('fill', `rgba(255,214,90,${(0.28 * clamp((f - hs.end) / 6, 0, 1)).toFixed(3)})`);
+  $('heart').style.opacity = h > 0 ? 1 : 0;
+  // 星芒：彈出＋轉入
+  const s = clamp((f - sp.start) / sp.dur, 0, 1);
+  $('spark').style.opacity = s > 0 ? 1 : 0;
+  $('spark').style.transform = `rotate(${(1 - spring(s)) * 60}deg) scale(${spring(s)})`;
+}
+
+const vids = [bg, cut], main = bg;
+const ready = () => Promise.all(vids.map(v => new Promise(r => v.readyState >= 2 ? r() : v.addEventListener('loadeddata', r, { once: true }))));
+if (qs.get('t') !== null) {
+  const t = parseFloat(qs.get('t')); vids.forEach(v => v.pause());
+  ready().then(() => { vids.forEach(v => v.currentTime = t); render(t); });
+} else {
+  ready().then(() => {
+    const loop = () => { const t = main.currentTime; vids.forEach(v => { if (v !== main && Math.abs(v.currentTime - t) > 0.06) v.currentTime = t; }); render(t); requestAnimationFrame(loop); };
+    vids.forEach(v => v.play()); requestAnimationFrame(loop);
+  });
+}
+</script>
+</body>
+</html>

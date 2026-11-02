@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>18 Auto Follow Camera</title>
+<style>
+html,body{margin:0;background:#0b1118}
+.card{position:relative;width:326px;height:158px;border-radius:12px;overflow:hidden;background:#000}
+#cam{position:absolute;left:0;top:0;width:326px;height:184px;transform-origin:0 0;will-change:transform}
+#cam video{position:absolute;left:0;top:0;width:326px;height:184px;object-fit:cover}
+#trk{position:absolute;left:0;top:0;width:0;height:0;display:none}
+#trk i{position:absolute;width:30%;height:30%;border:0 solid #7ff0e6}
+#trk i:nth-child(1){left:0;top:0;border-width:1.5px 0 0 1.5px}
+#trk i:nth-child(2){right:0;top:0;border-width:1.5px 1.5px 0 0}
+#trk i:nth-child(3){left:0;bottom:0;border-width:0 0 1.5px 1.5px}
+#trk i:nth-child(4){right:0;bottom:0;border-width:0 1.5px 1.5px 0}
+#trk b{position:absolute;left:50%;top:50%;width:3px;height:3px;margin:-1.5px 0 0 -1.5px;border-radius:50%;background:#7ff0e6}
+#map{position:absolute;right:8px;top:7px;width:56px;height:32px;border:1px solid rgba(255,255,255,.55);border-radius:3px;overflow:hidden;background:#000;box-shadow:0 2px 6px rgba(0,0,0,.5);display:none}
+#map canvas{position:absolute;left:0;top:0;width:100%;height:100%}
+#mapbox{position:absolute;border:1px solid #7ff0e6;box-sizing:border-box}
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <div id="cam"></div>
+  <div id="trk"><i></i><i></i><i></i><i></i><b></b></div>
+  <div id="map"><canvas id="mc" width="112" height="64"></canvas><div id="mapbox"></div></div>
+</div>
+<script>
+// ===== 設定區 =====
+// 底圖影片是示範素材，使用時請替換。
+// 此效果需要「主體（臉）位置」：底圖人物位置已知，直接用下面兩組關鍵幀設定（單位：影片畫面比例 0–1，t 為影片秒數）。
+const CFG = {
+  W: 326, H: 158, FPS: 30, LOOP: 120,
+  src: ['media/base.mp4'],     // 來源陣列（只用第 1 支）
+  // 臉位置：由人物去背遮罩逐幀量出（頭部中心，已平滑，再往下修正到眼鼻口的中心；單位：影片畫面比例 0–1，t 為影片秒數，每 1/25 秒一筆）
+  faceT: [0,0.04,0.08,0.12,0.16,0.2,0.24,0.28,0.32,0.36,0.4,0.44,0.48,0.52,0.56,0.6,0.64,0.68,0.72,0.76,0.8,0.84,0.88,0.92,0.96,1,1.04,1.08,1.12,1.16,1.2,1.24,1.28,1.32,1.36,1.4,1.44,1.48,1.52,1.56,1.6,1.64,1.68,1.72,1.76,1.8,1.84,1.88,1.92,1.96,2,2.04,2.08,2.12,2.16,2.2,2.24,2.28,2.32,2.36,2.4,2.44,2.48,2.52,2.56,2.6,2.64,2.68,2.72,2.76,2.8,2.84,2.88,2.92,2.96,3,3.04,3.08,3.12,3.16,3.2,3.24,3.28,3.32,3.36,3.4,3.44,3.48,3.52,3.56,3.6,3.64,3.68,3.72,3.76,3.8,3.84,3.88,3.92,3.96],
+  faceX: [0.4678,0.4671,0.4663,0.4653,0.4644,0.4635,0.4626,0.4619,0.4614,0.461,0.4609,0.4609,0.4612,0.4617,0.4623,0.4631,0.4639,0.4648,0.4658,0.4667,0.4675,0.4684,0.4691,0.4698,0.4705,0.471,0.4715,0.472,0.4724,0.4727,0.473,0.4734,0.4737,0.474,0.4743,0.4746,0.475,0.4753,0.4756,0.4759,0.4761,0.4763,0.4765,0.4767,0.4769,0.477,0.4771,0.4772,0.4773,0.4773,0.4774,0.4775,0.4775,0.4776,0.4777,0.4778,0.4779,0.478,0.4782,0.4784,0.4786,0.4788,0.479,0.4792,0.4795,0.4797,0.48,0.4802,0.4805,0.4807,0.481,0.4813,0.4816,0.4819,0.4822,0.4826,0.483,0.4835,0.484,0.4844,0.4849,0.4854,0.4859,0.4863,0.4867,0.487,0.4873,0.4875,0.4878,0.488,0.4882,0.4883,0.4885,0.4887,0.4889,0.489,0.4892,0.4894,0.4895,0.4896],
+  faceY: [0.3623,0.3627,0.3633,0.3638,0.3644,0.3649,0.3653,0.3657,0.366,0.3662,0.3663,0.3663,0.3662,0.366,0.3657,0.3654,0.365,0.3646,0.3642,0.3638,0.3634,0.3629,0.3624,0.362,0.3615,0.3611,0.3607,0.3603,0.3599,0.3596,0.3594,0.3591,0.3589,0.3588,0.3587,0.3586,0.3585,0.3584,0.3584,0.3584,0.3583,0.3583,0.3583,0.3584,0.3584,0.3584,0.3584,0.3585,0.3586,0.3586,0.3587,0.3587,0.3588,0.3588,0.3588,0.3588,0.3587,0.3586,0.3585,0.3583,0.3581,0.3579,0.3577,0.3575,0.3573,0.3571,0.3569,0.3567,0.3565,0.3563,0.3561,0.3559,0.3556,0.3553,0.3549,0.3545,0.3541,0.3536,0.3531,0.3525,0.352,0.3514,0.351,0.3505,0.3502,0.3499,0.3497,0.3496,0.3496,0.3497,0.35,0.3503,0.3507,0.3512,0.3518,0.3524,0.3529,0.3535,0.354,0.3544],
+  zooms: [                       // 只放大一次：約 8 幀（0.27 秒）像相機變焦環一撥，快速推到位、沒有過衝；之後鏡頭中心一直跟著臉
+    { start: 10, dur: 8, to: 1.8, over: 0 }
+  ],
+  shake: 0,                      // 手持晃動幅度（px），0 = 不晃動
+  faceW: 0.10,                  // 臉寬（影片寬比例），追蹤框 = 臉寬 × 倍率 × boxPad
+  boxPad: 1.2,
+  boxFrame: 20, boxPop: 5,      // 追蹤框出現幀、彈入所需幀數
+  mapFrame: 16,                 // 右上角小地圖出現幀
+  color: '#7ff0e6'
+};
+// ==================
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const card = $('card'), cam = $('cam'), trk = $('trk'), map = $('map'), mc = $('mc').getContext('2d'), mapbox = $('mapbox');
+if (qs.get('z')) card.style.zoom = qs.get('z');
+if (!qs.get('m')) document.body.style.padding = '20px';
+document.querySelectorAll('#trk i,#trk b').forEach(e => { e.style.borderColor = CFG.color; if (e.tagName === 'B') e.style.background = CFG.color; });
+mapbox.style.borderColor = CFG.color;
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const easeIOs = x => 0.5 - 0.5 * Math.cos(Math.PI * x);
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+const interp = (ts, vs, t) => { t = clamp(t, ts[0], ts[ts.length - 1]); let i = 0; while (i < ts.length - 2 && t > ts[i + 1]) i++; return vs[i] + (vs[i + 1] - vs[i]) * (t - ts[i]) / (ts[i + 1] - ts[i]); };
+
+const vids = CFG.src.map(s => { const v = document.createElement('video'); v.preload = 'auto'; v.muted = true; v.loop = true; v.playsInline = true; v.src = s; return v; });
+const vid = vids[0]; cam.appendChild(vid);
+const SH = 184;                    // 影片以 cover 放進 326 寬後的高度（16:9）
+
+// 某一幀的放大倍率：每次放大「快速到位＋過衝回彈」，逐次累積（不是滑順推進）
+function scaleAt(f) {
+  let sc = 1;
+  for (const z of CFG.zooms) {
+    const p = clamp((f - z.start) / z.dur, 0, 1);
+    if (p <= 0) break;
+    const from = sc, e = 0.5 - 0.5 * Math.cos(Math.PI * p);   // 柔和的起步與收尾
+    sc = from + (z.to - from) * e + (z.to - from) * z.over * Math.sin(Math.PI * clamp((f - z.start) / (z.dur + 6), 0, 1));
+  }
+  return sc;
+}
+function render(t) {
+  const f = (t * CFG.FPS) % CFG.LOOP, ts = f / CFG.FPS;
+  const hx = interp(CFG.faceT, CFG.faceX, ts) * CFG.W, hy = interp(CFG.faceT, CFG.faceY, ts) * SH;
+  const s = scaleAt(f);
+  const sh = s > 1.01 ? 1 : 0, jx = sh * CFG.shake * Math.sin(f * 1.7), jy = sh * CFG.shake * Math.sin(f * 2.3 + 1);
+  // 相機式變焦：以畫面上固定的一點為支點直接放大（不平移）；支點選在讓放大到位時臉剛好落在畫面中央。放大完成後才微幅跟著臉的漂移修正。
+  const zl = CFG.zooms[CFG.zooms.length - 1], zEnd = zl.start + zl.dur, tE = zEnd / CFG.FPS;
+  const hx0 = interp(CFG.faceT, CFG.faceX, tE) * CFG.W, hy0 = interp(CFG.faceT, CFG.faceY, tE) * SH;
+  const Px = (CFG.W / 2 - zl.to * hx0) / (1 - zl.to), Py = (CFG.H / 2 - zl.to * hy0) / (1 - zl.to);
+  const wz = clamp((f - zl.start) / zl.dur, 0, 1);              // 放大進度：越大越要跟臉的漂移
+  const tx = clamp(Px * (1 - s) - s * (hx - hx0) * wz, CFG.W - CFG.W * s, 0) + jx;
+  const ty = clamp(Py * (1 - s) - s * (hy - hy0) * wz, CFG.H - SH * s, 0) + jy;
+  cam.style.transform = `translate(${tx}px,${ty}px) scale(${s})`;
+  // 追蹤框
+  if (f >= CFG.boxFrame) {
+    const pop = 1 + 0.6 * (1 - easeOut(clamp((f - CFG.boxFrame) / CFG.boxPop, 0, 1)));
+    const size = CFG.faceW * CFG.W * s * CFG.boxPad * pop;
+    trk.style.display = 'block';
+    trk.style.transform = `translate(${tx + s * hx - size / 2}px,${ty + s * hy - size / 2}px)`;
+    trk.style.width = trk.style.height = size + 'px';
+  } else trk.style.display = 'none';
+  // 小地圖
+  if (f >= CFG.mapFrame) {
+    map.style.display = 'block';
+    if (vid.videoWidth) mc.drawImage(vid, 0, 0, 112, 64);
+    mapbox.style.left = (-tx / (CFG.W * s) * 54) + 'px'; mapbox.style.top = (-ty / (SH * s) * 30) + 'px';
+    mapbox.style.width = (CFG.W / (CFG.W * s) * 54) + 'px'; mapbox.style.height = (CFG.H / (SH * s) * 30) + 'px';
+  } else map.style.display = 'none';
+}
+
+const seekAll = t => vids.forEach(v => { if (Math.abs(v.currentTime - t) > 0.01) v.currentTime = t; });
+const ready = () => Promise.all(vids.map(v => new Promise(r => v.readyState >= 2 ? r() : v.addEventListener('loadeddata', r, { once: true }))));
+if (qs.get('t') !== null) {
+  const t = parseFloat(qs.get('t')); vids.forEach(v => v.pause());
+  seekAll(t); const tick = () => { render(t); requestAnimationFrame(tick); }; ready().then(tick);
+} else {
+  const loop = () => { render(vid.currentTime); requestAnimationFrame(loop); };
+  vids.forEach(v => v.play()); requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

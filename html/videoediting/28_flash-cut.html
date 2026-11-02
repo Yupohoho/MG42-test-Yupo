@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>28 Flash Cut</title>
+<style>
+html,body{margin:0;background:#0b1118}
+.card{position:relative;width:326px;height:158px;border-radius:12px;overflow:hidden;background:#000}
+video{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;object-position:50% 12%}
+.layer{position:absolute;left:0;top:0;width:100%;height:100%}
+#fl{background:#fff;opacity:0}
+#b{visibility:hidden}
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <video id="a" muted loop playsinline preload="auto"></video>
+  <video id="b" muted loop playsinline preload="auto"></video>
+  <div class="layer" id="fl"></div>
+</div>
+<script>
+// ===== 設定區 =====
+// 素材是示範，使用時請替換。A 畫面、B 畫面是兩段各自完整的影片（轉場形狀只決定新畫面露出的範圍），來源可在下方 A / B 自行更換。
+const CFG = {
+  W: 326, H: 158, FPS: 30, LOOP: 120,
+  A: 'media/base.mp4', B: 'media/base2.mp4',  // 轉場前後的兩段畫面
+  cut: 35,                                    // 硬切幀（白光峰值附近）
+  // 白光強度逐幀表 [幀, 透明度]：快速爆白 → 切換 → 衰退（逐幀硬量，不用緩動）
+  flash: [[29, 0], [30, 0.05], [31, 0.15], [32, 0.31], [33, 0.54], [34, 0.82], [35, 0.9], [36, 0.8], [37, 0.7],
+          [38, 0.57], [39, 0.41], [40, 0.25], [41, 0.13], [42, 0.03], [43, 0]]
+};
+// ==================
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const card = $('card');
+if (qs.get('z')) card.style.zoom = qs.get('z');
+if (!qs.get('m')) document.body.style.padding = '20px';
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const lerp = (a, b, t) => a + (b - a) * t;
+const seg = (f, a, b) => clamp((f - a) / (b - a), 0, 1);
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+const easeIn = x => x * x;
+const easeInOut = x => x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+const frameOf = t => (t * CFG.FPS) % CFG.LOOP;
+const B = $('b'), fl = $('fl');
+function flashAt(f) {
+  const fi = Math.floor(f), hit = CFG.flash.find(r => r[0] === fi);
+  return hit ? hit[1] : 0;   // 逐幀取值，不內插
+}
+function render(t) {
+  const f = frameOf(t);
+  B.style.visibility = f >= CFG.cut ? 'visible' : 'hidden';
+  fl.style.opacity = flashAt(f);
+}
+
+// ===== 影片同步 =====
+$('a').src = CFG.A; $('b').src = CFG.B;
+const vids = [$('a'), $('b')].concat(typeof EXTRA !== 'undefined' ? EXTRA : []), main = vids[0];
+const seekAll = t => vids.forEach(v => { if (Math.abs(v.currentTime - t) > 0.01) v.currentTime = t; });
+const ready = () => Promise.all(vids.map(v => new Promise(r => v.readyState >= 2 ? r() : v.addEventListener('loadeddata', r, { once: true }))));
+if (qs.get('t') !== null) {
+  const t = parseFloat(qs.get('t')); vids.forEach(v => v.pause());
+  ready().then(() => { seekAll(t); render(t); });
+} else {
+  const loop = () => { const t = main.currentTime; vids.forEach(v => { if (v !== main && Math.abs(v.currentTime - t) > 0.06) v.currentTime = t; }); render(t); requestAnimationFrame(loop); };
+  vids.forEach(v => v.play()); requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

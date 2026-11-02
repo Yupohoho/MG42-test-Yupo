@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>12 Triple Frame</title>
+<style>
+html,body{margin:0;background:#0b1118}
+.card{position:relative;width:326px;height:158px;border-radius:12px;overflow:hidden;background:#0a0d12}
+video{position:absolute;object-fit:cover}
+#bgb{left:0;top:0;width:100%;height:100%;transform:scale(1.4);filter:blur(9px) brightness(.4)}
+.fr{position:absolute;box-sizing:border-box;border-radius:7px;overflow:hidden;border:1.5px solid rgba(255,255,255,.75);background:#222;box-shadow:0 6px 14px rgba(0,0,0,.55);opacity:0;will-change:transform,opacity}
+.fr video{left:0;top:0;width:100%;height:100%}
+</style>
+</head>
+<body>
+<div class="card" id="card"></div>
+<script>
+// ===== 設定區 =====
+// 影片素材是示範，使用時請替換。clips[0]=背景模糊用影片，clips[1..3]=三個相框各自的影片；
+// pos = 三個相框的取景位置（object-position）。
+const CFG = {
+  W: 326, H: 158, FPS: 30, LOOP: 120, DUR: 4,
+  clips: ['media/land.mp4', 'media/base.mp4', 'media/base3.mp4', 'media/base2.mp4'],
+  pos: ['50% 15%', '95% 30%', '64% 35%'],   // 讓各框的主角落在框的正中間（左：橫向約 51%、中：約 75%、右：約 58%，右框主角會走動，取中間位置）
+  fw: 100, fh: 126, gap: 6,         // 相框大小與間距（px），三框水平置中
+  start: [2, 10, 18], dur: 26,      // 各相框彈出開始幀（一個接一個，前一個還在彈時下一個就出來，不停頓）、彈出長度
+  rot: [-14, 11, -9],               // 各框起始傾角（度）
+  fromY: 26, fromScale: 0.6         // 起始下移px、起始縮放
+};
+// ==================
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const card = $('card');
+if (qs.get('z')) card.style.zoom = qs.get('z');
+if (!qs.get('m')) document.body.style.padding = '20px';
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const spring = p => 1 - Math.exp(-7 * p) * Math.cos(p * Math.PI * 1.7);   // 柔和的過衝回彈
+const mk = (src, parent) => { const v = document.createElement('video'); v.src = src; v.muted = v.loop = v.playsInline = true; v.preload = 'auto'; parent.appendChild(v); return v; };
+const vB = mk(CFG.clips[0], card); vB.id = 'bgb';
+const frs = [0, 1, 2].map(i => {
+  const d = document.createElement('div'); d.className = 'fr';
+  const total = 3 * CFG.fw + 2 * CFG.gap;
+  Object.assign(d.style, { width: CFG.fw + 'px', height: CFG.fh + 'px', left: ((CFG.W - total) / 2 + i * (CFG.fw + CFG.gap)) + 'px', top: (CFG.H - CFG.fh) / 2 + 'px' });
+  const v = mk(CFG.clips[i + 1], d); v.style.objectPosition = CFG.pos[i];
+  card.appendChild(d); return { d, v };
+});
+
+function render(t) {
+  const f = (t * CFG.FPS) % CFG.LOOP;
+  frs.forEach((o, i) => {
+    const p = clamp((f - CFG.start[i]) / CFG.dur, 0, 1), s = spring(p);
+    o.d.style.opacity = f < CFG.start[i] ? 0 : clamp((f - CFG.start[i]) / 2, 0, 1);
+    o.d.style.transform = `translateY(${(1 - s) * CFG.fromY}px) rotate(${(1 - s) * CFG.rot[i]}deg) scale(${CFG.fromScale + (1 - CFG.fromScale) * s})`;
+  });
+}
+
+const vids = [vB, ...frs.map(o => o.v)], main = vB;
+const seekAll = t => vids.forEach(v => { if (Math.abs(v.currentTime - t) > 0.01) v.currentTime = t; });
+const ready = () => Promise.all(vids.map(v => new Promise(r => v.readyState >= 2 ? r() : v.addEventListener('loadeddata', r, { once: true }))));
+if (qs.get('t') !== null) {
+  const t = parseFloat(qs.get('t')); vids.forEach(v => v.pause());
+  ready().then(() => { seekAll(t); render(t); });
+} else {
+  const loop = () => { const t = main.currentTime; vids.forEach(v => { if (v !== main && Math.abs(v.currentTime - t) > 0.06) v.currentTime = t; }); render(t); requestAnimationFrame(loop); };
+  vids.forEach(v => v.play()); requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

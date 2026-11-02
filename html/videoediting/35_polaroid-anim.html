@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>35 Polaroid Anim</title>
+<style>
+html,body{margin:0;background:#0b1118}
+.card{position:relative;width:326px;height:158px;border-radius:12px;overflow:hidden;background:#222}
+video{position:absolute;object-fit:cover;object-position:50% 8%}
+#bg{left:0;top:0;width:100%;height:100%}
+.pl{position:absolute;background:#f8f5ee;box-shadow:0 3px 9px rgba(0,0,0,.45);visibility:hidden;will-change:transform}
+.ph{position:absolute;overflow:hidden;background:#333}
+.ph video{left:0;top:0;width:100%;height:100%}
+.fl{position:absolute;left:0;top:0;width:100%;height:100%;background:#fff}
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <video id="bg" src="media/base6.mp4" muted loop playsinline preload="auto"></video>
+</div>
+<script>
+// ===== 設定區 =====
+// 底圖影片是示範素材，使用時請替換（相片是同一支影片在拍照瞬間的定格）。
+const CFG = {
+  W: 326, H: 158, FPS: 30, LOOP: 120,
+  src: 'media/base6.mp4',
+  shots: [12, 28, 48],             // 三次「拍照」的幀
+  big:  { l: 8, t: 5, w: 310, h: 148, rot: 0 },    // 剛拍下時的大相片（近乎滿版）
+  final: [                         // 三張最終位置（左上角 px、尺寸 px、傾斜角）
+    { l: 10, t: 22, w: 86, h: 104, rot: -9 },
+    { l: 14, t: 28, w: 86, h: 104, rot: 5 },
+    { l: 18, t: 38, w: 86, h: 104, rot: -3 }
+  ],
+  border: { side0: 3, bottom0: 3, side1: 5, bottom1: 17 },  // 相框邊寬：大相片時 → 縮小後
+  hold: 3, fly: 12,                // 拍下後停留幀數、縮小飛行幀數
+  develop: 10,                     // 黑白 → 彩色顯影幀數
+  flash: 5                         // 曝光閃白幀數
+};
+// ==================
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const card = $('card'), bg = $('bg');
+if (qs.get('z')) card.style.zoom = qs.get('z');
+if (!qs.get('m')) document.body.style.padding = '20px';
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const easeIO = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const lerp = (a, b, k) => a + (b - a) * k;
+const pls = CFG.shots.map(s => {
+  const pl = document.createElement('div'); pl.className = 'pl';
+  const ph = document.createElement('div'); ph.className = 'ph';
+  const v = document.createElement('video'); v.src = CFG.src; v.muted = true; v.playsInline = true; v.preload = 'auto';
+  const fl = document.createElement('div'); fl.className = 'fl';
+  ph.append(v, fl); pl.append(ph); card.append(pl);
+  return { pl, ph, v, fl, s, time: (s + 1) / CFG.FPS };
+});
+
+function render(t) {
+  const f = (t * CFG.FPS) % CFG.LOOP;
+  pls.forEach((o, i) => {
+    const a = f - o.s;
+    o.pl.style.visibility = a >= 0 ? 'visible' : 'hidden';
+    if (a < 0) return;
+    const e = easeIO(clamp((a - CFG.hold) / CFG.fly, 0, 1));
+    const B = CFG.big, F = CFG.final[i], K = CFG.border;
+    const l = lerp(B.l, F.l, e), tp = lerp(B.t, F.t, e), w = lerp(B.w, F.w, e), h = lerp(B.h, F.h, e), rot = lerp(B.rot, F.rot, e);
+    const side = lerp(K.side0, K.side1, e), bot = lerp(K.bottom0, K.bottom1, e);
+    Object.assign(o.pl.style, { left: l + 'px', top: tp + 'px', width: w + 'px', height: h + 'px', transform: `rotate(${rot}deg)` });
+    Object.assign(o.ph.style, { left: side + 'px', top: side + 'px', width: (w - 2 * side) + 'px', height: (h - side - bot) + 'px' });
+    const d = clamp((a - CFG.hold) / CFG.develop, 0, 1);
+    o.v.style.filter = `grayscale(${1 - d}) contrast(${1.08 - 0.08 * d})`;
+    o.fl.style.opacity = 0.65 * (1 - clamp(a / CFG.flash, 0, 1));
+  });
+}
+
+const snaps = pls.map(o => o.v), vids = [bg, ...snaps];
+const ready = () => Promise.all(vids.map(v => new Promise(r => v.readyState >= 2 ? r() : v.addEventListener('loadeddata', r, { once: true }))));
+const freezeSnaps = () => pls.forEach(o => { o.v.pause(); o.v.currentTime = o.time; });
+if (qs.get('t') !== null) {
+  const t = parseFloat(qs.get('t')); vids.forEach(v => v.pause());
+  ready().then(() => { freezeSnaps(); bg.currentTime = t; render(t); });
+} else {
+  ready().then(() => {
+    freezeSnaps(); bg.play();
+    const loop = () => { render(bg.currentTime); requestAnimationFrame(loop); };
+    requestAnimationFrame(loop);
+  });
+}
+</script>
+</body>
+</html>

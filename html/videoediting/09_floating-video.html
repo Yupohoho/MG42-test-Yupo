@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>09 Floating Video</title>
+<style>
+html,body{margin:0;background:#0b1118}
+.card{position:relative;width:326px;height:158px;border-radius:12px;overflow:hidden;background:radial-gradient(120% 120% at 50% 40%,#16283a 0%,#0a121c 70%)}
+video{position:absolute;object-fit:cover}
+.side{top:34px;width:70px;height:90px;filter:blur(1.8px) brightness(.65);opacity:0;will-change:opacity}
+#sL{left:-22px}#sR{right:-22px}
+#stage{position:absolute;left:0;top:0;width:100%;height:100%;perspective:520px}
+#fl{position:absolute;will-change:transform,opacity}
+#fl .shadow{position:absolute;left:8%;right:8%;bottom:-14px;height:14px;background:radial-gradient(closest-side,rgba(0,0,0,.6),rgba(0,0,0,0));}
+#fl .box{position:absolute;inset:0;border-radius:8px;overflow:hidden;box-shadow:0 10px 22px rgba(0,0,0,.55);background:#222}
+#fl video{left:0;top:0;width:100%;height:100%;object-position:50% 20%}
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <div id="stage"><div id="fl"><div class="shadow"></div><div class="box"></div></div></div>
+</div>
+<script>
+// ===== 設定區 =====
+// 影片素材是示範，使用時請替換（clips 陣列：[0]=浮動的主影片、[1]=左側模糊小片、[2]=右側模糊小片）。
+const CFG = {
+  W: 326, H: 158, FPS: 30, LOOP: 120, DUR: 4,
+  clips: ['media/base.mp4', 'media/base2.mp4', 'media/base3.mp4'],
+  box: { w: 172, h: 100, cx: 0.5, cy: 0.5 },   // 浮動畫面大小（px）與中心（卡片比例）
+  popStart: 3, popEnd: 24,        // 浮起彈出幀
+  popY: 34, popRotX: 28, popRotY: -16,   // 起始：下移px、X軸傾角、Y軸傾角
+  sideStart: 8, sideEnd: 28,      // 兩側模糊畫面浮現幀
+  bob: 3.5, tilt: 4               // 持續漂浮：上下幅度px、左右傾角（整數圈無縫）
+};
+// ==================
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const card = $('card'), fl = $('fl');
+if (qs.get('z')) card.style.zoom = qs.get('z');
+if (!qs.get('m')) document.body.style.padding = '20px';
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const spring = p => 1 - Math.exp(-6.5 * p) * Math.cos(p * Math.PI * 2.4);
+const mk = (src, cls, parent) => { const v = document.createElement('video'); v.src = src; v.muted = v.loop = v.playsInline = true; v.preload = 'auto'; if (cls) v.className = cls; parent.appendChild(v); return v; };
+const B = CFG.box;
+Object.assign(fl.style, { left: (B.cx * CFG.W - B.w / 2) + 'px', top: (B.cy * CFG.H - B.h / 2) + 'px', width: B.w + 'px', height: B.h + 'px' });
+const vL = mk(CFG.clips[1], 'side', card); vL.id = 'sL';
+const vR = mk(CFG.clips[2], 'side', card); vR.id = 'sR';
+const vM = mk(CFG.clips[0], '', fl.querySelector('.box'));
+card.insertBefore(vL, $('stage')); card.insertBefore(vR, $('stage'));
+
+function render(t) {
+  const f = (t * CFG.FPS) % CFG.LOOP;
+  const p = clamp((f - CFG.popStart) / (CFG.popEnd - CFG.popStart), 0, 1);
+  const s = spring(p), a = 2 * Math.PI * f / CFG.LOOP;
+  const k = f < CFG.popStart ? 0 : 1;
+  const y = (1 - s) * CFG.popY + Math.sin(a) * CFG.bob * p;
+  const rx = (1 - s) * CFG.popRotX + Math.sin(a + 1) * 2 * p;
+  const ry = (1 - s) * CFG.popRotY + Math.sin(a) * CFG.tilt * p;
+  fl.style.opacity = k * clamp((f - CFG.popStart) / 3, 0, 1);
+  fl.style.transform = `translateY(${y}px) rotateX(${rx}deg) rotateY(${ry}deg) scale(${0.82 + 0.18 * s})`;
+  const q = clamp((f - CFG.sideStart) / (CFG.sideEnd - CFG.sideStart), 0, 1);
+  vL.style.opacity = vR.style.opacity = q * 0.9;
+}
+
+const vids = [vM, vL, vR], main = vM;
+const seekAll = t => vids.forEach(v => { if (Math.abs(v.currentTime - t) > 0.01) v.currentTime = t; });
+const ready = () => Promise.all(vids.map(v => new Promise(r => v.readyState >= 2 ? r() : v.addEventListener('loadeddata', r, { once: true }))));
+if (qs.get('t') !== null) {
+  const t = parseFloat(qs.get('t')); vids.forEach(v => v.pause());
+  ready().then(() => { seekAll(t); render(t); });
+} else {
+  const loop = () => { const t = main.currentTime; vids.forEach(v => { if (v !== main && Math.abs(v.currentTime - t) > 0.06) v.currentTime = t; }); render(t); requestAnimationFrame(loop); };
+  vids.forEach(v => v.play()); requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

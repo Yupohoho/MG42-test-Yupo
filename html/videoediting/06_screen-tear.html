@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>06 Screen Tear</title>
+<style>
+html,body{margin:0;background:#0b1118}
+.card{position:relative;width:326px;height:158px;border-radius:12px;overflow:hidden;background:#000}
+video{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;object-position:50% 12%}
+.half{position:absolute;left:0;top:0;width:100%;height:100%;will-change:transform;filter:drop-shadow(0 3px 5px rgba(0,0,0,.5))}
+.rim{position:absolute;left:0;top:0;width:100%;height:100%;background:#fff}
+.half video{position:absolute}
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <video id="b" src="media/land.mp4" muted loop playsinline preload="auto"></video>
+  <div class="half" id="hl"><div class="rim" id="rl"></div><video id="al" src="media/base.mp4" muted loop playsinline preload="auto"></video></div>
+  <div class="half" id="hr"><div class="rim" id="rr"></div><video id="ar" src="media/base.mp4" muted loop playsinline preload="auto"></video></div>
+</div>
+<script>
+// ===== 設定區 =====
+// 兩段示範素材，使用時請替換：A（上面的紙，被撕成兩半，用 base.mp4）、B（後面露出的風景，用 land.mp4）。此效果不需要人物遮罩。
+const CFG = {
+  W: 326, H: 158, FPS: 30, LOOP: 120,
+  tearX: 0.50,                  // 撕裂線中心（卡片寬比例）
+  step: 5, amp: 5, slope: 16,    // 撕裂線取樣平均間距 px、不規則幅度 px、整體斜度 px
+  wander: 7, notchP: 0.22,       // 緩慢的大幅彎曲 px、出現缺口的機率
+  seed: 7,                       // 亂數種子（改它會得到另一條撕裂線）
+  rim: 2.6,                     // 白色紙邊平均寬度 px（實際每個點寬度不同）
+  left:  { start: 6, end: 34, angle: -16, shiftX: -0.20, shiftY: 0.03 },  // 左半：以左下角為軸逆時針轉開、往左下移
+  right: { start: 8, end: 36, angle:  15, shiftX:  0.20, shiftY: 0.03 },  // 右半：以右下角為軸順時針轉開、往右下移
+  overshoot: 0.35,              // 轉開時的過衝回彈強度
+  creep: 0.04,                  // 轉開後繼續緩慢張開的比例
+  bScaleFrom: 1.1               // 後面風景由放大回到 1 倍
+};
+// ==================
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const card = $('card');
+if (qs.get('z')) card.style.zoom = qs.get('z');
+if (!qs.get('m')) document.body.style.padding = '20px';
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const easeOutBack = (x, s) => { const c = 1.70158 * s * 3; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+const W = CFG.W, H = CFG.H;
+
+// 不規則的撕裂線：點的間距、左右偏移、缺口、紙邊寬度都用固定亂數種子產生（不隨幀亂跳）
+function rnd(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const RN = rnd(CFG.seed);
+const E = [];
+for (let y = 0; y < H; ) {
+  const k = y / H;
+  let x = CFG.tearX * W + (k - 0.5) * CFG.slope
+        + CFG.wander * Math.sin(k * 6.283 * 1.3 + 0.7) + CFG.wander * 0.5 * Math.sin(k * 6.283 * 3.1 + 2.1)
+        + (RN() - 0.5) * 2 * CFG.amp * (0.4 + RN())
+        + (RN() < CFG.notchP ? (RN() < 0.5 ? -1 : 1) * CFG.amp * 1.7 : 0);
+  E.push({ x, y, r: CFG.rim * (0.35 + 1.7 * RN()) });
+  y += CFG.step * (0.35 + 1.3 * RN());
+}
+E.push({ x: CFG.tearX * W + 0.5 * CFG.slope + (RN() - 0.5) * CFG.amp, y: H, r: CFG.rim });
+function polyLeft(rim) { const p = [[0, 0]]; E.forEach(e => p.push([e.x + (rim ? e.r : 0), e.y])); p.push([0, H]); return poly(p); }
+function polyRight(rim) { const p = []; E.forEach(e => p.push([e.x - (rim ? e.r : 0), e.y])); p.push([W, H], [W, 0]); return poly(p); }
+function poly(p) { return 'polygon(' + p.map(q => `${q[0].toFixed(1)}px ${q[1].toFixed(1)}px`).join(',') + ')'; }
+
+$('al').style.clipPath = polyLeft(false);  $('rl').style.clipPath = polyLeft(true);
+$('ar').style.clipPath = polyRight(false); $('rr').style.clipPath = polyRight(true);
+$('hl').style.transformOrigin = '0px ' + H + 'px';
+$('hr').style.transformOrigin = W + 'px ' + H + 'px';
+
+function open(c, f) {
+  const p = clamp((f - c.start) / (c.end - c.start), 0, 1);
+  const q = clamp((f - c.end) / (CFG.LOOP - c.end), 0, 1);
+  return easeOutBack(p, CFG.overshoot) + CFG.creep * q;
+}
+function render(t) {
+  const f = (t * CFG.FPS) % CFG.LOOP;
+  const L = CFG.left, R = CFG.right, ol = open(L, f), or = open(R, f);
+  $('hl').style.transform = `translate(${L.shiftX * W * ol}px,${L.shiftY * H * ol}px) rotate(${L.angle * ol}deg)`;
+  $('hr').style.transform = `translate(${R.shiftX * W * or}px,${R.shiftY * H * or}px) rotate(${R.angle * or}deg)`;
+  const bp = easeOut(clamp((f - L.start) / (L.end + 10 - L.start), 0, 1));
+  $('b').style.transform = `scale(${CFG.bScaleFrom - (CFG.bScaleFrom - 1) * bp})`;
+}
+
+const vids = [$('b'), $('al'), $('ar')], main = vids[0];
+const seekAll = t => vids.forEach(v => { if (Math.abs(v.currentTime - t) > 0.01) v.currentTime = t; });
+const ready = () => Promise.all(vids.map(v => new Promise(r => v.readyState >= 2 ? r() : v.addEventListener('loadeddata', r, { once: true }))));
+if (qs.get('t') !== null) {
+  const t = parseFloat(qs.get('t')); vids.forEach(v => v.pause());
+  ready().then(() => { seekAll(t); render(t); });
+} else {
+  const loop = () => { const t = main.currentTime; vids.forEach(v => { if (v !== main && Math.abs(v.currentTime - t) > 0.06) v.currentTime = t; }); render(t); requestAnimationFrame(loop); };
+  vids.forEach(v => v.play()); requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

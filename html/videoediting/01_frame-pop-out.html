@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>01 Frame Pop Out</title>
+<style>
+html,body{margin:0;background:#0b1118}
+.card{position:relative;width:326px;height:158px;border-radius:12px;overflow:hidden;background:#0d1117}
+video{position:absolute;object-fit:cover}
+#bgb{left:0;top:0;width:100%;height:100%;transform:scale(1.5);filter:blur(7px) brightness(.45)}
+#grp{position:absolute;will-change:transform,opacity}
+#box{position:absolute;left:0;top:0;width:100%;height:100%;box-sizing:border-box;border:2px solid #fff;border-radius:7px;overflow:hidden;box-shadow:0 6px 16px rgba(0,0,0,.55);background:#222}
+#bg,#cut{left:0;top:0;width:100%;height:100%;object-position:50% 12%}
+#cut{transform-origin:50% 96%;will-change:transform}
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <video id="bgb" src="media/base.mp4" muted loop playsinline preload="auto"></video>
+  <div id="grp">
+    <div id="box"><video id="bg" src="media/base.mp4" muted loop playsinline preload="auto"></video></div>
+    <video id="cut" src="media/cutout.webm" muted loop playsinline preload="auto"></video>
+  </div>
+</div>
+<script>
+// ===== 設定區 =====
+// 底圖影片與人物去背透明影片是示範素材，使用時請替換；框的位置是依示範素材中人物的位置設定的。
+const CFG = {
+  W: 326, H: 158, FPS: 30, LOOP: 120,
+  frame: { x: 0.22, y: 0.17, w: 0.52, h: 0.73 },   // 相框（卡片比例）
+  popStart: 3, popEnd: 15,        // 相框彈出幀
+  popFrom: 0.25,                  // 相框起始縮放
+  cutStart: 14, cutEnd: 32,       // 人物衝出相框幀
+  cutScale: 1.5                   // 人物放大倍率（以腳底為支點）
+};
+// ==================
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const card = $('card'), grp = $('grp'), cut = $('cut');
+if (qs.get('z')) card.style.zoom = qs.get('z');
+if (!qs.get('m')) document.body.style.padding = '20px';
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const easeOutBack = x => { const c = 1.70158 + 0.6; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+const F = CFG.frame;
+Object.assign(grp.style, { left: F.x * CFG.W + 'px', top: F.y * CFG.H + 'px', width: F.w * CFG.W + 'px', height: F.h * CFG.H + 'px' });
+
+function render(t) {
+  const f = (t * CFG.FPS) % CFG.LOOP;
+  const p = clamp((f - CFG.popStart) / (CFG.popEnd - CFG.popStart), 0, 1);
+  const s = CFG.popFrom + (1 - CFG.popFrom) * easeOutBack(p);
+  grp.style.transform = `scale(${s})`;
+  grp.style.opacity = clamp((f - CFG.popStart) / 3, 0, 1);
+  const q = clamp((f - CFG.cutStart) / (CFG.cutEnd - CFG.cutStart), 0, 1);
+  cut.style.transform = `scale(${1 + (CFG.cutScale - 1) * easeOutBack(q)})`;
+  cut.style.visibility = f < CFG.cutStart ? 'hidden' : 'visible';
+}
+
+const vids = [$('bgb'), $('bg'), cut], main = vids[0];
+const seekAll = t => vids.forEach(v => { if (Math.abs(v.currentTime - t) > 0.01) v.currentTime = t; });
+const ready = () => Promise.all(vids.map(v => new Promise(r => v.readyState >= 2 ? r() : v.addEventListener('loadeddata', r, { once: true }))));
+if (qs.get('t') !== null) {
+  const t = parseFloat(qs.get('t')); vids.forEach(v => v.pause());
+  ready().then(() => { seekAll(t); render(t); });
+} else {
+  const loop = () => { const t = main.currentTime; vids.forEach(v => { if (v !== main && Math.abs(v.currentTime - t) > 0.06) v.currentTime = t; }); render(t); requestAnimationFrame(loop); };
+  vids.forEach(v => v.play()); requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

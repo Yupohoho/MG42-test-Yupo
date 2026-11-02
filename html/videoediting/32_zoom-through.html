@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>32 Zoom Through</title>
+<style>
+html,body{margin:0;background:#0b1118}
+.card{position:relative;width:326px;height:158px;border-radius:12px;overflow:hidden;background:#000}
+#st{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform,filter}
+#st video{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover}
+#plane{position:absolute;overflow:hidden}
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <div id="st">
+    <video id="a" muted loop playsinline preload="auto"></video>
+    <div id="plane"><video id="b" muted loop playsinline preload="auto"></video></div>
+  </div>
+</div>
+<script>
+// ===== 設定區 =====
+// 素材是示範，使用時請替換。A 是「手持手機」的影片（手機螢幕是空白的）、B 是下一幕，B 是橫向的完整畫面，一開始就以完整的橫向畫面（寬度＝螢幕寬度）顯示在手機螢幕裡，鏡頭一路往螢幕推進，推到 B 剛好填滿卡片，順暢接上下一幕。
+// 換素材時：量出 A 裡手機螢幕的中心與大小（影片畫面比例 0~1），填到 screen。
+const CFG = {
+  W: 326, H: 158, FPS: 30, LOOP: 120,
+  A: 'media/phone.mp4', B: 'media/base6.mp4',   // A：手持手機；B：下一幕
+  vw: 16 / 9,                                    // A 的長寬比
+  screen: { x: 0.376, y: 0.488, w: 0.171, h: 0.525 },  // 手機螢幕在 A 畫面中的中心 x、y 與寬、高（比例）
+  s0: 1.35,                                      // 開場倍率（讓手機在卡片正中間）
+  hold: 6, zoomEnd: 26,                          // 推進起訖幀
+  accel: 2.8,                                    // 推進加速程度：1＝等速，越大起步越慢、越推越快（到位時最快，直接衝進下一幕）
+  fit: 0.80                                      // B 在螢幕中的寬度佔螢幕寬度的比例（留點邊，手機有輕微晃動也不會超出螢幕）
+};
+// ==================
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const card = $('card');
+if (qs.get('z')) card.style.zoom = qs.get('z');
+if (!qs.get('m')) document.body.style.padding = '20px';
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const lerp = (a, b, t) => a + (b - a) * t;
+const seg = (f, a, b) => clamp((f - a) / (b - a), 0, 1);
+const easeInOut = x => x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+const frameOf = t => (t * CFG.FPS) % CFG.LOOP;
+const st = $('st'), plane = $('plane');
+const W = CFG.W, H = CFG.H, PW = W, PH = W / CFG.vw;            // A 畫面平面的大小（寬度填滿卡片）
+const sc = CFG.screen, cx = sc.x * PW, cy = sc.y * PH, sw = sc.w * PW, sh = sc.h * PH;
+const bw = sw * CFG.fit, bh = bw * H / W;                                // B 平面：完整橫向畫面（比例同卡片），寬度＝螢幕寬度×fit，置中於螢幕
+const S1 = W / bw;                                              // B 剛好填滿卡片時的倍率
+st.style.width = PW + 'px'; st.style.height = PH + 'px';
+st.style.top = '0'; st.style.left = '0';
+plane.style.width = bw + 'px'; plane.style.height = bh + 'px';
+plane.style.left = (cx - bw / 2) + 'px'; plane.style.top = (cy - bh / 2) + 'px';
+function render(t) {
+  const f = frameOf(t);
+  const z = Math.pow(seg(f, CFG.hold, CFG.zoomEnd), CFG.accel), s = Math.exp(lerp(Math.log(CFG.s0), Math.log(S1), z));
+  st.style.transform = `translate(${W / 2}px,${H / 2}px) scale(${s.toFixed(4)}) translate(${-cx}px,${-cy}px)`;
+}
+
+// ===== 影片同步 =====
+$('a').src = CFG.A; $('b').src = CFG.B;
+const vids = [$('a'), $('b')], main = vids[0];
+const seekAll = t => vids.forEach(v => { if (Math.abs(v.currentTime - t) > 0.01) v.currentTime = t; });
+const ready = () => Promise.all(vids.map(v => new Promise(r => v.readyState >= 2 ? r() : v.addEventListener('loadeddata', r, { once: true }))));
+if (qs.get('t') !== null) {
+  const t = parseFloat(qs.get('t')); vids.forEach(v => v.pause());
+  ready().then(() => { seekAll(t); render(t); });
+} else {
+  const loop = () => { const t = main.currentTime; vids.forEach(v => { if (v !== main && Math.abs(v.currentTime - t) > 0.06) v.currentTime = t; }); render(t); requestAnimationFrame(loop); };
+  vids.forEach(v => v.play()); requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

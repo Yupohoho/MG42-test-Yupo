@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>03 3D Popup</title>
+<style>
+html,body{margin:0;background:#0b1118}
+.card{position:relative;width:326px;height:158px;border-radius:12px;overflow:hidden;background:#0a0d12}
+video{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;object-position:50% 12%}
+#bgb{transform:scale(1.7);filter:blur(6px) brightness(.3)}
+.stage{position:absolute;left:0;top:0;width:100%;height:100%;perspective:620px}
+#tilt{position:absolute;left:0;top:0;width:100%;height:100%;overflow:hidden;box-sizing:border-box;will-change:transform}
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <video id="bgb" src="media/base.mp4" muted loop playsinline preload="auto"></video>
+  <div class="stage"><div id="tilt"><video id="bg" src="media/base.mp4" muted loop playsinline preload="auto"></video></div></div>
+</div>
+<script>
+// ===== 設定區 =====
+// 底圖影片是示範素材，使用時請替換。此效果不需要人物遮罩。
+const CFG = {
+  W: 326, H: 158, FPS: 30, LOOP: 120,
+  start: 6, end: 30,            // 滿版縮成立體卡片的幀
+  scale: 0.62,                  // 卡片最終縮放
+  rotX: 10, rotY: -24, rotZ: -4,// 最終傾斜角（度）
+  shiftX: 0.03,                 // 卡片最終水平偏移（卡片寬比例）
+  radius: 6,
+  drift: 2                      // 停定後左右微擺幅度（度），一圈 LOOP 幀，無縫
+};
+// ==================
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const card = $('card'), tilt = $('tilt');
+if (qs.get('z')) card.style.zoom = qs.get('z');
+if (!qs.get('m')) document.body.style.padding = '20px';
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const easeIO = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+
+function render(t) {
+  const f = (t * CFG.FPS) % CFG.LOOP;
+  const p = easeIO(clamp((f - CFG.start) / (CFG.end - CFG.start), 0, 1));
+  const dr = CFG.drift * Math.sin(2 * Math.PI * f / CFG.LOOP) * p;
+  tilt.style.transform =
+    `translateX(${CFG.shiftX * CFG.W * p}px) rotateX(${CFG.rotX * p}deg) rotateY(${CFG.rotY * p + dr}deg) rotateZ(${CFG.rotZ * p}deg) scale(${1 - (1 - CFG.scale) * p})`;
+  tilt.style.borderRadius = (CFG.radius * p) + 'px';
+  tilt.style.border = `${(1.5 * p).toFixed(2)}px solid rgba(255,255,255,${(0.85 * p).toFixed(2)})`;
+  tilt.style.boxShadow = p > 0 ? `0 ${12 * p}px ${26 * p}px rgba(0,0,0,.65)` : 'none';
+}
+
+const vids = [$('bgb'), $('bg')], main = vids[0];
+const seekAll = t => vids.forEach(v => { if (Math.abs(v.currentTime - t) > 0.01) v.currentTime = t; });
+const ready = () => Promise.all(vids.map(v => new Promise(r => v.readyState >= 2 ? r() : v.addEventListener('loadeddata', r, { once: true }))));
+if (qs.get('t') !== null) {
+  const t = parseFloat(qs.get('t')); vids.forEach(v => v.pause());
+  ready().then(() => { seekAll(t); render(t); });
+} else {
+  const loop = () => { const t = main.currentTime; vids.forEach(v => { if (v !== main && Math.abs(v.currentTime - t) > 0.06) v.currentTime = t; }); render(t); requestAnimationFrame(loop); };
+  vids.forEach(v => v.play()); requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

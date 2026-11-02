@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>07 Clone Multiply</title>
+<style>
+html,body{margin:0;background:#0b1118}
+.card{position:relative;width:326px;height:158px;border-radius:12px;overflow:hidden;background:#000}
+video{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;object-position:50% 12%}
+.cl{will-change:transform,opacity;opacity:0;transform-origin:50% 100%}
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <video id="bg" src="media/base.mp4" muted loop playsinline preload="auto"></video>
+  <video id="cL" class="cl" src="media/cutout.webm" muted loop playsinline preload="auto"></video>
+  <video id="cR" class="cl" src="media/cutout.webm" muted loop playsinline preload="auto"></video>
+  <video id="cut" src="media/cutout.webm" muted loop playsinline preload="auto"></video>
+</div>
+<script>
+// ===== 設定區 =====
+// 底圖影片與人物去背透明影片是示範素材，使用時請替換；分身左右位移量是依示範素材中人物的寬度設定的。
+// 分身用同一段去背影片、各自錯開播放時間，所以動作不會一模一樣。
+const CFG = {
+  W: 326, H: 158, FPS: 30, LOOP: 120, DUR: 4,
+  gap: 0.31,                       // 分身離原人物的水平距離（卡片寬比例）
+  r: { start: 10, end: 30, off: 0.7 },   // 右分身出現幀、與原人物的播放時間差（秒）
+  l: { start: 24, end: 44, off: 1.4 },   // 左分身
+  scale: 0.97                      // 分身略小一點，有層次（以畫面底部為縮放支點，下緣與畫面邊緣貼齊，不留空隙）
+};
+// ==================
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const card = $('card'), bg = $('bg'), cut = $('cut'), cL = $('cL'), cR = $('cR');
+if (qs.get('z')) card.style.zoom = qs.get('z');
+if (!qs.get('m')) document.body.style.padding = '20px';
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+
+function place(el, c, dir, f) {
+  const p = easeOut(clamp((f - c.start) / (c.end - c.start), 0, 1));
+  el.style.opacity = p;
+  el.style.transform = `translateX(${dir * CFG.gap * CFG.W * p}px) scale(${1 - (1 - CFG.scale) * p})`;
+}
+function render(t) {
+  const f = (t * CFG.FPS) % CFG.LOOP;
+  place(cR, CFG.r, 1, f);
+  place(cL, CFG.l, -1, f);
+}
+
+const vids = [bg, cut, cL, cR], offs = [0, 0, CFG.l.off, CFG.r.off], main = bg;
+const want = (t, i) => (t + offs[i]) % CFG.DUR;
+const seekAll = t => vids.forEach((v, i) => { const w = want(t, i); if (Math.abs(v.currentTime - w) > 0.01) v.currentTime = w; });
+const ready = () => Promise.all(vids.map(v => new Promise(r => v.readyState >= 2 ? r() : v.addEventListener('loadeddata', r, { once: true }))));
+if (qs.get('t') !== null) {
+  const t = parseFloat(qs.get('t')); vids.forEach(v => v.pause());
+  ready().then(() => { seekAll(t); render(t); });
+} else {
+  const loop = () => {
+    const t = main.currentTime;
+    vids.forEach((v, i) => { if (v !== main) { let d = Math.abs(v.currentTime - want(t, i)); d = Math.min(d, CFG.DUR - d); if (d > 0.06) v.currentTime = want(t, i); } });
+    render(t); requestAnimationFrame(loop);
+  };
+  vids.forEach(v => v.play()); requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

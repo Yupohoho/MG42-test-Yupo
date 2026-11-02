@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>10 Phone Screen In</title>
+<style>
+html,body{margin:0;background:#0b1118}
+.card{position:relative;width:326px;height:158px;border-radius:12px;overflow:hidden;background:#000}
+video{position:absolute;object-fit:cover}
+#bgb{left:0;top:0;width:100%;height:100%;transform:scale(1.35);filter:blur(7px) brightness(.5)}
+#ph{position:absolute;box-sizing:border-box;background:#0a0a0c;overflow:hidden;will-change:transform,width,height;box-shadow:0 8px 20px rgba(0,0,0,.6)}
+#scr{position:absolute;overflow:hidden;background:#222}
+#scr video{left:0;top:0;width:100%;height:100%;object-position:50% 14%}
+#isl{position:absolute;left:50%;top:0;transform:translateX(-50%);background:#050506;border-radius:5px;opacity:0}
+#rim{position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 1px rgba(160,170,190,.5);pointer-events:none;opacity:0}
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <div id="ph"><div id="scr"></div><div id="isl"></div><div id="rim"></div></div>
+</div>
+<script>
+// ===== 設定區 =====
+// 影片素材是示範，使用時請替換（clips[0]=手機裡的影片、clips[1]=背景模糊用影片）。
+// 手機螢幕取景（#scr video 的 object-position）要讓主角落在手機畫面中間，換素材後請依主角位置調整。
+const CFG = {
+  W: 326, H: 158, FPS: 30, LOOP: 120, DUR: 4,
+  clips: ['media/base.mp4', 'media/base2.mp4'],
+  phone: { w: 82, h: 146 },        // 手機最終大小（px），置中
+  tilt: -9,                        // 手機最終傾斜角（度）
+  tiltStart: 32, tiltEnd: 66,      // 旋轉起訖幀：在縮小快完成時就順接開始（與縮小尾段重疊，不停頓），慢慢轉到定位（無過衝）
+  bezel: 4, radius: 15,            // 邊框粗細、手機圓角
+  shrinkStart: 18, shrinkEnd: 44,  // 全螢幕縮成手機的幀
+  island: { w: 22, h: 6, top: 6 }  // 動態島
+};
+// ==================
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const card = $('card'), ph = $('ph'), scr = $('scr'), isl = $('isl'), rim = $('rim');
+if (qs.get('z')) card.style.zoom = qs.get('z');
+if (!qs.get('m')) document.body.style.padding = '20px';
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const easeOutBack = x => { const c = 1.2; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+const mk = (src, id, parent, first) => { const v = document.createElement('video'); v.src = src; v.id = id || ''; v.muted = v.loop = v.playsInline = true; v.preload = 'auto'; first ? parent.insertBefore(v, parent.firstChild) : parent.appendChild(v); return v; };
+const vB = mk(CFG.clips[1], 'bgb', card, true);
+const vM = mk(CFG.clips[0], '', scr);
+
+function render(t) {
+  const f = (t * CFG.FPS) % CFG.LOOP;
+  const p = clamp((f - CFG.shrinkStart) / (CFG.shrinkEnd - CFG.shrinkStart), 0, 1);
+  const e = easeOutBack(p);
+  const w = CFG.W + (CFG.phone.w - CFG.W) * e, h = CFG.H + (CFG.phone.h - CFG.H) * e;
+  const r = CFG.radius * clamp(p * 1.5, 0, 1), bz = CFG.bezel * clamp(p * 1.4, 0, 1);
+  const tp = clamp((f - CFG.tiltStart) / (CFG.tiltEnd - CFG.tiltStart), 0, 1);
+  ph.style.transform = `rotate(${CFG.tilt * tp * tp * tp * (tp * (tp * 6 - 15) + 10)}deg)`;   // smootherstep：起步與收尾都柔和
+  Object.assign(ph.style, { width: w + 'px', height: h + 'px', left: (CFG.W - w) / 2 + 'px', top: (CFG.H - h) / 2 + 'px', borderRadius: r + 'px' });
+  Object.assign(scr.style, { left: bz + 'px', top: bz + 'px', right: bz + 'px', bottom: bz + 'px', width: 'auto', height: 'auto', borderRadius: Math.max(0, r - bz) + 'px' });
+  const I = CFG.island, ip = clamp((p - 0.55) / 0.45, 0, 1);
+  Object.assign(isl.style, { width: I.w * ip + 'px', height: I.h + 'px', top: (bz + I.top) + 'px', opacity: ip });
+  rim.style.opacity = clamp(p * 2, 0, 1);
+  ph.style.boxShadow = `0 8px 20px rgba(0,0,0,${0.6 * clamp(p * 2, 0, 1)})`;
+}
+
+const vids = [vM, vB], main = vM;
+const seekAll = t => vids.forEach(v => { if (Math.abs(v.currentTime - t) > 0.01) v.currentTime = t; });
+const ready = () => Promise.all(vids.map(v => new Promise(r => v.readyState >= 2 ? r() : v.addEventListener('loadeddata', r, { once: true }))));
+if (qs.get('t') !== null) {
+  const t = parseFloat(qs.get('t')); vids.forEach(v => v.pause());
+  ready().then(() => { seekAll(t); render(t); });
+} else {
+  const loop = () => { const t = main.currentTime; vids.forEach(v => { if (v !== main && Math.abs(v.currentTime - t) > 0.06) v.currentTime = t; }); render(t); requestAnimationFrame(loop); };
+  vids.forEach(v => v.play()); requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

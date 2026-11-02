@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>17 Punch Zoom</title>
+<style>canvas{z-index:2}
+html,body{margin:0;background:#0b1118}
+.card{position:relative;width:326px;height:158px;border-radius:12px;overflow:hidden;background:#000}
+canvas{position:absolute;left:0;top:0;width:100%;height:100%}
+video{position:absolute;left:0;top:0;width:100%;height:100%;opacity:0.01;pointer-events:none}
+</style>
+</head>
+<body>
+<div class="card" id="card"><canvas id="cv"></canvas></div>
+<script>
+// ===== 設定區 =====
+// 底圖影片是示範素材，使用時請替換。此效果不需要人物遮罩。
+// 手機／紀錄片式的突然放大：靜止 → 猛然拉近一次到臉部 → 停一下 → 再微微拉近一次 → 停住。每次都是幾幀內快速到位（帶一點過衝與手持晃動感），不是專業的滑順推軌。
+const CFG = {
+  W: 326, H: 158, FPS: 30, LOOP: 120,
+  src: ['media/base.mp4'],       // 來源陣列（只用第 1 支）
+  pivotX: 153, pivotY: 62,       // 縮放支點（卡片座標，大約臉的位置）
+  zooms: [                       // 每一次放大：開始幀、花幾幀、放大到幾倍（相對原畫面）、過衝量
+    { start: 14, dur: 4, to: 2.0,  over: 0.10 },   // 第一次：猛然拉近
+    { start: 52, dur: 3, to: 2.28, over: 0.05 }    // 第二次：再微微拉近
+  ],
+  shake: 0.8,                    // 手持晃動幅度（px），停住時微微抖動
+  blurCopies: 8                  // 放大瞬間的動態模糊疊加張數
+};
+// ==================
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const card = $('card'), cv = $('cv'), ctx = cv.getContext('2d');
+if (qs.get('z')) card.style.zoom = qs.get('z');
+if (!qs.get('m')) document.body.style.padding = '20px';
+const K = 2; cv.width = CFG.W * K; cv.height = CFG.H * K;
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const lerp = (a, b, x) => a + (b - a) * x;
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+
+const vids = CFG.src.map(s => { const v = document.createElement('video'); v.preload = 'auto'; v.muted = true; v.loop = true; v.playsInline = true; v.src = s; card.appendChild(v); return v; });
+const vid = vids[0];
+
+function draw(s, a) {                       // 以 cover 方式畫影片，繞支點縮放
+  if (!vid.videoWidth) return;
+  const vh = CFG.W * vid.videoHeight / vid.videoWidth, vy = -Math.max(0, vh - CFG.H) * 0.12;
+  ctx.save(); ctx.globalAlpha = a; ctx.setTransform(K, 0, 0, K, 0, 0);
+  ctx.translate(CFG.pivotX, CFG.pivotY); ctx.scale(s, s); ctx.translate(-CFG.pivotX, -CFG.pivotY);
+  ctx.drawImage(vid, 0, vy, CFG.W, vh); ctx.restore();
+}
+function radial(s0, s1) {                   // 放射模糊：多層疊加 alpha=1/(i+1)
+  for (let i = 0; i < CFG.blurCopies; i++) draw(lerp(s0, s1, i / (CFG.blurCopies - 1)), 1 / (i + 1));
+}
+
+// 某一幀的放大倍率：每次放大用「快速到位＋過衝回彈」，逐次累積
+function scaleAt(f) {
+  let sc = 1;
+  for (const z of CFG.zooms) {
+    const p = clamp((f - z.start) / z.dur, 0, 1);
+    if (p <= 0) break;
+    const from = sc, e = 1 - Math.pow(1 - p, 3);
+    sc = from + (z.to - from) * e + (z.to - from) * z.over * Math.sin(Math.PI * clamp((f - z.start) / (z.dur + 6), 0, 1));   // 快速到位後略過衝再回彈
+  }
+  return sc;
+}
+function render(t) {
+  const f = (t * CFG.FPS) % CFG.LOOP;
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height);
+  const sc = scaleAt(f), prev = scaleAt(f - 1);
+  const dx = sc > 1.01 ? CFG.shake * Math.sin(f * 1.7) : 0, dy = sc > 1.01 ? CFG.shake * Math.sin(f * 2.3 + 1) : 0;
+  ctx.save(); ctx.translate(dx, dy);
+  if (Math.abs(sc - prev) > 0.04) { for (let i = 0; i < CFG.blurCopies; i++) draw(lerp(prev, sc, i / (CFG.blurCopies - 1)), 1 / (i + 1)); }   // 放大瞬間的動態模糊
+  else draw(sc, 1);
+  ctx.restore();
+}
+
+const seekAll = t => vids.forEach(v => { if (Math.abs(v.currentTime - t) > 0.01) v.currentTime = t; });
+const ready = () => Promise.all(vids.map(v => new Promise(r => v.readyState >= 2 ? r() : v.addEventListener('loadeddata', r, { once: true }))));
+if (qs.get('t') !== null) {
+  const t = parseFloat(qs.get('t')); vids.forEach(v => v.pause());
+  seekAll(t); const tick = () => { render(t); requestAnimationFrame(tick); }; ready().then(tick);
+} else {
+  const loop = () => { const t = vid.currentTime; render(t); requestAnimationFrame(loop); };
+  vids.forEach(v => v.play()); requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

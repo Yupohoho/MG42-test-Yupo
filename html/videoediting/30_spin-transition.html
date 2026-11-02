@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>30 Spin Transition</title>
+<style>
+html,body{margin:0;background:#0b1118}
+.card{position:relative;width:326px;height:158px;border-radius:12px;overflow:hidden;background:#000}
+canvas{position:absolute;left:0;top:0;width:326px;height:158px}
+video{position:absolute;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none}
+</style>
+</head>
+<body>
+<div class="card" id="card"><canvas id="cv" width="652" height="316"></canvas></div>
+<script>
+// ===== 設定區 =====
+// 素材是示範，使用時請替換。A、B 是轉場前後兩段完整的影片。
+// 旋轉轉場：畫面以中心旋轉（畫面大小不變、不縮放），整個轉場共轉 turns 圈，速度「起步加速→最高速→緩緩減速到停」；轉到一半硬切到 B（那一刻最快、最糊）。
+// 旋轉時若會露出畫面底部（四角），就把畫面放大：倍率「固定不變」（整段從頭到尾同一個倍率，所以沒有任何縮放動態），大小剛好讓任何角度都不會露底。整個動作很快，在高速旋轉時趁機接上下一幕。
+const CFG = {
+  W: 326, H: 158, FPS: 30, LOOP: 120,
+  A: 'media/land2.mp4', B: 'media/land.mp4',
+  vr: 16 / 9,                                 // 素材長寬比（旋轉時用整張影片畫面，比只用卡片裁切範圍多一點邊，放大倍率可以小一些）
+  start: 8, end: 40,                          // 旋轉起訖幀
+  zoomIn: 0.25,                               // A 起步時拉近完成的位置（整段的幾成）：從原本大小微微拉近到轉場倍率
+  zoomOut: 0.6,                               // B 開始從轉場倍率回到原本大小的位置，到位（整段結束）時剛好回到 1 倍
+  peakAt: 0.35,                                // 最高速出現在整段的幾成處：前段等加速、後段等減速到停（像用力轉一個輪子，起步快加速、然後慢慢減速到停）；最高速那一刻硬切到 B
+  turns: 1,                                   // 整個轉場共轉幾圈
+  shutter: 1.5,                               // 旋轉動態模糊的快門長度（以幀計；越大，轉得快時的旋轉殘影越長）
+  samples: 9                                  // 動態模糊取樣數
+};
+// ==================
+const qs = new URLSearchParams(location.search);
+const card = document.getElementById('card'), cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+if (qs.get('z')) card.style.zoom = qs.get('z');
+if (!qs.get('m')) document.body.style.padding = '20px';
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const seg = (f, a, b) => clamp((f - a) / (b - a), 0, 1);
+const easeInOut = x => x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+const W = CFG.W, H = CFG.H;
+const mk = src => { const v = document.createElement('video'); v.src = src; v.muted = v.loop = v.playsInline = true; v.preload = 'auto'; card.appendChild(v); return v; };
+const va = mk(CFG.A), vb = mk(CFG.B), vids = [va, vb];
+
+const IW = Math.max(W, H * CFG.vr), IH = IW / CFG.vr;   // 影片畫面在卡片裡的大小（cover：寬或高至少填滿卡片，多出來的邊平常被裁掉，旋轉時就派上用場）
+// 角度：前段等加速、後段等減速（速度三角形），總共轉 turns 圈
+const ang = p => { const a = CFG.peakAt, pk = 2; return 360 * CFG.turns * (p < a ? pk * p * p / (2 * a) : 1 - pk * (1 - p) * (1 - p) / (2 * (1 - a))); };
+const cover = deg => { const r = deg * Math.PI / 180, c = Math.abs(Math.cos(r)), n = Math.abs(Math.sin(r)); return Math.max(1, (W * c + H * n) / IW, (W * n + H * c) / IH); };   // 該角度剛好不露底的最小倍率（用完整影片畫面算）
+let SCALE = 1; for (let d = 0; d <= 90; d += 0.5) SCALE = Math.max(SCALE, cover(d));   // 轉場時的倍率：任何角度都不露底所需的最大值
+const sm = x => x * x * (3 - 2 * x);
+// 倍率：起步時從 1 倍拉近到 SCALE、中間維持、B 到位前回到 1 倍；任何時刻都不低於不露底所需的倍率
+const scaleAt = (p, deg) => Math.min(SCALE, Math.max(1 + (SCALE - 1) * sm(clamp(p / CFG.zoomIn, 0, 1)) * (1 - sm(clamp((p - CFG.zoomOut) / (1 - CFG.zoomOut), 0, 1))), cover(deg)));
+function drawAt(v, deg, p) {
+  ctx.save();
+  ctx.translate(W / 2, H / 2); ctx.rotate(deg * Math.PI / 180); const sc = scaleAt(p, deg); ctx.scale(sc, sc); ctx.translate(-W / 2, -H / 2);
+  ctx.drawImage(v, (W - IW) / 2, (H - IH) / 2, IW, IH);
+  ctx.restore();
+}
+function render(t) {
+  const f = (t * CFG.FPS) % CFG.LOOP, p = seg(f, CFG.start, CFG.end), deg = ang(p);
+  const v = p >= CFG.peakAt ? vb : va;          // 最高速時硬切；切點前後角度相同，方向連續
+  const vel = (ang(seg(f + 0.5, CFG.start, CFG.end)) - ang(seg(f - 0.5, CFG.start, CFG.end)));   // 每幀轉幾度
+  const arc = vel * CFG.shutter, n = vel > 0.5 ? CFG.samples : 1;   // 旋轉動態模糊：在這一幀的轉動範圍內疊多張取平均
+  ctx.setTransform(2, 0, 0, 2, 0, 0);
+  for (let k = 0; k < n; k++) {
+    ctx.globalAlpha = 1 / (k + 1);
+    ctx.setTransform(2, 0, 0, 2, 0, 0);
+    drawAt(v, deg + (n > 1 ? (k / (n - 1) - 0.5) * arc : 0), p);
+  }
+  ctx.globalAlpha = 1;
+}
+
+const seekAll = t => Promise.all(vids.map(v => new Promise(r => { if (Math.abs(v.currentTime - t) <= 0.01) return r(); v.addEventListener('seeked', r, { once: true }); v.currentTime = t; setTimeout(r, 800); })));
+const ready = () => Promise.all(vids.map(v => v.readyState >= 2 ? 0 : new Promise(r => v.addEventListener('loadeddata', r, { once: true }))));
+if (qs.get('t') !== null) {
+  const t = parseFloat(qs.get('t')); vids.forEach(v => v.pause());
+  ready().then(() => seekAll(t)).then(() => render(t));
+} else {
+  const loop = () => { const t = va.currentTime; if (Math.abs(vb.currentTime - t) > 0.06) vb.currentTime = t; render(t); requestAnimationFrame(loop); };
+  vids.forEach(v => v.play()); requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

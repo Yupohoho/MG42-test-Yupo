@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>02 Text Orbit</title>
+<link href="https://fonts.googleapis.com/css2?family=Anton&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0b1118}
+.card{position:relative;width:326px;height:158px;border-radius:12px;overflow:hidden;background:#000}
+.layer{position:absolute;left:0;top:0;width:100%;height:100%}
+video{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;object-position:50% 12%}
+.txt{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}
+.ch{position:absolute;top:0;left:0;font-family:'Anton','Archivo Black',sans-serif;font-size:56px;line-height:1;will-change:transform}
+.star{position:absolute;left:0;top:0;width:26px;height:26px;will-change:transform}
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <video id="bg" class="layer" src="media/base.mp4" muted loop playsinline preload="auto"></video>
+  <div class="txt" id="back"></div>
+  <video id="cut" class="layer" src="media/cutout.webm" muted loop playsinline preload="auto"></video>
+  <div class="txt" id="front"></div>
+</div>
+<script>
+// ===== 設定區 =====
+const CFG = {
+  W: 326, H: 158,
+  FPS: 30,
+  LOOP: 120,                 // 4 秒＝軌道正好轉一圈，也是素材長度
+  word: 'SMILE',
+  cx: 0.50, cy: 0.50,        // 軌道中心（卡片比例），人物在正中，軸心也在正中
+  rx: 0.36, ry: 0.24,        // 軌道橫向、縱向半徑（卡片寬、高比例）
+  spacing: 34,               // 字與字相隔角度（度）
+  phase0: 40,                // 第 0 幀領頭字（S）的角度（度）
+  sizeFront: 1.12, sizeBack: 0.52, // 最近、最遠時的字縮放
+  front: '#ffffff', back: '#a9cfe6',
+  backOpacity: 0.8, backBlur: 1.2
+};
+// ==================
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const card = $('card'), bg = $('bg'), cut = $('cut'), front = $('front'), back = $('back');
+if (qs.get('z')) card.style.zoom = qs.get('z');
+if (!qs.get('m')) document.body.style.padding = '20px';
+
+const lerp = (a, b, k) => a + (b - a) * k;
+const mix = (c1, c2, k) => {
+  const p = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
+  const a = p(c1), b = p(c2);
+  return 'rgb(' + a.map((v, i) => Math.round(lerp(v, b[i], k))).join(',') + ')';
+};
+
+// 每個字兩份：前層（人物前面）與後層（人物後面）
+const items = [];
+const labels = CFG.word.split('').concat(['*']);   // 最後一格放星形
+for (const ch of labels) {
+  const it = { star: ch === '*' };
+  for (const [key, layer] of [['f', front], ['b', back]]) {
+    let el;
+    if (it.star) {
+      el = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      el.setAttribute('viewBox', '0 0 24 24'); el.setAttribute('class', 'star');
+      el.innerHTML = '<path fill="currentColor" d="M12 0 C12.8 7 17 11.2 24 12 C17 12.8 12.8 17 12 24 C11.2 17 7 12.8 0 12 C7 11.2 11.2 7 12 0Z"/>';
+    } else {
+      el = document.createElement('div'); el.className = 'ch'; el.textContent = ch;
+    }
+    layer.appendChild(el); it[key] = el;
+  }
+  items.push(it);
+}
+
+function render(t) {
+  const f = (t * CFG.FPS) % CFG.LOOP;
+  const W = CFG.W, H = CFG.H;
+  const rot = 360 * f / CFG.LOOP;                       // 整數圈，無縫循環
+  items.forEach((it, i) => {
+    const th = (CFG.phase0 + rot - i * CFG.spacing) * Math.PI / 180;
+    const sn = Math.sin(th);                            // +1 最靠近鏡頭，-1 最遠
+    const x = (CFG.cx + CFG.rx * Math.cos(th)) * W;
+    const y = (CFG.cy + CFG.ry * sn) * H;
+    const k = (sn + 1) / 2;                             // 0 遠 → 1 近
+    const sc = lerp(CFG.sizeBack, CFG.sizeFront, k);
+    const isFront = sn >= 0;
+    const el = isFront ? it.f : it.b, off = isFront ? it.b : it.f;
+    off.style.opacity = 0;
+    const w = it.star ? 26 : (el.offsetWidth || 30), h = it.star ? 26 : (el.offsetHeight || 56);
+    el.style.transform = `translate(${x - w / 2}px,${y - h / 2}px) scale(${sc})` + (it.star ? ` rotate(${rot * 3}deg)` : '');
+    el.style.color = mix(CFG.front, CFG.back, 1 - k);
+    el.style.opacity = lerp(CFG.backOpacity, 1, k);
+    el.style.filter = sn < 0 ? `blur(${(-sn * CFG.backBlur).toFixed(2)}px)` : 'none';
+  });
+}
+
+// 靜態定格（?t=秒）或循環播放
+const tq = qs.get('t');
+function seekBoth(t) { for (const v of [bg, cut]) if (Math.abs(v.currentTime - t) > 0.01) v.currentTime = t; }
+const fontReady = () => (document.fonts ? document.fonts.load('56px Anton', 'SMILE') : Promise.resolve());
+if (tq !== null) {
+  const t = parseFloat(tq);
+  bg.pause(); cut.pause();
+  Promise.all([bg, cut].map(v => new Promise(r => v.readyState >= 2 ? r() : v.addEventListener('loadeddata', r, { once: true }))))
+    .then(fontReady).then(() => { seekBoth(t); render(t); });
+} else {
+  const loop = () => {
+    const t = bg.currentTime;
+    if (Math.abs(cut.currentTime - t) > 0.06) cut.currentTime = t;
+    render(t);
+    requestAnimationFrame(loop);
+  };
+  fontReady().then(() => { bg.play(); cut.play(); requestAnimationFrame(loop); });
+}
+</script>
+</body>
+</html>

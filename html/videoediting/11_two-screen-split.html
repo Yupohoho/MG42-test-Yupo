@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>11 Two Screen Split</title>
+<style>
+html,body{margin:0;background:#0b1118}
+.card{position:relative;width:326px;height:158px;border-radius:12px;overflow:hidden;background:#05080c}
+.pane{position:absolute;top:0;height:100%;overflow:hidden;will-change:left,width}
+#ln{position:absolute;top:0;width:2px;height:100%;background:#fff;visibility:hidden;z-index:5}
+.pane video{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover}
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <div class="pane" id="pA"></div>
+  <div class="pane" id="pB"></div>
+  <div id="ln"></div>
+</div>
+<script>
+// ===== 設定區 =====
+// 影片素材是示範，使用時請替換（clips[0]=左畫面、clips[1]=右畫面），兩段各自以所在畫面 cover 取景。
+// 畫面被切成左右兩半同時呈現，中間一條白色分隔線（沒有間隙、沒有圓角）。
+// pos 是兩段的取景位置（object-position），要讓各自的主角落在自己那一半的正中間，換素材後請依主角位置調整。
+const CFG = {
+  W: 326, H: 158, FPS: 30, LOOP: 120, DUR: 4,
+  clips: ['media/base.mp4', 'media/base3.mp4'],
+  pos: ['48% 12%', '100% 12%'],     // 兩段的取景位置（object-position）：左段主角約在影片橫向 51%、右段約 75%
+  inStart: 16, inEnd: 40,           // 右畫面由右側滑入的幀
+  split: 0.5, line: 2                // 分割位置（卡片比例）、白色分隔線粗細 px
+};
+// ==================
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const card = $('card'), pA = $('pA'), pB = $('pB');
+if (qs.get('z')) card.style.zoom = qs.get('z');
+if (!qs.get('m')) document.body.style.padding = '20px';
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+const mk = (src, parent, pos) => { const v = document.createElement('video'); v.src = src; v.muted = v.loop = v.playsInline = true; v.preload = 'auto'; v.style.objectPosition = pos; parent.appendChild(v); return v; };
+const vA = mk(CFG.clips[0], pA, CFG.pos[0]), vB = mk(CFG.clips[1], pB, CFG.pos[1]);
+
+function render(t) {
+  const f = (t * CFG.FPS) % CFG.LOOP;
+  const p = easeOut(clamp((f - CFG.inStart) / (CFG.inEnd - CFG.inStart), 0, 1));
+  const sx = CFG.W * CFG.split;                            // 右畫面最終左緣
+  const bx = CFG.W - (CFG.W - sx) * p;                      // 右畫面左緣（由右側滑入）
+  const aw = Math.min(CFG.W, bx);                           // 左畫面被右畫面擠窄（影片隨畫面重新取景）
+    Object.assign(pA.style, { left: "0px", width: aw + "px" });
+  Object.assign(pB.style, { left: bx + "px", width: (CFG.W - bx) + "px" });
+  const ln = $('ln'); ln.style.left = (bx - CFG.line / 2) + "px"; ln.style.width = CFG.line + "px"; ln.style.visibility = f < CFG.inStart ? "hidden" : "visible";
+  pB.style.visibility = f < CFG.inStart ? "hidden" : "visible";
+}
+
+const vids = [vA, vB], main = vA;
+const seekAll = t => vids.forEach(v => { if (Math.abs(v.currentTime - t) > 0.01) v.currentTime = t; });
+const ready = () => Promise.all(vids.map(v => new Promise(r => v.readyState >= 2 ? r() : v.addEventListener('loadeddata', r, { once: true }))));
+if (qs.get('t') !== null) {
+  const t = parseFloat(qs.get('t')); vids.forEach(v => v.pause());
+  ready().then(() => { seekAll(t); render(t); });
+} else {
+  const loop = () => { const t = main.currentTime; vids.forEach(v => { if (v !== main && Math.abs(v.currentTime - t) > 0.06) v.currentTime = t; }); render(t); requestAnimationFrame(loop); };
+  vids.forEach(v => v.play()); requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

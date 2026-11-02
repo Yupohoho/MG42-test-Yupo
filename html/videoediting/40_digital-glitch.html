@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>40 Digital Glitch</title>
+<style>
+html,body{margin:0;background:#0b1118}
+.card{position:relative;width:326px;height:158px;border-radius:12px;overflow:hidden;background:#000}
+#fx{position:absolute;left:0;top:0;width:100%;height:100%}
+video{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;object-position:50% 20%}
+.bar{position:absolute;pointer-events:none}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <filter id="gf" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+    <feTurbulence id="gt" type="fractalNoise" baseFrequency="0 0.06" numOctaves="1" seed="1" result="n"/>
+    <feColorMatrix in="n" type="matrix" values="1.8 0 0 0 -0.4  0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0 1" result="m0"/>
+    <feComponentTransfer in="m0" result="m"><feFuncR type="discrete" tableValues="0 .5 .5 1"/></feComponentTransfer>
+    <feDisplacementMap id="gd" in="SourceGraphic" in2="m" scale="30" xChannelSelector="R" yChannelSelector="G" result="d"/>
+    <feColorMatrix in="d" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="r"/>
+    <feOffset id="go1" in="r" dx="4" result="ro"/>
+    <feColorMatrix in="d" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="g"/>
+    <feColorMatrix in="d" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="b"/>
+    <feOffset id="go2" in="b" dx="-4" result="bo"/>
+    <feBlend in="ro" in2="g" mode="screen" result="rg"/>
+    <feBlend in="rg" in2="bo" mode="screen"/>
+  </filter>
+</svg>
+<div class="card" id="card">
+  <div id="fx">
+    <video id="a" src="media/base4.mp4" muted loop playsinline preload="auto"></video>
+  </div>
+</div>
+<script>
+// ===== 設定區 =====
+// 底圖影片是示範素材，使用時請替換。單一畫面，沒有轉場，只有數位故障（Digital Glitch）：橫向切片位移、RGB 色偏、色塊與橫線，間歇出現。
+const CFG = {
+  W: 326, H: 158, FPS: 30, LOOP: 120,
+  bursts: [                        // 故障段落：起訖幀、強度(0~1)
+    { s: 20, e: 34, i: 1.0 },
+    { s: 34, e: 38, i: 0.35 },
+    { s: 52, e: 56, i: 0.6 },
+    { s: 84, e: 92, i: 0.8 }
+  ],
+  maxShift: 70,                    // 切片位移最大像素
+  maxSplit: 10,                    // RGB 位移最大像素
+  maxBars: 7,                      // 色塊／橫線最多數量
+  barColors: ['#19d9d9', '#ff2a9d', '#ffffff', '#2fe0e0'],
+  dropRate: 0.18                   // 故障段落中，隨機插入乾淨幀的比例
+};
+// ==================
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const card = $('card'), fx = $('fx'), A = $('a');
+if (qs.get('z')) card.style.zoom = qs.get('z');
+if (!qs.get('m')) document.body.style.padding = '20px';
+const hash = n => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+const bars = [];
+for (let i = 0; i < CFG.maxBars; i++) { const d = document.createElement('div'); d.className = 'bar'; card.append(d); bars.push(d); }
+
+function render(t) {
+  const f = Math.floor((t * CFG.FPS) % CFG.LOOP);
+  const seg = CFG.bursts.find(b => f >= b.s && f < b.e);
+  const clean = !seg || hash(f * 3.7) < CFG.dropRate;
+  bars.forEach(d => d.style.display = 'none');
+  if (clean) { fx.style.filter = 'none'; fx.style.transform = 'none'; return; }
+  const i = seg.i * (0.6 + 0.4 * hash(f + 5));
+  $('gt').setAttribute('seed', Math.floor(hash(f) * 200));
+  $('gt').setAttribute('baseFrequency', `0 ${(0.02 + 0.14 * hash(f + 1)).toFixed(3)}`);
+  $('gd').setAttribute('scale', (CFG.maxShift * i * (0.3 + 0.7 * hash(f + 2))).toFixed(1));
+  const dx = (2 + CFG.maxSplit * i * hash(f + 3)).toFixed(1);
+  $('go1').setAttribute('dx', dx); $('go2').setAttribute('dx', -dx);
+  fx.style.filter = 'url(#gf)';
+  fx.style.transform = `translateX(${((hash(f + 4) - 0.5) * 6 * i).toFixed(1)}px)`;
+  const n = Math.round(2 + (CFG.maxBars - 2) * i * hash(f + 6));
+  for (let k = 0; k < n; k++) {
+    const r = j => hash(f * 11 + k * 7 + j);
+    const thin = r(1) < 0.45, w = thin ? CFG.W * (0.4 + 0.6 * r(2)) : 14 + 40 * r(2);
+    Object.assign(bars[k].style, {
+      display: 'block', left: (r(3) * (CFG.W - (thin ? 0 : w)) - (thin ? CFG.W * 0.2 * r(8) : 0)) + 'px', top: (r(4) * CFG.H) + 'px',
+      width: w + 'px', height: (thin ? 1 : 3 + 7 * r(5)) + 'px', background: CFG.barColors[Math.floor(r(6) * CFG.barColors.length)],
+      opacity: (0.6 + 0.4 * r(7)).toFixed(2)
+    });
+  }
+}
+
+const vids = [A], main = A;
+const ready = () => Promise.all(vids.map(v => new Promise(r => v.readyState >= 2 ? r() : v.addEventListener('loadeddata', r, { once: true }))));
+if (qs.get('t') !== null) {
+  const t = parseFloat(qs.get('t')); vids.forEach(v => v.pause());
+  ready().then(() => { vids.forEach(v => v.currentTime = t); render(t); });
+} else {
+  ready().then(() => {
+    const loop = () => { render(main.currentTime); requestAnimationFrame(loop); };
+    vids.forEach(v => v.play()); requestAnimationFrame(loop);
+  });
+}
+</script>
+</body>
+</html>

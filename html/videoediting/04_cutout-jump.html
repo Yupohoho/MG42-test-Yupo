@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>04 Cutout Jump</title>
+<style>
+html,body{margin:0;background:#0b1118}
+.card{position:relative;width:326px;height:158px;border-radius:12px;overflow:hidden;background:#0d1520}
+.layer{position:absolute;left:0;top:0;width:100%;height:100%}
+video{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;object-position:50% 12%}
+#win{position:absolute;left:0;top:0;width:100%;height:100%;overflow:hidden;will-change:clip-path}
+#cut{transform-origin:50% 88%;will-change:transform,filter}
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <div id="win"><video id="bg" src="media/base.mp4" muted loop playsinline preload="auto"></video></div>
+  <video id="cut" class="layer" src="media/cutout.webm" muted loop playsinline preload="auto"></video>
+</div>
+<script>
+// ===== 設定區 =====
+const CFG = {
+  W: 326, H: 158,
+  FPS: 30,
+  LOOP: 120,                 // 4 秒；素材也是 4 秒
+  frame: { l: 0.10, r: 0.10, t: 0.12, b: 0.16, radius: 10 }, // 框內縮（卡片比例）
+  shrinkStart: 10, shrinkEnd: 30,   // 滿版縮成框的幀
+  outlineStart: 6, outlineEnd: 14,  // 白描邊長出
+  outlinePx: 2,                     // 白描邊粗細（螢幕像素）
+  scaleFrom: 1.0, scaleTo: 1.5,     // 人物放大倍率（以腳底中心為支點）
+  scaleStart: 8, scaleEnd: 110,
+  dim: 0.55, sat: 0.75              // 框內畫面變暗程度、飽和度
+};
+// ==================
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const card = $('card'), bg = $('bg'), cut = $('cut'), win = $('win');
+if (qs.get('z')) card.style.zoom = qs.get('z');
+if (!qs.get('m')) document.body.style.padding = '20px';
+
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const easeIO = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+
+function render(t) {
+  const f = (t * CFG.FPS) % CFG.LOOP;
+  const W = CFG.W, H = CFG.H, F = CFG.frame;
+  // 框：滿版 → 圓角框
+  const p = easeIO(clamp((f - CFG.shrinkStart) / (CFG.shrinkEnd - CFG.shrinkStart), 0, 1));
+  const L = F.l * W * p, R = F.r * W * p, T = F.t * H * p, B = F.b * H * p, rad = F.radius * p;
+  win.style.clipPath = `inset(${T}px ${R}px ${B}px ${L}px round ${rad}px)`;
+  // 框內變暗（滿版時保持原色）
+  const d = 1 - (1 - CFG.dim) * p, s = 1 - (1 - CFG.sat) * p;
+  bg.style.filter = `brightness(${d}) saturate(${s})`;
+  // 人物去背層：放大＋白描邊
+  const sp = easeOut(clamp((f - CFG.scaleStart) / (CFG.scaleEnd - CFG.scaleStart), 0, 1));
+  const sc = CFG.scaleFrom + (CFG.scaleTo - CFG.scaleFrom) * sp;
+  const o = easeOut(clamp((f - CFG.outlineStart) / (CFG.outlineEnd - CFG.outlineStart), 0, 1));
+  const w = (CFG.outlinePx * o / sc).toFixed(2);   // 補償縮放，描邊粗細恆定
+  cut.style.transform = `scale(${sc})`;
+  cut.style.filter = w > 0.01
+    ? `drop-shadow(${w}px 0 0 #fff) drop-shadow(-${w}px 0 0 #fff) drop-shadow(0 ${w}px 0 #fff) drop-shadow(0 -${w}px 0 #fff)`
+    : 'none';
+  // 滿版階段不放大人物：人物與底圖完全重合，避免提早露出
+  cut.style.visibility = f < CFG.outlineStart ? 'hidden' : 'visible';
+}
+
+const tq = qs.get('t');
+function seekBoth(t) { for (const v of [bg, cut]) if (Math.abs(v.currentTime - t) > 0.01) v.currentTime = t; }
+if (tq !== null) {
+  const t = parseFloat(tq);
+  bg.pause(); cut.pause();
+  Promise.all([bg, cut].map(v => new Promise(r => v.readyState >= 2 ? r() : v.addEventListener('loadeddata', r, { once: true }))))
+    .then(() => { seekBoth(t); render(t); });
+} else {
+  const loop = () => {
+    const t = bg.currentTime;
+    if (Math.abs(cut.currentTime - t) > 0.06) cut.currentTime = t;
+    render(t);
+    requestAnimationFrame(loop);
+  };
+  bg.play(); cut.play(); requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>
